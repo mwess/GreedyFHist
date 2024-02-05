@@ -1,0 +1,23 @@
+package: 
+  name: GreefyFHist
+  version: "0.0.1"
+
+source:
+  git_rev: 0.0.1
+  git_url: https://github.com/mwess/GreedyFHist
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - genomedk::greedy-diffeomorphic
+
+  run:
+    - python
+
+test:
+  imports:
+    - 
+
+about:
+  home: https://github.com/mwess/GreedyFHist
