@@ -24,3 +24,5 @@ notebooks/
 out/
 save_directories/
 tmp/
+
+dist

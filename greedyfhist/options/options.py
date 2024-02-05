@@ -1,10 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple
 
 @dataclass
 class Options:
 
-    resolution: Tuple[int, int] = (1024, 1024)
+    resolution: Tuple[int, int] = field(default=(1024, 1024))
     kernel_size: int = 10
     output_directory: str = 'out'
     temporary_directory: str = 'tmp'
@@ -72,7 +72,7 @@ class GreedyOptions:
     cost_function: str = 'ncc'
     iteration_rigid: int = 10000
     ia: str = 'ia_com_init'
-    pyramid_iterations: List[int] = [100, 50, 10]
+    pyramid_iterations: List[int] = field(default=[100, 50, 10])
     n_threads: int = 1
     use_sv: bool = False
     use_svlb: bool = False
