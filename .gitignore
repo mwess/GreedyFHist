@@ -25,4 +25,5 @@ out/
 save_directories/
 tmp/
 
-dist
+dist/
+scripts/
