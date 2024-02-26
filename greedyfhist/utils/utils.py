@@ -3,6 +3,7 @@ General utils files. Lowest level of utils. Cannot import from anywhere else in 
 """
 import shlex
 import subprocess
+from typing import Dict, List, Union
 
 
 def call_command(cmd: str):
@@ -15,7 +16,7 @@ def call_command(cmd: str):
     return ret
 
 
-def build_cmd_string(path_to_exec, args):
+def build_cmd_string(path_to_exec: str, args: Dict[str, Union[str, List[str]]]) -> str:
     """Small custom function for collection arguments in a function call."""
     cmd = [path_to_exec]
     for key in args:
@@ -26,7 +27,7 @@ def build_cmd_string(path_to_exec, args):
                 cmd += val
             else:
                 cmd.append(val)
-    cmd = ' '.join(cmd)
+    cmd = ' '.join([str(x) for x in cmd])
     return cmd
 
 

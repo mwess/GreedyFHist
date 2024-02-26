@@ -206,8 +206,10 @@ def map_infs_back(warped_landmarks: pandas.DataFrame, source_landmarks: pandas.D
     """
     infs = (source_landmarks.x_small == np.inf) | (source_landmarks.y_small == np.inf)
     infs = infs.to_numpy()
-    warped_landmarks.x.loc[infs] = np.inf
-    warped_landmarks.y.loc[infs] = np.inf
+    warped_landmarks.loc[infs, 'x'] = np.inf
+    warped_landmarks.loc[infs, 'y'] = np.inf
+    # warped_landmarks.x.loc[infs] = np.inf
+    # warped_landmarks.y.loc[infs] = np.inf
     return warped_landmarks
 
 
@@ -510,10 +512,10 @@ class GreedyFHist:
     def register_(self,
                  moving_img: numpy.array,
                  fixed_img: numpy.array,
-                 options: Optional[Options],
                  moving_img_mask: Optional[numpy.array] = None,
                  fixed_img_mask: Optional[numpy.array] = None,
-                 args: Optional[Dict[Any, Any]] = None) -> Any:
+                 options: Optional[Options] = None,                  
+                 **kwargs: Dict) -> 'RegResult':
         if options is None:
             options = Options()
         # Step 1: Set up all the parameters and filenames as necessary.
@@ -565,8 +567,6 @@ class GreedyFHist:
         fixed_img = resample_by_factor(fixed_img, pre_downsampling_factor)
         if moving_img_mask is None:
             moving_img_mask = self.segmentation_function(moving_img)
-        else:
-            moving_img_mask = options.moving_img_mask
         if fixed_img_mask is None:
             fixed_img_mask = self.segmentation_function(fixed_img)
         # Do padding
@@ -649,7 +649,7 @@ class GreedyFHist:
         path_metrics_full_resolution = os.path.join(path_metrics, 'full_resolution')
 
         create_if_not_exists(path_output)
-        create_if_not_exists(path_temp)
+        # create_if_not_exists(path_temp)
         create_if_not_exists(path_metrics)
         create_if_not_exists(path_metrics_small_resolution)
         create_if_not_exists(path_metrics_full_resolution)
@@ -716,8 +716,7 @@ class GreedyFHist:
                                                      options.greedy_opts,
                                                      output_warp=path_small_warp,
                                                      output_inv_warp=path_small_warp_inv,
-                                                     affine_pre_transform=path_small_affine,
-                                                     additional_args=args)
+                                                     affine_pre_transform=path_small_affine)
         cmdln_returns.append(deformable_reg_ret)
 
         factor = 100 / resample
@@ -756,8 +755,7 @@ class GreedyFHist:
              current_moving_preprocessed.height_original),
             factor)
 
-        if options.remove_temporary_directory:
-            self.__cleanup_temporary_directory(path_temp)
+
         
         # Check those 2
         width_downscale = current_fixed_preprocessed.width / current_fixed_preprocessed.width_original
@@ -799,288 +797,16 @@ class GreedyFHist:
             path_to_small_ref_image=path_to_small_ref_image,
             sub_dir_key=subdir_num
         )
-        return reg_result
-
-    def register_(self,
-                 moving_img: numpy.array,
-                 fixed_img: numpy.array,
-                 moving_img_mask: Optional[numpy.array] = None,
-                 fixed_img_mask: Optional[numpy.array] = None,
-                 args: Optional[Dict[Any, Any]] = None) -> Any:
-        if args is None:
-            args = {}
-        # Step 1: Set up all the parameters and filenames as necessary.
-        path_output = args.get('output_dir', 'out')
-        path_output = join(path_output, 'registrations')
-        path_output, subdir_num = derive_subdir(path_output)
-        create_if_not_exists(path_output)
-        self.path_output = path_output
-        path_temp = args.get('tmp_dir', join(path_output, 'tmp'))
-        clean_if_exists(path_temp)
-        path_temp, _ = derive_subdir(path_temp)
-        create_if_not_exists(path_temp)
-        self.path_temp = path_temp
-        cleanup_temporary_directories = args.get('cleanup_temporary_directories', True)
-        s1 = args.get('s1', 6.0)
-        s2 = args.get('s2', 5.0)
-        resolution = tuple(map(lambda x: int(x), args.get('resolution', (1024, 1024))))
-        kernel = args.get('kernel', 10)
-        iteration_rigid = args.get('iteration_rigid', 10000)
-        affine_init = args.get('ia', 'ia-image-centers')
-        cost_fun = args.get('cost_fun', 'ncc').lower()
-        store_cmdl_returns = args.get('store_cmdl_returns', True)
-        affine_use_denoising = args.get('affine_use_denoising', True)
-        deformable_use_denoising = args.get('deformable_use_denoising', False)
-        pre_downsampling_factor = args.get('pre_downsampling_factor', 1)
-        original_moving_image_size = moving_img.shape
-        original_fixed_image_size = fixed_img.shape
-
-        reg_params = {'s1': s1,
-                      's2': s2,
-                      'iteration_rigid': iteration_rigid,
-                      'resolution': resolution,
-                      'affine_use_denoising': affine_use_denoising,
-                      'deformable_use_denoising': deformable_use_denoising,
-                      'args': args,
-                      'pre_downsampling_factor': pre_downsampling_factor,
-                      'original_moving_image_size': original_moving_image_size,
-                      'original_fixed_image_size': original_fixed_image_size
-                      }
-
-        cmdln_returns = []
-        # try:
-        moving_img = resample_by_factor(moving_img, pre_downsampling_factor)
-        fixed_img = resample_by_factor(fixed_img, pre_downsampling_factor)
-        if moving_img_mask is None:
-            moving_img_mask = self.segmentation_function(moving_img)
-        if fixed_img_mask is None:
-            fixed_img_mask = self.segmentation_function(fixed_img)
-        # Do padding
-        # Missing step: Cropping around Tissue edges before. Remember to add the removed area to warped image later on.
-        cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
-        cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
-        reg_params['cropping_params_mov'] = crop_params_mov
-        reg_params['cropping_params_fix'] = crop_params_fix
-        reg_params['original_shape_fixed_image'] = fixed_img.shape
-        cropped_moving_img = moving_img[crop_params_mov[0]:crop_params_mov[1], crop_params_mov[2]:crop_params_mov[3]]
-        cropped_fixed_img = fixed_img[crop_params_fix[0]:crop_params_fix[1], crop_params_fix[2]:crop_params_fix[3]]
-        # print(cropped_fixed_img.shape, cropped_fixed_mask.shape, fixed_img.shape, fixed_img_mask.shape)        
-        moving_pad, fixed_pad = get_symmetric_padding(cropped_moving_img, cropped_fixed_img)
-        moving_img = pad_asym(cropped_moving_img, moving_pad)
-        fixed_img = pad_asym(cropped_fixed_img, fixed_pad)
-        moving_img_mask = pad_asym(cropped_moving_mask, moving_pad)
-        fixed_img_mask = pad_asym(cropped_fixed_mask, fixed_pad)
-        reg_params['moving_padding'] = moving_pad
-        reg_params['fixed_padding'] = fixed_pad
-        # print(cropped_fixed_img.shape, cropped_fixed_mask.shape, fixed_img.shape, fixed_img_mask.shape)
-        moving_img = apply_mask(moving_img, moving_img_mask)
-        fixed_img = apply_mask(fixed_img, fixed_img_mask)
-
-        resample = resolution[0] / moving_img.shape[0] * 100
-        smoothing = max(int(100 / (2 * resample)), 1)
-        reg_params['resample'] = resample
-        reg_params['smoothing'] = smoothing
-
-        requires_denoising = affine_use_denoising or deformable_use_denoising
-        requires_standard_preprocessing = (not affine_use_denoising) or (not deformable_use_denoising)
-        if requires_denoising:
-            mov_sr = args.get('mov_sr', 30)
-            mov_sp = args.get('mov_sp', 20)
-            moving_img_denoised = denoise_image(moving_img, sp=mov_sp, sr=mov_sr)
-
-            fix_sr = args.get('fix_sr', 30)
-            fix_sp = args.get('fix_sp', 20)
-            fixed_img_denoised = denoise_image(fixed_img, sp=fix_sp, sr=fix_sr)
-
-            moving_denoised_tmp_dir = join(path_temp, 'moving_denoised')
-            create_if_not_exists(moving_denoised_tmp_dir)
-            moving_denoised_preprocessed = preprocess_image(moving_img_denoised, kernel, resolution,
-                                                            smoothing, moving_denoised_tmp_dir)
-            fixed_denoised_tmp_dir = join(path_temp, 'fixed_denoised')
-            create_if_not_exists(fixed_denoised_tmp_dir)
-            fixed_denoised_preprocessed = preprocess_image(fixed_img_denoised, kernel, resolution,
-                                                           smoothing,
-                                                           fixed_denoised_tmp_dir)
-            height = fixed_denoised_preprocessed.height
-        # 1. Set up directories and filenames
-        if requires_standard_preprocessing:
-            # Metrics
-            moving_tmp_dir = join(path_temp, 'moving')
-            create_if_not_exists(moving_tmp_dir)
-            moving_img_preprocessed = preprocess_image(moving_img, kernel, resolution, smoothing,
-                                                       moving_tmp_dir)
-            fixed_tmp_dir = join(path_temp, 'fixed')
-            create_if_not_exists(fixed_tmp_dir)
-            fixed_img_preprocessed = preprocess_image(fixed_img, kernel, resolution, smoothing,
-                                                      fixed_tmp_dir)
-            height = fixed_img_preprocessed.height
-
-        path_metrics = os.path.join(path_output, 'metrics')
-        path_metrics_small_resolution = os.path.join(path_metrics, 'small_resolution')
-        path_metrics_full_resolution = os.path.join(path_metrics, 'full_resolution')
-
-        create_if_not_exists(path_output)
-        create_if_not_exists(path_temp)
-        create_if_not_exists(path_metrics)
-        create_if_not_exists(path_metrics_small_resolution)
-        create_if_not_exists(path_metrics_full_resolution)
-
-        # 3. Registration
-
-        # Affine registration
-        path_small_affine = os.path.join(path_metrics_small_resolution, 'small_affine.mat')
-        offset = int((height + (kernel * 4)) / 10)
-        iteration_vec = [100, 50, 10]
-        reg_params['offset'] = offset
-        reg_params['iteration_vec'] = iteration_vec
-
-        ia_init = ''
-        if affine_init == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
-            # Use Segmentation masks to compute center of mass initialization
-            # Check that masks are np.arrays
-            init_mat_path = os.path.join(path_temp, 'Affine_init.mat')
-            init_mat = com_affine_matrix(fixed_img_mask, moving_img_mask)
-            write_mat_to_file(init_mat, init_mat_path)
-            ia_init = ['-ia', f'{init_mat_path}']
-        elif affine_init == 'ia-image-centers':
-            ia_init = ['-ia-image-centers', '']
-        else:
-            print(f'Unknown ia option: {affine_init}.')
-
-        if affine_use_denoising:
-            current_fixed_preprocessed = fixed_denoised_preprocessed
-            current_moving_preprocessed = moving_denoised_preprocessed
-            fixed_img_path = fixed_denoised_preprocessed.image_path
-            moving_img_path = moving_denoised_preprocessed.image_path
-        else:
-            current_fixed_preprocessed = fixed_img_preprocessed
-            current_moving_preprocessed = moving_img_preprocessed
-            fixed_img_path = fixed_img_preprocessed.image_path
-            moving_img_path = moving_img_preprocessed.image_path
-
-        aff_ret = affine_registration(self.path_to_greedy,
-                                      fixed_img_path,
-                                      moving_img_path,
-                                      path_small_affine,
-                                      offset,
-                                      iteration_vec,
-                                      iteration_rigid,
-                                      cost_fun,
-                                      ia=ia_init,
-                                      kernel=kernel)
-        # TODO: Add error handling for affine and deformable registration.
-
-        cmdln_returns.append(aff_ret)
-
-        # Diffeomorphic
-        if affine_use_denoising and not deformable_use_denoising:
-            # Map paths back
-            fixed_img_path = fixed_img_preprocessed.image_path
-            moving_img_path = moving_img_preprocessed.image_path
-            current_fixed_preprocessed = fixed_img_preprocessed
-            current_moving_preprocessed = moving_img_preprocessed
-
-        path_small_warp = os.path.join(path_metrics_small_resolution, 'small_warp.nii.gz')
-        path_small_warp_inv = os.path.join(path_metrics_small_resolution, 'small_inv_warp.nii.gz')
-
-        deformable_reg_ret = deformable_registration(self.path_to_greedy,
-                                                     fixed_img_path,
-                                                     moving_img_path,
-                                                     cost_fun,
-                                                     kernel,
-                                                     iteration_vec,
-                                                     s1,
-                                                     s2,
-                                                     output_warp=path_small_warp,
-                                                     output_inv_warp=path_small_warp_inv,
-                                                     affine_pre_transform=path_small_affine,
-                                                     additional_args=args)
-        cmdln_returns.append(deformable_reg_ret)
-
-        factor = 100 / resample
-        reg_params['factor'] = factor
-
-        path_affine = os.path.join(path_metrics_full_resolution, 'Affine.mat')
-        rescale_affine(path_small_affine, path_affine, factor)
-
-        reg_params['WIDTH_small_fixed'] = current_fixed_preprocessed.width
-        reg_params['HEIGHT_small_fixed'] = current_fixed_preprocessed.height
-        reg_params['WIDTH_fixed_image_padded'] = current_fixed_preprocessed.width_padded
-        reg_params['HEIGHT_fixed_image_padded'] = current_fixed_preprocessed.height_padded
-        reg_params['WIDTH_fixed_image'] = current_fixed_preprocessed.width_original
-        reg_params['HEIGHT_fixed_image'] = current_fixed_preprocessed.height_original
-
-        path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
-        rescale_warp(path_small_warp,
-                     path_big_warp,
-                     (current_fixed_preprocessed.width, current_fixed_preprocessed.height),
-                     (current_fixed_preprocessed.width_original,
-                      current_fixed_preprocessed.height_original),
-                     factor)
-        reg_params['WIDTH_small_moving'] = current_moving_preprocessed.width
-        reg_params['HEIGHT_small_moving'] = current_moving_preprocessed.height
-        reg_params['WIDTH_moving_image_padded'] = current_moving_preprocessed.width_padded
-        reg_params['HEIGHT_moving_image_padded'] = current_moving_preprocessed.height_padded
-        reg_params['WIDTH_moving_image'] = current_moving_preprocessed.width_original
-        reg_params['HEIGHT_moving_image'] = current_moving_preprocessed.height_original
-
-        path_big_warp_inv = os.path.join(path_metrics_full_resolution, 'big_warp_inv.nii.gz')
-        rescale_warp(
-            path_small_warp_inv,
-            path_big_warp_inv,
-            (current_moving_preprocessed.width, current_moving_preprocessed.height),
-            (current_moving_preprocessed.width_original,
-             current_moving_preprocessed.height_original),
-            factor)
-
-        if cleanup_temporary_directories:
-            self.__cleanup_temporary_directory(path_temp)
         
-        # Check those 2
-        width_downscale = current_fixed_preprocessed.width / current_fixed_preprocessed.width_original
-        height_downscale = current_fixed_preprocessed.height / current_fixed_preprocessed.height_original
-
-        reg_params['width_downscaling_factor'] = width_downscale
-        reg_params['height_downscaling_factor'] = height_downscale
-
-        # Write small ref image to file for warping of coordinates
-        small_moving = sitk.ReadImage(current_moving_preprocessed.image_path)
-        empty_moving_img = small_moving[:,:]
-        empty_moving_img[:,:] = 0
-        path_to_small_ref_image = join(path_output, 'small_ref_image.nii.gz')
-        sitk.WriteImage(empty_moving_img, path_to_small_ref_image)
-
-        reg_param_outpath = os.path.join(path_output, 'reg_params.json')
-        with open(reg_param_outpath, 'w') as f:
-            json.dump(reg_params, f)
-
-        if store_cmdl_returns:
-            cmd_output = os.path.join(path_output, 'cmdl_returns.txt')
-            with open(cmd_output, 'w') as f:
-                for ret in cmdln_returns:
-                    f.write(f'{ret}\n')
-
-        reg_result = RegResult(
-            path_to_small_affine=path_small_affine,
-            path_to_big_affine=path_affine,
-            path_to_small_warp=path_small_warp,
-            path_to_big_warp=path_big_warp,
-            path_to_small_inv_warp=path_small_warp_inv,
-            path_to_big_inv_warp=path_big_warp_inv,
-            width_downscaling_factor=width_downscale,
-            height_downscaling_factor=height_downscale,
-            path_to_small_moving=current_moving_preprocessed.image_path,
-            path_to_small_fixed=current_fixed_preprocessed.image_path,
-            cmdl_log=cmdln_returns,
-            reg_params=reg_params,
-            path_to_small_ref_image=path_to_small_ref_image,
-            sub_dir_key=subdir_num
-        )
+        if options.remove_temporary_directory:
+            self.__cleanup_temporary_directory(path_temp)        
+        
         return reg_result
 
     def register_multi_image(self,
                              image_mask_list: List[Tuple[numpy.array, Optional[numpy.array]]],
-                             args):
+                             options: Optional[Options] = None,
+                             **kwargs: Dict):
         moving_image, moving_mask = image_mask_list[0]
         reg_results = OrderedDict()
         for (fixed_image, fixed_mask) in image_mask_list:
@@ -1088,8 +814,14 @@ class GreedyFHist:
                                         fixed_image,
                                         moving_mask,
                                         fixed_mask,
-                                        args)
-            reg_results[reg_results.sub_dir_key] = reg_result
+                                        options,
+                                        **kwargs)
+            image_transform_result = self.transform_image_(moving_image, reg_result, 'LINEAR')
+            moving_image = image_transform_result.registered_image
+            if moving_mask is not None:
+                mask_transform_result = self.transform_image_(moving_mask, reg_result, 'NN')
+                moving_mask = mask_transform_result.registered_image
+            reg_results[reg_result.sub_dir_key] = reg_result
         multi_reg_result = MultiRegResult(reg_results=reg_results)
         return multi_reg_result
 
@@ -1097,17 +829,15 @@ class GreedyFHist:
                         image: numpy.array,
                         transformation: MultiRegResult,
                         interpolation_mode: str,
-                        args: Optional[Dict[Any, Any]] = None) -> Any:
-        if args is None:
-            args = {}
-        tmp_dir = args.get('tmp_dir', 'tmp')
+                        **kwargs: Dict) -> 'MultiImageTransformationResult':
+        tmp_dir = kwargs.get('tmp_dir', 'tmp')
         transformed_image = image.copy()
         transformation_results = []
         for key in transformation.reg_results:
             sub_transform = transformation.reg_results[key]
-            sub_args = args.copy()
+            sub_args = kwargs.copy()
             sub_args['tmp_dir'] = f'{tmp_dir}/{key}'
-            transformation_result = self.transform_image_(transformed_image, sub_transform, interpolation_mode, sub_args)
+            transformation_result = self.transform_image_(transformed_image, sub_transform, interpolation_mode, **sub_args)
             transformed_image = transformation_result.registered_image
             transformation_results.append(transformation_result)
         multi_image_transform_result = MultiImageTransformationResult(transformation_results, transformation_results[-1])
@@ -1118,13 +848,11 @@ class GreedyFHist:
                    image: numpy.array,
                    transformation: RegResult,
                    interpolation_mode: str,
-                   args: Optional[Dict[Any, Any]] = None) -> Any:
+                   **kwargs: Dict) -> Any:
         # TODO: Is this command just copying images into a new folder?
-        if args is None:
-            args = {}
-        tmp_dir = args.get('tmp_dir', 'tmp')
+        tmp_dir = kwargs.get('tmp_dir', 'tmp')
         create_if_not_exists(tmp_dir)
-        remove_temp_directory = args.get('remove_temp_directory', True)
+        remove_temp_directory = kwargs.get('remove_temp_directory', True)
         output_image_path = join(tmp_dir, 'registered_image.nii.gz')
         image_dtype = image.dtype
         out_image_pixel_type = sitk.sitkUInt64 if image.dtype.name == 'uint64' else -1
@@ -1161,7 +889,7 @@ class GreedyFHist:
         transforms = [transformation.path_to_big_warp, transformation.path_to_big_affine]
         warp_params['transforms'] = transforms
         # interpolation_mode = args.get('interpolation_mode', 'LINEAR')
-        rb = args.get('rb', 0)
+        rb = kwargs.get('rb', 0)
         warp_params['interpolation_mode'] = interpolation_mode
         big_reslice_args = {}
         big_reslice_args['-r'] = transforms
@@ -1204,9 +932,9 @@ class GreedyFHist:
         return transform_ret
 
     def transform_pointset(self,
-                              pointset: pandas.DataFrame,
-                              transformation: MultiRegResult,
-                              args:Dict[str, Any]=None) -> 'MultiPointCloudTransformationResult':
+                           pointset: pandas.DataFrame,
+                           transformation: MultiRegResult,
+                           **kwargs: Dict) -> 'MultiPointCloudTransformationResult':
         """Transforms pointset. Can be applied to chained registrations.
 
         Args:
@@ -1217,16 +945,14 @@ class GreedyFHist:
         Returns:
             Any: _description_
         """
-        if args is None:
-            args = {}
-        tmp_dir = args.get('tmp_dir', 'tmp')
+        tmp_dir = kwargs.get('tmp_dir', 'tmp')
         transformed_coordinates = pointset.copy()
         transformation_results = []
         for key in transformation.reg_results:
             sub_transform = transformation.reg_results[key]
-            sub_args = args.copy()
+            sub_args = kwargs.copy()
             sub_args['tmp_dir'] = f'{tmp_dir}/{key}'
-            transformation_result = self.transform_pointset_(transformed_coordinates, sub_transform, sub_args)
+            transformation_result = self.transform_pointset_(transformed_coordinates, sub_transform, **sub_args)
             transformed_coordinates = transformation_result.pointcloud
             transformation_results.append(transformation_result)
         multi_image_transform_result = MultiPointCloudTransformationResult(transformation_results, transformation_results[-1])
@@ -1236,7 +962,7 @@ class GreedyFHist:
     def transform_pointset_(self,
                          pointset: pandas.DataFrame,
                          transformation: RegResult,
-                         args=None) -> Any:
+                         **kwargs) -> Any:
         """Transform pointset. 
 
         Args:
@@ -1247,12 +973,10 @@ class GreedyFHist:
         Returns:
             Any: _description_
         """
-        if args is None:
-            args = {}
-        tmp_dir = args.get('tmp_dir', 'tmp')
-        output_path = args.get('output_path', join(tmp_dir, 'registered_pc.csv'))
+        tmp_dir = kwargs.get('tmp_dir', 'tmp')
+        output_path = kwargs.get('output_path', join(tmp_dir, 'registered_pc.csv'))
         create_if_not_exists(tmp_dir)
-        remove_temp_directory = args.get('remove_temp_directory', True)
+        remove_temp_directory = kwargs.get('remove_temp_directory', True)
         path_landmarks = os.path.join(tmp_dir, 'coordinates.csv')
         pre_downsampling_factor = transformation.reg_params['pre_downsampling_factor']
         pointset = scale_table(pointset, pre_downsampling_factor)
@@ -1281,9 +1005,9 @@ class GreedyFHist:
         return transform_res
 
     def transform_geojson(self,
-                          geojson_data: geojson.Geojson,
+                          geojson_data: geojson.GeoJSON,
                           transformation: MultiRegResult,
-                          args=None) -> 'MultiGeojsonTransformationResult':
+                          **kwargs) -> 'MultiGeojsonTransformationResult':
         """Transforms geojson data using the computed transformation.
 
         Args:
@@ -1294,10 +1018,9 @@ class GreedyFHist:
         Returns:
             MultiGeojsonTransformationResult: Warped geojson data. 
         """
-        args = args if args is not None else {}
         geojson_data = copy.deepcopy(geojson_data)
         geo_df = geojson_2_table(geojson_data)
-        transform_result = self.transform_pointset(geo_df, transformation, args)
+        transform_result = self.transform_pointset(geo_df, transformation, **kwargs)
         warped_geo_coordinates_df = transform_result.final_transform
         warped_geo_df = geo_df.copy()
         warped_geo_df.x = warped_geo_coordinates_df.pointcloud.iloc[:, 0].to_numpy()
@@ -1306,25 +1029,6 @@ class GreedyFHist:
         geojson_transform_result = GeojsonTransformationResult(warped_geojson, transform_result)
         geojson_multi_transform_result = MultiGeojsonTransformationResult(transform_result.point_cloud_transformation_results, geojson_transform_result)
         return geojson_multi_transform_result
-
-    # def transform_geojson_(self,
-    #                       geojson_data,
-    #                       transformation: RegResult,
-    #                       args=None) -> Any:
-    #     args = args if args is not None else {}
-    #     downscale_factor = args.get('downscale_factor', 1)
-    #     geo_df = geojson_2_table(geojson_data)
-    #     geo_df.rename(columns={0: 'x', 1: 'y'}, inplace=True)
-    #     geo_df = scale_table(geo_df, downscale_factor)
-    #     transform_result = self.transform_coordinates(geo_df, transformation, args)
-    #     warped_geo_df = geo_df.copy()
-    #     warped_geo_df.x = transform_result.pointcloud.iloc[:, 0].to_numpy()
-    #     warped_geo_df.y = transform_result.pointcloud.iloc[:, 1].to_numpy()
-    #     warped_geo_df = scale_table(geo_df, 1 / downscale_factor)
-    #     warped_geojson = convert_table_2_geo_json(geojson_data, warped_geo_df)
-    #     geojson_transform_result = GeojsonTransformationResult(warped_geojson, transform_result)
-    #     return geojson_transform_result
-        
 
     def __cleanup_temporary_directory(self, directory: str) -> None:
         """Removes the temporary directory.

@@ -5,18 +5,20 @@ import json
 import os
 from os.path import exists
 from pathlib import Path
+from typing import Dict, Optional
 
-
+import numpy
 import numpy as np
+import SimpleITK
 import SimpleITK as sitk
 import yaml
 
 
-def create_if_not_exists(path):
+def create_if_not_exists(path: str) -> None:
     Path(path).mkdir(parents=True, exist_ok=True)
 
 
-def write_coordinates_as_vtk(coordinates, output_path):
+def write_coordinates_as_vtk(coordinates: numpy.array, output_path: str) -> None:
     """
     Writes 2d coordinates in vtk format.
     :param coordinates:
@@ -39,7 +41,7 @@ def write_coordinates_as_vtk(coordinates, output_path):
         f.write(content)
 
 
-def read_simple_vtk(path):
+def read_simple_vtk(path: str) -> numpy.array:
     """
     Reads vtk from path. No suitable for general vtk reading.
     :param path:
@@ -58,18 +60,18 @@ def read_simple_vtk(path):
             point_list.append((x, y))
         return np.array(point_list)
 
-def write_mat_to_file(mat, fname):
+def write_mat_to_file(mat: numpy.array, fname: str) -> None:
     out_str = f'{mat[0,0]} {mat[0,1]} {mat[0,2]}\n{mat[1,0]} {mat[1,1]} {mat[1,2]}\n{mat[2,0]} {mat[2,1]} {mat[2,2]}'
     with open(fname, 'w') as f:
         f.write(out_str)
 
-def read_sitk_if_not_none(path):
+def read_sitk_if_not_none(path: str) -> Optional[SimpleITK.SimpleITK.Image]:
     if exists(path):
         return sitk.GetArrayFromImage(sitk.ReadImage(path))
     return None
 
 
-def read_config(path):
+def read_config(path: str) -> Dict:
     with open(path) as f:
         if path.endswith('.json'):
             return json.load(f)

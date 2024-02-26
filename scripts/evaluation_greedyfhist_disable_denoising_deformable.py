@@ -17,11 +17,14 @@ import numpy as np
 import pandas as pd
 
 from greedyfhist.registration import GreedyFHist, get_default_args
+from greedyfhist.options import Options
+from greedyfhist.utils.metrics import compute_tre
+
 
 
 from miit.reg_graph import RegGraph
 from miit.utils.utils import create_if_not_exists, clean_configs
-from miit.utils.metrics import compute_tre, compute_tre_sections_
+# from miit.utils.metrics import compute_tre, compute_tre_sections_
 
 def get_core_names():
     return [x.split('.')[0] for x in os.listdir('../../spami/configs/cores_hr/')]
@@ -92,28 +95,40 @@ def main():
                 sub_dir = join(target_dir, f'{source_idx}_{target_idx}')
                 create_if_not_exists(sub_dir)
                 # args = get_default_args()
-                args = get_default_args()
-                args['resolution'] = reg_config['resolution']
-                args['kernel'] = reg_config['kernel']
-                args['deformable_use_denoising'] = False
+                options = Options()
+                options.resolution = reg_config['resolution']
+                options.greedy_opts.kernel_size = reg_config['kernel']
+                # options.deformable_do_denoising = False
+                options.greedy_opts.n_threads = 32
+                # args = get_default_args()
+                # args['resolution'] = reg_config['resolution']
+                # args['kernel'] = reg_config['kernel']
+                # args['deformable_use_denoising'] = False
+                options.deformable_do_denoising=False
                 start = time.time()
                 output_dir = 'save_directories/temp_nb/'
                 temp_dir = 'save_directories/temp_nb/temp'
-                args['output_dir'] = output_dir
-                
-                if exists(args['output_dir']):
-                    shutil.rmtree(args['output_dir'])
-                create_if_not_exists(args['output_dir'])
-                registration_result = registerer.register(moving_img=source_section.image.data,
-                                                                                 fixed_img=target_section.image.data,
-                                                                                 moving_img_mask=source_section.segmentation_mask.data,
-                                                                                 fixed_img_mask=target_section.segmentation_mask.data,
-                                                                                 args=args)  
-                end = time.time()                
-                warped_section = source_section.warp(registerer, registration_result, args) # Warp section here
+                options.output_directory = output_dir
+                options.temporary_directory = temp_dir
+                # args['output_dir'] = output_dir
 
+                if exists(options.output_directory):
+                    shutil.rmtree(options.output_directory)
+                create_if_not_exists(options.output_directory)
+                registration_result = registerer.register(moving_img=source_section.image.data,
+                                                          fixed_img=target_section.image.data,
+                                                          moving_img_mask=source_section.segmentation_mask.data,
+                                                          fixed_img_mask=target_section.segmentation_mask.data,
+                                                          options=options)
+                end = time.time()
+                transformation_result = registerer.transform_pointset(source_section.landmarks.data, registration_result)
+                warped_pointset = transformation_result.final_transform.pointcloud
+                warped_pointset['label'] = source_section.landmarks.data.label
+                target_pointset = target_section.landmarks.data
+                shape = target_section.image.data.shape
+                mean_rtre, median_rtre, mean_tre, median_tre = compute_tre(target_pointset, warped_pointset, shape)            
                 duration = end - start
-                mean_rtre, median_rtre, mean_tre, median_tre = compute_tre_sections_(target_section, warped_section)
+                # mean_rtre, median_rtre, mean_tre, median_tre = compute_tre_sections_(target_section, warped_section)
                 row = {
                     'core_name': core_name,
                     'fixed_section_id': target_idx,

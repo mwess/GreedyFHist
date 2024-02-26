@@ -29,21 +29,21 @@ def polygon2table(coordinates, id_ = None):
 def point2table(coordinates, id_ = None):
     table = pd.DataFrame(np.array(coordinates)).transpose()
     if id_ is not None:
-        table[id_] = id_
+        table['id'] = id_
     table['type'] = 'Point'
     return table
 
 def multipoint2table(coordinates, id_ = None):
     table = ring2table(coordinates)
     if id_ is not None:
-        table[id_] = id_
+        table['id'] = id_
     table['type'] = 'MultiPoint'
     return table    
 
 def linestring2table(coordinates, id_ = None):
     table = ring2table(coordinates)
     if id_ is not None:
-        table[id_] = id_
+        table['id'] = id_
     table['type'] = 'LineString'
     return table
 
@@ -118,6 +118,9 @@ def convert_table_2_geo_json(geo_template, table):
     for idx, feature in enumerate(geo_template['features']):
         id_ = feature['id']
         sub_df = table[table.id == id_]
+        if sub_df.shape[0] == 0:
+            print(f'Id: {id_} not present in table.')
+            continue
         coords = table2coords(sub_df)
         geo_template['features'][idx]['geometry']['coordinates'] = coords
     return geo_template  
@@ -131,6 +134,9 @@ def geojson_2_table(geojson_fc):
         type_ = geometry['type']
         id_ = row['id']
         coordinates = geometry['coordinates']
+        if len(coordinates[0]) == 0:
+            print(f'Feature: {geometry}, {type_}, {id_} is empty.')
+            continue
         if type_ == 'MultiPolygon':
             table_ = multipolygon2table(coordinates, id_)
         elif type_ == 'Polygon':

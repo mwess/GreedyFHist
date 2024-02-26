@@ -3,21 +3,25 @@ Utils for transformation of image and warp functions.
 """
 import os
 
-from typing import Tuple
+from typing import Optional, Tuple, Union
 
 import cv2
 import numpy
 import numpy as np
 import scipy.ndimage as nd
+import SimpleITK
 import SimpleITK as sitk
 from skimage.transform import resize
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
 
 from greedyfhist.utils.utils import call_command
+from greedyfhist.custom_types import padding_type, image_shape
 
-
-def com_affine_matrix(fixed: numpy.array, moving: numpy.array):
+def com_affine_matrix(fixed: numpy.array, moving: numpy.array) -> numpy.array:
+    """
+    Compute the difference in center of mass between fixed and moving image masks.
+    """
     mat = numpy.eye(3)
     fixed_com = nd.center_of_mass(fixed)
     moving_com = nd.center_of_mass(moving)
@@ -26,7 +30,7 @@ def com_affine_matrix(fixed: numpy.array, moving: numpy.array):
     return mat
 
 # Rescale functions
-def rescale_affine(small_affine_path, big_affine_path, factor):
+def rescale_affine(small_affine_path: str, big_affine_path: str, factor: float) -> None:
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
     # Modify translation vector
@@ -37,8 +41,15 @@ def rescale_affine(small_affine_path, big_affine_path, factor):
         f.write(out_str)
 
 
-def rescale_warp_test(path_to_c2d, small_warp_path, big_warp_path, small_resolution, original_resolution_padded,
-                      original_resolution, factor, temp_path=None, cleanup=True):
+def rescale_warp_test(path_to_c2d: str, 
+                      small_warp_path: str, 
+                      big_warp_path: str, 
+                      small_resolution: image_shape, 
+                      original_resolution_padded: image_shape,
+                      original_resolution: image_shape, 
+                      factor: float, 
+                      temp_path: Optional[str] =None, 
+                      cleanup: bool =True):
     # create a blank image with 1's as background.
 
     WIDTH_small, HEIGHT_small = small_resolution
@@ -106,11 +117,11 @@ def rescale_warp_test(path_to_c2d, small_warp_path, big_warp_path, small_resolut
 
     return cmdln_returns
 
-def rescale_warp(small_warp_path,
-                 big_warp_path,
-                 small_resolution,
-                 original_resolution,
-                 factor):
+def rescale_warp(small_warp_path: str,
+                 big_warp_path: str,
+                 small_resolution: image_shape,
+                 original_resolution: image_shape,
+                 factor: float):
     warp = sitk.GetArrayFromImage(sitk.ReadImage(small_warp_path))
     mask = np.ones((small_resolution[0], small_resolution[1], 2), dtype=np.uint8)
     padding = (warp.shape[0] - small_resolution[0])//2
@@ -120,22 +131,22 @@ def rescale_warp(small_warp_path,
     big_warp_sitk = sitk.GetImageFromArray(big_warp, isVector=True)
     sitk.WriteImage(big_warp_sitk, big_warp_path)
 
-def apply_mask(image, mask):
+def apply_mask(image: numpy.array, mask: numpy.array) -> numpy.array:
     return image * np.expand_dims(mask, -1).astype(np.uint8)
 
 
-def pad_pointcloud(pc, padding: Tuple[int, int, int, int]):
+def pad_pointcloud(pc, padding: padding_type):
     left, _, top, _ = padding
     pc.x = pc.x + left
     pc.y = pc.y + top
     return pc
 
 
-def rescale_image(image, resolution):
+def rescale_image(image: numpy.array, resolution: image_shape) -> numpy.array:
     return cv2.resize(image, (resolution[1], resolution[0]))
 
 
-def get_symmetric_padding(img1, img2):
+def get_symmetric_padding(img1: numpy.array, img2: numpy.array) -> Tuple[padding_type, padding_type]:
     max_size = max(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
     # print(max_size)
     padding_img1 = get_padding_params(img1, max_size)
@@ -143,7 +154,7 @@ def get_symmetric_padding(img1, img2):
     return padding_img1, padding_img2
 
 
-def get_padding_params(img, shape):
+def get_padding_params(img: numpy.array, shape: image_shape):
     pad_x = shape - img.shape[0]
     pad_x_l = pad_x // 2
     pad_x_u = pad_x // 2
@@ -157,7 +168,7 @@ def get_padding_params(img, shape):
     return pad_y_l, pad_y_u, pad_x_l, pad_x_u
 
 
-def denoise_image(image, resolution=512, sp=20, sr=20, maxLevel=2):
+def denoise_image(image: numpy.array, resolution: int =512, sp: int =20, sr: int =20, maxLevel: int =2) -> numpy.array:
     shape = image.shape
     img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     img_hsv = cv2.resize(img_hsv, (resolution, resolution))
@@ -167,7 +178,7 @@ def denoise_image(image, resolution=512, sp=20, sr=20, maxLevel=2):
     return img_denoised
 
 
-def resample_image_with_gaussian(image, resolution, sigma):
+def resample_image_with_gaussian(image: numpy.array, resolution: image_shape, sigma: float):
     image = gaussian(image, sigma, channel_axis=-1)
     image = resize(image, resolution)
     image = rgb2gray(image) * 255
@@ -175,7 +186,7 @@ def resample_image_with_gaussian(image, resolution, sigma):
     return image
 
 
-def resample_image(path_to_c2d, image_path, out, resample_factor, smoothing=None):
+def resample_image(path_to_c2d: str, image_path: str, out: str, resample_factor: float, smoothing: float =None):
     resampling_cmd = f''
     if smoothing is not None:
         resampling_cmd = resampling_cmd + f'-smooth-fast {smoothing}x{smoothing}vox '
@@ -185,7 +196,7 @@ def resample_image(path_to_c2d, image_path, out, resample_factor, smoothing=None
     return ret
 
 
-def pad_image(image, padding, constant_values=0):
+def pad_image(image: numpy.array, padding: padding_type, constant_values: float =0):
     dims = len(image.shape)
     if dims == 2:
         padded_image = np.pad(image, ((padding, padding), (padding, padding)), constant_values=constant_values)
@@ -196,14 +207,14 @@ def pad_image(image, padding, constant_values=0):
     return padded_image
 
 
-def get_symmetric_padding(img1: numpy.array, img2: numpy.array):
+def get_symmetric_padding(img1: numpy.array, img2: numpy.array) -> Tuple[padding_type, padding_type]:
     max_size = max(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
     padding_img1 = get_padding_params(img1, max_size)
     padding_img2 = get_padding_params(img2, max_size)
     return padding_img1, padding_img2
 
 
-def get_padding_params(img: numpy.array, shape: int):
+def get_padding_params(img: numpy.array, shape: int) -> padding_type:
     pad_x = shape - img.shape[0]
     pad_x_l = pad_x // 2
     pad_x_u = pad_x // 2
@@ -217,7 +228,7 @@ def get_padding_params(img: numpy.array, shape: int):
     return pad_y_l, pad_y_u, pad_x_l, pad_x_u
 
 
-def pad_asym(image, padding: Tuple[int, int, int, int], constant_values: int = 0):
+def pad_asym(image: numpy.array, padding: padding_type, constant_values: int = 0) -> numpy.array:
         left, right, top, bottom = padding
         if len(image.shape) == 2:
             image = np.pad(image, ((top, bottom), (left, right)), constant_values=constant_values)
@@ -227,14 +238,14 @@ def pad_asym(image, padding: Tuple[int, int, int, int], constant_values: int = 0
         return image
 
 
-def remove_padding(image, padding: Tuple[int, int, int, int]):
+def remove_padding(image: numpy.array, padding: padding_type) -> numpy.array:
     left, right, top, bottom = padding
     bottom_idx = -bottom if bottom != 0 else image.shape[0]
     right_idx = -right if right != 0 else image.shape[1]
     return image[top:bottom_idx, left:right_idx]
     
 
-def empty_image(resolution, dtype=np.float32):
+def empty_image(resolution: padding_type, dtype=type) -> SimpleITK.SimpleITK.Image:
     img = np.zeros(resolution, dtype=dtype)
     sitk_img = sitk.GetImageFromArray(img)
     direction = tuple(map(lambda x: x*-1, sitk_img.GetDirection()))
@@ -242,7 +253,7 @@ def empty_image(resolution, dtype=np.float32):
     # Do I need to set origin
     return sitk_img
 
-def build_empty_ref_image(sitk_image):
+def build_empty_ref_image(sitk_image: SimpleITK.SimpleITK.Image) -> SimpleITK.SimpleITK.Image:
     shape = (sitk_image.GetWidth(), sitk_image.GetHeight())
     origin = sitk_image.GetOrigin()
     spacing = sitk_image.GetSpacing()
@@ -253,11 +264,11 @@ def build_empty_ref_image(sitk_image):
     empty_img.SetDirection(direction)
     return empty_img
 
-def write_empty_ref_image_to_file(image, path):
+def write_empty_ref_image_to_file(image: SimpleITK.SimpleITK.Image, path: str) -> None:
     empty_image = build_empty_ref_image(image)
     sitk.WriteImage(empty_image, path)
 
-def cropping(mask):
+def cropping(mask: numpy.array) -> Tuple[numpy.array, padding_type]:
     p = np.argwhere(mask == 1)
     min_x = int(np.min(p[:,0]))
     max_x = int(np.max(p[:,0]))
@@ -266,7 +277,7 @@ def cropping(mask):
     cropped_mask = mask[min_x:max_x, min_y:max_y]
     return cropped_mask, (min_x, max_x, min_y, max_y)    
 
-def add_cropped_region(img, original_shape, cropping):
+def add_cropped_region(img: numpy.array, original_shape: image_shape, cropping: padding_type) -> numpy.array:
     rh_x = original_shape[0]-cropping[1]
     rh_y = original_shape[1]-cropping[3]
     if len(img.shape) == 2:
@@ -275,11 +286,11 @@ def add_cropped_region(img, original_shape, cropping):
         img_uncropped = np.pad(img, ((cropping[0], rh_x), (cropping[2], rh_y), (0,0)))
     return img_uncropped
 
-def resample_by_factor(img, factor):
+def resample_by_factor(img: numpy.array, factor: float) -> numpy.array:
     img2 = cv2.resize(img, (int(img.shape[1]//factor), int(img.shape[0]//factor)))
     return img2
 
-def resize_image(img, shape, interpolation='NN'):
+def resize_image(img: numpy.array, shape: image_shape, interpolation: str ='NN') -> numpy.array:
     if interpolation == 'NN':
         interpolation_mode = cv2.INTER_NEAREST
     else:
