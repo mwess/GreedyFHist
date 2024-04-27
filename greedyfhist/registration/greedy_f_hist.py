@@ -39,23 +39,6 @@ from greedyfhist.segmentation.segmenation import load_yolo_segmentation
 from greedyfhist.options import Options, GreedyOptions
 
 
-def get_default_args():
-    return {
-        'kernel': 10,
-        'resolution': (1024, 1024),
-        'use_segmentation_masks': True,
-        'output_dir': 'save_directories/temp_nb/',
-        'tmp_dir': 'save_directories/temp_nb/tmp',
-        'cleanup_temporary_directories': False,
-        'remove_temp_directory': False,
-        'cost_fun': 'WNCC',
-        'ia': 'ia-com-init',
-        'affine_use_denoising': True,
-        'deformable_use_denoising': True,
-        'pre_downsampling_factor': 1
-    }
-
-
 def deformable_registration(path_to_greedy:str,
                             path_fixed_image:str,
                             path_moving_image:str,
@@ -87,7 +70,9 @@ def deformable_registration(path_to_greedy:str,
     # def_args['-m'] = f'NCC {kernel}x{kernel}'
     def_args['-m'] = cost_fun_params
     def_args['-i'] = [path_fixed_image, path_moving_image]
-    def_args['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
+    pyramid_iterations = 'x'.join([str(x) for x in options.deformable_pyramid_iterations])
+    def_args['-n'] = pyramid_iterations
+    # def_args['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
     # def_args['-threads'] = '32'
     def_args['-threads'] = options.n_threads
     def_args['-s'] = [f'{options.s1}vox', f'{options.s2}vox']
@@ -133,7 +118,9 @@ def affine_registration(path_to_greedy: str,
     aff_rgs['-i'] = [path_to_fixed_image, path_to_moving_image]
     aff_rgs['-o'] = path_output
     aff_rgs['-m'] = cost_fun_params
-    aff_rgs['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
+    pyramid_iterations = 'x'.join([str(x) for x in options.affine_pyramid_iterations])
+    # aff_rgs['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
+    aff_rgs['-n'] = pyramid_iterations
     aff_rgs['-threads'] = options.n_threads
     aff_rgs['-dof'] = '12'
     aff_rgs['-search'] = f'{options.iteration_rigid} 180 {offset}'.split()  # Replaced 360 with any for rotation parameter
@@ -316,6 +303,19 @@ class MultiRegResult:
 
     reg_results: Any# TODO: Fix this!!#OrderedDict[Any, Any]#OrderedDict[Any, 'RegResult']
 
+    # TODO: Implement get partial stepwise registration
+    def get_partial_step_transform(self, src_idx, dst_idx):
+        # Gets partial transform from src_idx to dst_idx.
+        # TODO: Would probably be better to not rely on indexing and implement something a bit more robuster.
+        partial_transforms = [self.reg_results[idx] for idx in range(src_idx, dst_idx)]
+        return MultiRegResult(partial_transforms)
+
+    # TODO: Implement function to do groupwise registration!!!!!
+
+    # def store(self, directory):
+    #     # TODO: Check that name is correct.
+    #     pass
+
     @classmethod
     def from_directory(cls, directory):
         sub_dirs = sorted(os.listdir(directory), key=lambda x: int(x))
@@ -342,6 +342,10 @@ class RegResult:
     reg_params: Optional[Any]
     path_to_small_ref_image: str
     sub_dir_key: int
+
+    # def store(self, directory):
+    #     # TODO: Do I even need that??? Would be more of a copy operation.
+    #     pass
 
     @classmethod
     def from_directory(cls, directory):
@@ -471,6 +475,14 @@ def derive_subdir(directory, limit=1000):
     # TODO: Do better error handling here, but who has 1000 sections to register, really?!
     return subdir, subdir_num
 
+# TODO: There is probably a better way to ensure the dtype of the image.
+def correct_img_dtype(img):
+    if np.issubdtype(img.dtype, np.floating):
+        img = (img * 255).astype(np.uint8)
+    else:
+        img = img.astype(np.uint8)
+    return img
+
 @dataclass
 class GreedyFHist:
 
@@ -532,20 +544,10 @@ class GreedyFHist:
         path_temp, _ = derive_subdir(path_temp)
         create_if_not_exists(path_temp)
         self.path_temp = path_temp
-        # cleanup_temporary_directories = args.get('cleanup_temporary_directories', True)
-        # s1 = args.get('s1', 6.0)
-        # s2 = args.get('s2', 5.0)
-        # resolution = tuple(map(lambda x: int(x), args.get('resolution', (1024, 1024))))
-        # affine_init = args.get('ia', 'ia-image-centers')
-        # cost_fun = args.get('cost_fun', 'ncc').lower()
         affine_use_denoising = options.affine_do_denoising
         deformable_use_denoising = options.deformable_do_denoising
         # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
         pre_downsampling_factor = options.pre_downsampling_factor
-        # store_cmdl_returns = args.get('store_cmdl_returns', True)
-        # affine_use_denoising = args.get('affine_use_denoising', True)
-        # deformable_use_denoising = args.get('deformable_use_denoising', False)
-        # pre_downsampling_factor = args.get('pre_downsampling_factor', 1)
         original_moving_image_size = moving_img.shape
         original_fixed_image_size = fixed_img.shape
 
@@ -563,6 +565,11 @@ class GreedyFHist:
 
         cmdln_returns = []
         # try:
+        # Convert to correct format, if necessary
+        # print(moving_img.dtype)
+        moving_img = correct_img_dtype(moving_img)
+        # print(moving_img.dtype)
+        fixed_img = correct_img_dtype(fixed_img)
         moving_img = resample_by_factor(moving_img, pre_downsampling_factor)
         fixed_img = resample_by_factor(fixed_img, pre_downsampling_factor)
         if moving_img_mask is None:
@@ -591,21 +598,17 @@ class GreedyFHist:
         fixed_img = apply_mask(fixed_img, fixed_img_mask)
 
         resample = options.resolution[0] / moving_img.shape[0] * 100
-        smoothing = max(int(100 / (2 * resample)), 1)
+        smoothing = max(int(100 / (2 * resample)), 1) + 1
         reg_params['resample'] = resample
         reg_params['smoothing'] = smoothing
 
         requires_denoising = options.affine_do_denoising or options.deformable_do_denoising
         requires_standard_preprocessing = (not options.affine_do_denoising) or (not options.deformable_do_denoising)
         if requires_denoising:
-            # mov_sr = args.get('mov_sr', 30)
-            # mov_sp = args.get('mov_sp', 20)
             moving_img_denoised = denoise_image(moving_img, 
                                                 sp=options.moving_sr, 
                                                 sr=options.moving_sp)
 
-            # fix_sr = args.get('fix_sr', 30)
-            # fix_sp = args.get('fix_sp', 20)
             fixed_img_denoised = denoise_image(fixed_img, 
                                                sp=options.fixed_sp, 
                                                sr=options.fixed_sr)
@@ -661,7 +664,8 @@ class GreedyFHist:
         offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
         # iteration_vec = [100, 50, 10]
         reg_params['offset'] = offset
-        reg_params['iteration_vec'] = options.greedy_opts.pyramid_iterations
+        reg_params['affine_iteration_vec'] = options.greedy_opts.affine_pyramid_iterations
+        reg_params['deformable_iteration_vec'] = options.greedy_opts.deformable_pyramid_iterations
 
         ia_init = ''
         if options.greedy_opts.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
@@ -765,11 +769,11 @@ class GreedyFHist:
         reg_params['height_downscaling_factor'] = height_downscale
 
         # Write small ref image to file for warping of coordinates
-        small_moving = sitk.ReadImage(current_moving_preprocessed.image_path)
-        empty_moving_img = small_moving[:,:]
-        empty_moving_img[:,:] = 0
+        small_fixed = sitk.ReadImage(current_fixed_preprocessed.image_path)
+        empty_fixed_img = small_fixed[:,:]
+        empty_fixed_img[:,:] = 0
         path_to_small_ref_image = join(path_output, 'small_ref_image.nii.gz')
-        sitk.WriteImage(empty_moving_img, path_to_small_ref_image)
+        sitk.WriteImage(empty_fixed_img, path_to_small_ref_image)
 
         reg_param_outpath = os.path.join(path_output, 'reg_params.json')
         with open(reg_param_outpath, 'w') as f:
@@ -809,7 +813,7 @@ class GreedyFHist:
                              **kwargs: Dict):
         moving_image, moving_mask = image_mask_list[0]
         reg_results = OrderedDict()
-        for (fixed_image, fixed_mask) in image_mask_list:
+        for (fixed_image, fixed_mask) in image_mask_list[1:]:
             reg_result = self.register_(moving_image,
                                         fixed_image,
                                         moving_mask,
@@ -842,6 +846,22 @@ class GreedyFHist:
             transformation_results.append(transformation_result)
         multi_image_transform_result = MultiImageTransformationResult(transformation_results, transformation_results[-1])
         return multi_image_transform_result
+
+    def transform_image_new_(self,
+                             image: numpy.array,
+                             transformation: RegResult,
+                             interpolation_mode: str,
+                             **kwargs: Dict) -> Any:
+        """
+        New implementation for warping data. Should limit dependence on Greedy and would work natively in Python.
+        Probably means that we can throw away a lot of other parameters and Pointset transformation doesnt need the whole downscaling bit.
+        For groupwise, composite ALL transformations to limit interpolation artifacts.
+        Also for groupwise: Reimplement, so that we transform from end to beginning.
+        
+        Method: Load all transformation matrices, composite them using SimpleITK, warp. 
+        """
+        pass
+
 
     # Previously named warp_image
     def transform_image_(self,

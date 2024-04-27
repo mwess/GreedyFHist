@@ -290,9 +290,18 @@ def resample_by_factor(img: numpy.array, factor: float) -> numpy.array:
     img2 = cv2.resize(img, (int(img.shape[1]//factor), int(img.shape[0]//factor)))
     return img2
 
+# def resize_image(img: numpy.array, shape: image_shape, interpolation: str ='NN') -> numpy.array:
+#     if interpolation == 'NN':
+#         interpolation_mode = cv2.INTER_NEAREST
+#     else:
+#         interpolation_mode = cv2.INTER_LINEAR
+#     return cv2.resize(img, (shape[1], shape[0]), interpolation_mode)
+
 def resize_image(img: numpy.array, shape: image_shape, interpolation: str ='NN') -> numpy.array:
     if interpolation == 'NN':
-        interpolation_mode = cv2.INTER_NEAREST
+        # interpolation_mode = cv2.INTER_NEAREST
+        interpolation_mode = 0
     else:
-        interpolation_mode = cv2.INTER_LINEAR
-    return cv2.resize(img, (shape[1], shape[0]), interpolation_mode)
+        # interpolation_mode = cv2.INTER_LINEAR
+        interpolation_mode = 1
+    return resize(img, (shape[0], shape[1]), order=interpolation_mode)

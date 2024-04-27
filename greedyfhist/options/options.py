@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 
 def get_pyramid_iterations():
-    return [100, 50, 10]
+    return [100, 100, 50, 10]
 
 @dataclass
 class GreedyOptions:
@@ -15,7 +15,8 @@ class GreedyOptions:
     cost_function: str = 'ncc'
     iteration_rigid: int = 10000
     ia: str = 'ia-com-init'
-    pyramid_iterations: List[int] = field(default_factory=get_pyramid_iterations)
+    affine_pyramid_iterations: List[int] = field(default_factory=get_pyramid_iterations)
+    deformable_pyramid_iterations: List[int] = field(default_factory=get_pyramid_iterations)
     n_threads: int = 1
     use_sv: bool = False
     use_svlb: bool = False
