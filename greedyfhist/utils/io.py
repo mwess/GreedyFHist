@@ -5,6 +5,7 @@ import json
 import os
 from os.path import exists
 from pathlib import Path
+import shutil
 from typing import Dict, Optional
 
 import numpy
@@ -17,6 +18,9 @@ import yaml
 def create_if_not_exists(path: str) -> None:
     Path(path).mkdir(parents=True, exist_ok=True)
 
+def clean_if_exists(path):
+    if os.path.exists(path):
+        shutil.rmtree(path)
 
 def write_coordinates_as_vtk(coordinates: numpy.array, output_path: str) -> None:
     """
