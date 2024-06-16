@@ -41,6 +41,7 @@ SimpleITK = "^2.2.1"
 stack-data = "^0.6.2"
 tifffile = "^2023.7.10"
 tqdm = "^4.66.1"
+# Remove ultralytics dependency, since we only need opencv for reading the segmentation model
 ultralytics = "^8.0.199"
 
 [tool.poetry.dev-dependencies]
