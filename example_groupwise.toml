@@ -43,6 +43,8 @@ yolo_segmentation_min_size = 5000
 
 image_path = 'image_path1'
 mask_path = 'mask_path1'
+annotation_path = 'annotation_path1'
+geojson_path = 'geojson_path1'
 
 [[input.data]]
 
@@ -53,3 +55,4 @@ mask_path = 'mask_path2'
 
 image_path = 'image_path3'
 mask_path = 'mask_path3'
+

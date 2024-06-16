@@ -6,6 +6,7 @@
 # fixed_mask = FIXED_MASK_PATH
 # path_to_greedy = PATH_TO_GREEDY
 # output_directory = PATH_TO_OUTPUT_DIRECTORY
+# annotation_path = moving_annotation_path
 [options]
 
 temporary_directory = 'tmp'
