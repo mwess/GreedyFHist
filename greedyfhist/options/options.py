@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
-def get_pyramid_iterations():
+def get_3_step_pyramid_iterations():
+    return [100, 50, 10]
+
+def get_4_step_pyramid_iterations():
     return [100, 100, 50, 10]
 
 @dataclass
@@ -15,11 +18,12 @@ class GreedyOptions:
     cost_function: str = 'ncc'
     iteration_rigid: int = 10000
     ia: str = 'ia-com-init'
-    affine_pyramid_iterations: List[int] = field(default_factory=get_pyramid_iterations)
-    deformable_pyramid_iterations: List[int] = field(default_factory=get_pyramid_iterations)
+    affine_pyramid_iterations: List[int] = field(default_factory=get_3_step_pyramid_iterations)
+    deformable_pyramid_iterations: List[int] = field(default_factory=get_4_step_pyramid_iterations)
     n_threads: int = 1
     use_sv: bool = False
     use_svlb: bool = False
+    exp: Optional[int] = None
     # TODO: Parse this option correctly.
     yolo_segmentation_min_size=5000
 
@@ -31,7 +35,7 @@ class GreedyOptions:
         if key in args_dict:
             value = args_dict[key]
             if key in self.__anotations__:
-                self.__setattribute__(key, value)
+                self.__setattr__(key, value)
 
     def to_dict(self):
         d = {}
@@ -53,7 +57,6 @@ def load_default_resolution():
 class Options:
 
     greedy_opts: 'GreedyOptions' = field(default_factory=load_greedyoptions)
-    # greedy_opts: 'GreedyOptions' = field(default_factory=GreedyOptions.load_options())
     resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
     kernel_size: int = 10
     output_directory: str = 'out'
@@ -66,10 +69,10 @@ class Options:
     moving_sp: int = 25
     fixed_sr: int = 30
     fixed_sp: int = 25
-    # padding: int
     pre_downsampling_factor: float = 1
     store_cmdline_returns: bool = True
     remove_temporary_directory: bool = True
+    keep_affine_unbounded: bool = False
 
     
     def __post_init__(self):
@@ -96,7 +99,7 @@ class Options:
         if key in args_dict:
             value = args_dict[key]
             if key in self.__annotations__:
-                self.__setattribute__(key, value)
+                self.__setattr__(key, value)
 
     def to_dict(self):
         d = {}

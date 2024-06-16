@@ -85,8 +85,10 @@ def main():
             # paddings = get_symmetric_padding_for_sections([graph.sections[x] for x in section_ids])
 
             for i in range(len(section_ids)-1):
-                source_idx = section_ids[i]
-                target_idx = section_ids[i+1]
+                # Add a timer for sleeping, since sometimes greedyfhist get weird results 
+                time.sleep(10)
+                source_idx = section_ids[i+1]
+                target_idx = section_ids[i]
                 source_section = graph.sections[source_idx].copy()
                 target_section = graph.sections[target_idx].copy()
                 if source_section.landmarks is None or target_section.landmarks is None:
@@ -121,12 +123,16 @@ def main():
                                                           fixed_img_mask=target_section.segmentation_mask.data,
                                                           options=options)
                 end = time.time()
-                transformation_result = registerer.transform_pointset(source_section.landmarks.data, registration_result)
-                warped_pointset = transformation_result.final_transform.pointcloud
-                warped_pointset['label'] = source_section.landmarks.data.label
+                src_landmarks = source_section.landmarks.data[['x', 'y']].to_numpy()
+                warped_pointset = registerer.transform_pointset(src_landmarks, registration_result.moving_transform)
+                warped_pointset_df = pd.DataFrame(warped_pointset, columns=['x', 'y'])
+                warped_pointset_df['label'] = source_section.landmarks.data.label.copy()
+                # transformation_result = registerer.transform_pointset(source_section.landmarks.data, registration_result)
+                # warped_pointset = transformation_result.final_transform.pointcloud
+                # warped_pointset['label'] = source_section.landmarks.data.label
                 target_pointset = target_section.landmarks.data
                 shape = target_section.image.data.shape
-                mean_rtre, median_rtre, mean_tre, median_tre = compute_tre(target_pointset, warped_pointset, shape)            
+                mean_rtre, median_rtre, mean_tre, median_tre = compute_tre(target_pointset, warped_pointset_df, shape)            
                 duration = end - start
                 # mean_rtre, median_rtre, mean_tre, median_tre = compute_tre_sections_(target_section, warped_section)
                 row = {

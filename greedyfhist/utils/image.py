@@ -40,6 +40,32 @@ def rescale_affine(small_affine_path: str, big_affine_path: str, factor: float) 
     with open(big_affine_path, 'w') as f:
         f.write(out_str)
 
+def rescale_affine_2(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK.Transform:
+    with open(small_affine_path) as f:
+        my_var = list(map(float, f.read().split()))
+    # Modify translation vector
+    new_val_1 = my_var[2] * factor
+    new_val_2 = my_var[5] * factor
+
+    affine_transform = sitk.AffineTransform(2)
+    affine_transform.SetTranslation((new_val_1, new_val_2))
+    affine_transform.SetMatrix((my_var[0], my_var[1], my_var[3], my_var[4]))
+    return affine_transform
+    # out_str = f'{my_var[0]} {my_var[1]} {new_val_1}\n{my_var[3]} {my_var[4]} {new_val_2}\n{my_var[6]} {my_var[7]} {my_var[8]}'
+    # with open(big_affine_path, 'w') as f:
+    #     f.write(out_str)
+
+def invert_affine_transform(transform: SimpleITK.SimpleITK.AffineTransform) -> SimpleITK.SimpleITK.AffineTransform:
+    rotation = transform.GetMatrix()
+    rotation = (rotation[0], -1*rotation[1], -1*rotation[2], rotation[3])
+    translation = transform.GetTranslation()
+    new_tx = -1*translation[0]*rotation[0] - translation[1]*rotation[1]
+    new_ty = -1*translation[1]*rotation[0] + translation[0]*rotation[1]
+    inverted_transform = sitk.AffineTransform(2)
+    inverted_transform.SetMatrix(rotation)
+    inverted_transform.SetTranslation((new_tx, new_ty))
+    return inverted_transform
+
 
 def rescale_warp_test(path_to_c2d: str, 
                       small_warp_path: str, 
@@ -122,13 +148,16 @@ def rescale_warp(small_warp_path: str,
                  small_resolution: image_shape,
                  original_resolution: image_shape,
                  factor: float):
-    warp = sitk.GetArrayFromImage(sitk.ReadImage(small_warp_path))
+    warp_sitk = sitk.ReadImage(small_warp_path)
+    warp = sitk.GetArrayFromImage(warp_sitk)
     mask = np.ones((small_resolution[0], small_resolution[1], 2), dtype=np.uint8)
     padding = (warp.shape[0] - small_resolution[0])//2
     mask = np.pad(mask, ((padding, padding), (padding, padding), (0, 0)))
-    warp_no_pad = (warp + mask)[padding:-padding, padding:-padding]
+    warp_no_pad = (warp)[padding:-padding, padding:-padding]
     big_warp = resize(warp_no_pad, (original_resolution[0], original_resolution[1])) * factor
     big_warp_sitk = sitk.GetImageFromArray(big_warp, isVector=True)
+    big_warp_sitk.SetDirection(warp_sitk.GetDirection())
+    big_warp_sitk.SetOrigin((0,0))
     sitk.WriteImage(big_warp_sitk, big_warp_path)
 
 def apply_mask(image: numpy.array, mask: numpy.array) -> numpy.array:

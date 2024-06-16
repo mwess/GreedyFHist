@@ -1,6 +1,3 @@
-"""
-Contains functionality to segment images
-"""
 import os
 from os.path import join, split
 
@@ -9,13 +6,21 @@ import numpy
 import numpy as np
 from skimage.measure import regionprops, label
 from skimage.restoration import denoise_tv_chambolle
+from skimage.morphology import reconstruction
 # from ultralytics import YOLO
 import onnxruntime as ort
 
-from greedyfhist.segmentation.yolo8_parsing import postprocess_segmentation
+from greedyfhist.segmentation.yolo8_parsing import postprocess
 
 path_to_model = 'data/model/model.onnx'
 
+def fill_hole(mask):
+    seed = np.copy(mask)
+    seed[1:-1, 1:-1] = 1 
+    mask_ = mask 
+
+    filled = reconstruction(seed, mask_, method='erosion')
+    return filled
 
 def preprocess_for_segmentation(image: numpy.array):
     image = cv2.resize(image, (640, 640))
@@ -109,18 +114,21 @@ def load_yolo_segmentation():
     IMAGE_SHAPE = (640, 640)
 
 
-    def _predict(image, min_area_size: int = 500):
+    def _predict(image, min_area_size: int = 10000, fill_holes: bool = True):
         preprocessed_image = preprocess_for_segmentation2(image)
         preprocessed_image = (np.expand_dims(np.moveaxis(preprocessed_image, 2, 0), 0) / 255.).astype(np.float32)
 
         outputs = ort_session.run(output_names, {'images': preprocessed_image}, None)
         # prediction = model(preprocessed_image, task='segment')
-        prediction = postprocess_segmentation(outputs, IMAGE_SHAPE)
+        _, _, prediction = postprocess(outputs, shape=IMAGE_SHAPE)
+        prediction = prediction.astype(np.uint8)
         # mask = prediction[0].masks.data.numpy()
         mask = prediction[0]
         if len(mask.shape) > 2:
             # print('Warning! More than one mask predicted. Using only the first part for now.')
             mask = np.squeeze(mask)
+        if fill_holes:
+            mask = fill_hole(mask)
         filtered_mask = np.zeros_like(mask)
         # Filter out small regions.
         regions = regionprops(label(mask))
@@ -134,4 +142,3 @@ def load_yolo_segmentation():
         # filtered_mask = cv2.resize(filtered_mask, (image.shape[1], image.shape[0]))
         return filtered_mask
     return _predict
-    
