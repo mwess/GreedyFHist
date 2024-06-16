@@ -6,6 +6,7 @@ GreedyFHist - Registration of stained histology images.
 This code needs some more tweaking before it can be used properly. These are the features that will be released within the next 2-4 weeks (i.e. until mid of July):
 
 - Proper installation script (with some information on how to install greedy).
+- Proper documentation
 - Proper command line interface.
 - Tutorial.
 - Maybe some additional features.
