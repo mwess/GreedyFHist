@@ -35,7 +35,7 @@ class GreedyOptions:
         if key in args_dict:
             value = args_dict[key]
             if key in self.__anotations__:
-                self.__setattribute__(key, value)
+                self.__setattr__(key, value)
 
     def to_dict(self):
         d = {}
@@ -57,7 +57,6 @@ def load_default_resolution():
 class Options:
 
     greedy_opts: 'GreedyOptions' = field(default_factory=load_greedyoptions)
-    # greedy_opts: 'GreedyOptions' = field(default_factory=GreedyOptions.load_options())
     resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
     kernel_size: int = 10
     output_directory: str = 'out'
@@ -70,7 +69,6 @@ class Options:
     moving_sp: int = 25
     fixed_sr: int = 30
     fixed_sp: int = 25
-    # padding: int
     pre_downsampling_factor: float = 1
     store_cmdline_returns: bool = True
     remove_temporary_directory: bool = True
@@ -101,7 +99,7 @@ class Options:
         if key in args_dict:
             value = args_dict[key]
             if key in self.__annotations__:
-                self.__setattribute__(key, value)
+                self.__setattr__(key, value)
 
     def to_dict(self):
         d = {}

@@ -46,16 +46,13 @@ class GroupwiseRegResult:
                        no_deformable: bool = False):
         # TODO: At the moment only one direction works.
         transforms = self.affine_transform[source:]
-        if not no_deformable:
+        if self.deformable_transform is not None and len(self.deformable_transform) > 0:
             transforms.append(self.deformable_transform[source])
         # Composite transforms
         composited_fixed_transform = compose_transforms([x.fixed_transform for x in transforms])
         composited_moving_transform = compose_transforms([x.moving_transform for x in transforms][::-1])
         reg_result = RegistrationResult(composited_fixed_transform, composited_moving_transform)
         return reg_result
-
-        
-        
     
 
 @dataclass
@@ -64,6 +61,7 @@ class GFHTransform:
     size: Tuple[int, int]
     transform: SimpleITK.SimpleITK.Transform
 
+    # TODO: Check that path is directory and change name since we are storing to a directory and not to one file.
     def to_file(self, path):
         create_if_not_exists(path)
         attributes = {
@@ -176,124 +174,6 @@ class PreprocessedData:
     height_original: int
     width_original: int
 
-# def compose_reg_transforms(transformation: RegResult) -> SimpleITK.SimpleITK.Image:
-
-#     # TODO: Implement transformation from fixed to moving space in case we want to go in a different direction?
-#     moving_padding = transformation.reg_params['moving_padding']
-#     moving_cropping = transformation.reg_params['cropping_params_mov']
-#     fixed_padding = transformation.reg_params['fixed_padding']
-#     fixed_cropping = transformation.reg_params['cropping_params_fix']
-#     fixed_image_shape = transformation.reg_params['original_fixed_image_size']
-
-#     all_transforms = sitk.CompositeTransform(2)
-#     aff_trans1 = sitk.TranslationTransform(2)
-#     offset_x = -moving_padding[0]
-#     offset_y = -moving_padding[2]
-#     aff_trans1.SetOffset((offset_x, offset_y))
-    
-#     aff_trans2 = sitk.TranslationTransform(2)
-#     offset_x = moving_cropping[2]
-#     offset_y = moving_cropping[0]
-#     aff_trans2.SetOffset((offset_x, offset_y))
-#     displ_field = sitk.Image(transformation.displacement_field)
-
-#     rotated_displ_field = sitk.GetArrayFromImage(displ_field)
-#     rotated_displ_field *= -1
-#     # moving_padded_cropping = transformation.reg_params['cropped_padded_mov_mask']
-#     # rotated_displ_field[moving_padded_cropping[0]:moving_padded_cropping[1], moving_padded_cropping[2]: moving_padded_cropping[3]]  = 0
-#     # Set areas outside moving image region to zero.
-#     # left_bound = moving_cropping[2] - moving_padding[0]
-#     # right_size = rotated_displ_field.shape[0]
-#     # right_bound = right_size - moving_padding[1] + moving_cropping[1]
-#     # rotated_displ_field[]
-#     # TODO: Set areas cropped out during registration to 0.
-#     rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-#     displ_field = sitk.Image(rotated_displ_field_sitk) 
-#     displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-
-#     displ_transform = sitk.DisplacementFieldTransform(2)
-#     displ_transform.SetDisplacementField(displ_field)
-
-#     aff_trans3 = sitk.TranslationTransform(2)
-#     aff_trans3.SetOffset((-fixed_cropping[2], -fixed_cropping[0]))
-    
-#     aff_trans4 = sitk.TranslationTransform(2)
-#     aff_trans4.SetOffset((fixed_padding[0], fixed_padding[2]))
-
-#     all_transforms.AddTransform(aff_trans1)
-#     all_transforms.AddTransform(aff_trans2)
-#     all_transforms.AddTransform(displ_transform)
-#     all_transforms.AddTransform(aff_trans3)
-#     all_transforms.AddTransform(aff_trans4)
-
-#     df_forward_filter = sitk.TransformToDisplacementFieldFilter()
-#     df_forward_filter.SetOutputDirection((1,0,0,1))
-#     df_forward_filter.SetOutputOrigin((0,0))
-#     df_forward_filter.SetOutputSpacing((1.0,1.0))
-#     df_forward_filter.SetReferenceImage(sitk.GetImageFromArray(np.zeros((fixed_image_shape)), True))
-#     forward_displacement_field = df_forward_filter.Execute(all_transforms)
-
-#     return forward_displacement_field
-
-
-# def compose_inv_reg_transforms(transformation: RegResult) -> SimpleITK.SimpleITK.Image:
-
-#     moving_padding = transformation.reg_params['moving_padding']
-#     moving_cropping = transformation.reg_params['cropping_params_mov']
-#     fixed_padding = transformation.reg_params['fixed_padding']
-#     fixed_cropping = transformation.reg_params['cropping_params_fix']
-#     moving_image_shape = transformation.reg_params['original_moving_image_size']
-    
-#     all_transforms = sitk.CompositeTransform(2)
-#     aff_trans1 = sitk.TranslationTransform(2)
-#     offset_x = moving_padding[0]
-#     offset_y = moving_padding[2]
-#     aff_trans1.SetOffset((offset_x, offset_y))
-    
-#     aff_trans2 = sitk.TranslationTransform(2)
-#     offset_x = -moving_cropping[2]
-#     offset_y = -moving_cropping[0]
-#     aff_trans2.SetOffset((offset_x, offset_y))
-
-#     displ_field = sitk.Image(transformation.inv_displacement_field)
-
-#     rotated_displ_field = sitk.GetArrayFromImage(displ_field)
-#     rotated_displ_field *= -1
-#     rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-#     rotated_displ_field_sitk.SetOrigin((0,0))
-#     rotated_displ_field_sitk.SetDirection((1,0,0,1))
-#     rotated_displ_field_sitk.SetSpacing((1.0, 1.0))
-#     displ_field = sitk.Image(rotated_displ_field_sitk) 
-#     displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-
-#     displ_transform = sitk.DisplacementFieldTransform(2)
-#     displ_transform.SetDisplacementField(displ_field)
-
-#     aff_trans3 = sitk.TranslationTransform(2)
-#     aff_trans3.SetOffset((fixed_cropping[2], fixed_cropping[0]))
-    
-#     aff_trans4 = sitk.TranslationTransform(2)
-#     aff_trans4.SetOffset((-fixed_padding[0], -fixed_padding[2]))
-
-#     all_transforms.AddTransform(aff_trans4)
-#     all_transforms.AddTransform(aff_trans3)
-#     all_transforms.AddTransform(displ_transform)
-#     all_transforms.AddTransform(aff_trans2)
-#     all_transforms.AddTransform(aff_trans1)
-
-#     df_forward_filter = sitk.TransformToDisplacementFieldFilter()
-#     df_forward_filter.SetOutputDirection((1,0,0,1))
-#     df_forward_filter.SetOutputOrigin((0,0))
-#     df_forward_filter.SetOutputSpacing((1.0,1.0))
-#     df_forward_filter.SetReferenceImage(sitk.GetImageFromArray(np.zeros((moving_image_shape)), True))
-#     displacement_field = df_forward_filter.Execute(all_transforms)
-#     return displacement_field
-
-
-# def compute_transforms(transformation: RegResult) -> Tuple[SimpleITK.SimpleITK.Image, SimpleITK.SimpleITK.Image]:
-#     forward_displacement_field = compose_reg_transforms(transformation)
-#     backward_displacement_field = compose_inv_reg_transforms(transformation)
-#     return forward_displacement_field, backward_displacement_field
 
 # TODO: Write a sub function that just works with simpleitk transforms.
 def composite_sitk_transforms(transforms: List[SimpleITK.SimpleITK.Transform]) -> SimpleITK.SimpleITK.Transform:
@@ -331,24 +211,6 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     offset_y = moving_cropping[0]
     aff_trans2.SetOffset((offset_x, offset_y))
 
-    # displ_field = sitk.Image(transformation.displacement_field)
-    # rotated_displ_field = sitk.GetArrayFromImage(displ_field)
-    # rotated_displ_field *= -1
-    # # moving_padded_cropping = transformation.reg_params['cropped_padded_mov_mask']
-    # # rotated_displ_field[moving_padded_cropping[0]:moving_padded_cropping[1], moving_padded_cropping[2]: moving_padded_cropping[3]]  = 0
-    # # Set areas outside moving image region to zero.
-    # # left_bound = moving_cropping[2] - moving_padding[0]
-    # # right_size = rotated_displ_field.shape[0]
-    # # right_bound = right_size - moving_padding[1] + moving_cropping[1]
-    # # rotated_displ_field[]
-    # # TODO: Set areas cropped out during registration to 0.
-    # rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-    # displ_field = sitk.Image(rotated_displ_field_sitk) 
-    # displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-
-    # displ_transform = sitk.DisplacementFieldTransform(2)
-    # displ_transform.SetDisplacementField(displ_field)
-
     aff_trans3 = sitk.TranslationTransform(2)
     aff_trans3.SetOffset((-fixed_cropping[2], -fixed_cropping[0]))
     
@@ -357,20 +219,10 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
 
     all_transforms.AddTransform(aff_trans1)
     all_transforms.AddTransform(aff_trans2)
-    # all_transforms.AddTransform(displ_transform)
     all_transforms.AddTransform(transform)
     all_transforms.AddTransform(aff_trans3)
     all_transforms.AddTransform(aff_trans4)
     return all_transforms
-
-    # df_forward_filter = sitk.TransformToDisplacementFieldFilter()
-    # df_forward_filter.SetOutputDirection((1,0,0,1))
-    # df_forward_filter.SetOutputOrigin((0,0))
-    # df_forward_filter.SetOutputSpacing((1.0,1.0))
-    # df_forward_filter.SetReferenceImage(sitk.GetImageFromArray(np.zeros((fixed_image_shape)), True))
-    # forward_displacement_field = df_forward_filter.Execute(all_transforms)
-
-    # return forward_displacement_field
 
 
 def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
@@ -393,19 +245,6 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     offset_y = -moving_cropping[0]
     aff_trans2.SetOffset((offset_x, offset_y))
 
-    # displ_field = sitk.Image(transformation.inv_displacement_field)
-    # rotated_displ_field = sitk.GetArrayFromImage(displ_field)
-    # rotated_displ_field *= -1
-    # rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-    # rotated_displ_field_sitk.SetOrigin((0,0))
-    # rotated_displ_field_sitk.SetDirection((1,0,0,1))
-    # rotated_displ_field_sitk.SetSpacing((1.0, 1.0))
-    # displ_field = sitk.Image(rotated_displ_field_sitk) 
-    # displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-
-    # displ_transform = sitk.DisplacementFieldTransform(2)
-    # displ_transform.SetDisplacementField(displ_field)
-
     aff_trans3 = sitk.TranslationTransform(2)
     aff_trans3.SetOffset((fixed_cropping[2], fixed_cropping[0]))
     
@@ -419,14 +258,6 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     all_transforms.AddTransform(aff_trans2)
     all_transforms.AddTransform(aff_trans1)
     return all_transforms
-
-    # df_forward_filter = sitk.TransformToDisplacementFieldFilter()
-    # df_forward_filter.SetOutputDirection((1,0,0,1))
-    # df_forward_filter.SetOutputOrigin((0,0))
-    # df_forward_filter.SetOutputSpacing((1.0,1.0))
-    # df_forward_filter.SetReferenceImage(sitk.GetImageFromArray(np.zeros((moving_image_shape)), True))
-    # displacement_field = df_forward_filter.Execute(all_transforms)
-    # return displacement_field
 
 
 def compute_transforms(transformation: RegResult) -> Tuple[SimpleITK.SimpleITK.Transform, SimpleITK.SimpleITK.Transform]:
@@ -531,7 +362,6 @@ class GreedyFHist:
                  options: Optional[Options] = None,                  
                  **kwargs: Dict) -> 'RegResult':
         # TODO: We only need a temp directory now, so get rid of output.
-        # TODO: Commandline output should be dealt with by logging.
         if options is None:
             options = Options()
         # Step 1: Set up all the parameters and filenames as necessary.
@@ -658,7 +488,6 @@ class GreedyFHist:
         create_if_not_exists(path_metrics_full_resolution)
 
         # 3. Registration
-
         # Affine registration
         offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
         reg_params['offset'] = offset
@@ -724,11 +553,16 @@ class GreedyFHist:
                                                          output_inv_warp=path_small_warp_inv,
                                                          affine_pre_transform=path_small_affine,
                                                          ia=ia_init)
+            # TODO: Improve error handling
+            if deformable_reg_ret.returncode != 0:
+                print(deformable_reg_ret.args)
+                print(deformable_reg_ret.stderr)
+                return
             cmdln_returns.append(deformable_reg_ret)
         else:
             path_small_warp = None
             path_small_warp_inv = None
-        
+
         # Post processing
         # TODO: Most of these are not needed anymore.
         reg_params['WIDTH_small_fixed'] = current_fixed_preprocessed.width
@@ -799,7 +633,7 @@ class GreedyFHist:
             displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
             forward_transform = sitk.DisplacementFieldTransform(2)
             forward_transform.SetDisplacementField(displ_field)
-
+            
             inv_displacement_field = sitk.ReadImage(path_big_composite_warp_inv, sitk.sitkVectorFloat64)
             rotated_displ_field = sitk.GetArrayFromImage(inv_displacement_field)
             rotated_displ_field *= -1
@@ -849,9 +683,6 @@ class GreedyFHist:
             inv_displacement_field=inv_displacement_field
         )
 
-        # forward_displacement_field, backward_displacement_field = compute_transforms(reg_result)
-        # forward_transform, backward_transform = compute_transforms(reg_result)
-
         # TODO: For affine transforms: Write function to convert all 5 transforms into a single transform.
         # TODO: Add option to compress all 5 transforms into a single displacement field.
         composited_forward_transform = compose_reg_transforms(forward_transform, reg_result)
@@ -863,8 +694,6 @@ class GreedyFHist:
         
         if options.remove_temporary_directory:
             self.__cleanup_temporary_directory(path_temp)        
-        
-        # return forward_displacement_field, backward_displacement_field
         return registration_result
 
     def groupwise_registration(self,
@@ -878,17 +707,16 @@ class GreedyFHist:
             affine_options.deformable_do_registration = False
         if nonrigid_option is None:
             nonrigid_option = Options()
-            nonrigid_option.affine_do_registration = False
+        nonrigid_option.affine_do_registration = False
         # Stage1: Affine register along the the sequence.
         moving_image, moving_mask = image_mask_list[0]
         # TODO: Do i really need to do that?
         # Need masks only for the deformable registration part, since the moving images are pretransformed there.
-        if moving_mask is None:
-            seg_fun = load_yolo_segmentation()
-            moving_mask = seg_fun(moving_image)
-            print(moving_mask.shape)
-        warped_image = moving_image.copy()
-        warped_mask = moving_mask.copy()
+        # if moving_mask is None:
+        #     seg_fun = load_yolo_segmentation()
+        #     moving_mask = seg_fun(moving_image)
+        # warped_image = moving_image.copy()
+        # warped_mask = moving_mask.copy()
         # Need to get mask is None supplied
         # First do affine swipe
         registered_images = []
@@ -903,13 +731,13 @@ class GreedyFHist:
             # map_to_transforms[rev_idx] = (forward, backward)
             moving_image = fixed_image
             moving_mask = fixed_mask
-            warped_image = self.transform_image_(warped_image, reg_result.fixed_transform.transform, reg_result.fixed_transform.size, 'LINEAR')
-            warped_mask = self.transform_image_(warped_mask, reg_result.fixed_transform.transform, reg_result.fixed_transform.size, 'NN')
-            registered_images.append(warped_image)
+            # warped_image = self.transform_image_(warped_image, reg_result.fixed_transform.transform, reg_result.fixed_transform.size, 'LINEAR')
+            # warped_mask = self.transform_image_(warped_mask, reg_result.fixed_transform.transform, reg_result.fixed_transform.size, 'NN')
+            # registered_images.append(warped_image)
         # Stage 2: Take the matched images and do a nonrigid registration
         if skip_deformable_registration:
-            # Think about what to return
-            pass
+            g_res = GroupwiseRegResult(affine_transform_lists, [])
+            return g_res, registered_images
         nonrigid_transformations = []
         nonrigid_warped_images = []
         fixed_image, fixed_mask = image_mask_list[-1]
@@ -927,24 +755,6 @@ class GreedyFHist:
             nonrigid_transformations.append(nonrigid_reg_result)
         groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, nonrigid_transformations)
         return groupwise_registration_results, nonrigid_warped_images
-        
-            
-
-        # moving_image = warped_image
-        # moving_mask = warped_mask
-        # fixed_image = image_mask_list[-1][0]
-        # fixed_mask = image_mask_list[-1][1]
-        # options = Options()
-        # options.affine_do_registration = False
-        # options.deformable_do_registration = True
-        # deformable_reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, options=options)
-        # transform_lists.append(deformable_reg_result)
-        # warped_image = self.transform_image_(moving_image, 
-        #                                           deformable_reg_result.fixed_transform.transform, 
-        #                                           deformable_reg_result.fixed_transform.size, 
-        #                                           'LINEAR')
-        # return [warped_image], transform_lists, registered_images
-
 
     def transform_image(self,
                         image: numpy.array,
@@ -994,16 +804,11 @@ class GreedyFHist:
         Returns:
             Any: _description_
         """
-        # transform = sitk.DisplacementFieldTransform(2)
-        # transform.SetDisplacementField(sitk.Image(displacement_field))
         pointset -= 0.5
         warped_points = []
         for i in range(pointset.shape[0]):
             point = (pointset[i,0], pointset[i,1])
-            # physical_point = transform.TransformContinuousIndexToPhysicalPoint(point)
             warped_point = transform.TransformPoint(point)
-            # warped_point = displacement_field.TransformPhysicalPointToContinuousIndex(warped_physical_point)
-            # warped_point = transform.TransformPoint(point)
             warped_points.append(warped_point)
         warped_pointset = np.array(warped_points)
         return warped_pointset
