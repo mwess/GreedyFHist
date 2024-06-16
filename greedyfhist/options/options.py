@@ -59,7 +59,6 @@ class Options:
     greedy_opts: 'GreedyOptions' = field(default_factory=load_greedyoptions)
     resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
     kernel_size: int = 10
-    output_directory: str = 'out'
     temporary_directory: str = 'tmp'
     affine_do_registration: bool = True
     deformable_do_registration: bool = True
@@ -73,7 +72,6 @@ class Options:
     store_cmdline_returns: bool = True
     remove_temporary_directory: bool = True
     keep_affine_unbounded: bool = True
-
     
     def __post_init__(self):
         self.greedy_opts = GreedyOptions()
@@ -93,7 +91,6 @@ class Options:
                 value = args_dict[key]
                 greedy_args[g_key] = value
         return greedy_args
-        
 
     def __assign_if_present(self, key, args_dict):
         if key in args_dict:

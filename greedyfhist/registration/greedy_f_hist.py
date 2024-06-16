@@ -27,6 +27,7 @@ from greedyfhist.utils.image import (
     get_symmetric_padding,
     cropping,
     resample_by_factor,
+    resample_image_sitk
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps
 from greedyfhist.utils.geojson_utils import geojson_2_table, convert_table_2_geo_json
@@ -201,6 +202,11 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     fixed_image_shape = transformation.reg_params['original_fixed_image_size']
 
     all_transforms = sitk.CompositeTransform(2)
+    # Try adding downsampling factor
+    ds_factor = transformation.reg_params['pre_downsampling_factor']
+    pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
+    post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
+    
     aff_trans1 = sitk.TranslationTransform(2)
     offset_x = -moving_padding[0]
     offset_y = -moving_padding[2]
@@ -217,11 +223,13 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     aff_trans4 = sitk.TranslationTransform(2)
     aff_trans4.SetOffset((fixed_padding[0], fixed_padding[2]))
 
+    all_transforms.AddTransform(pre_downscale_transform)
     all_transforms.AddTransform(aff_trans1)
     all_transforms.AddTransform(aff_trans2)
     all_transforms.AddTransform(transform)
     all_transforms.AddTransform(aff_trans3)
     all_transforms.AddTransform(aff_trans4)
+    all_transforms.AddTransform(post_upscale_transform)
     return all_transforms
 
 
@@ -235,6 +243,11 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     moving_image_shape = transformation.reg_params['original_moving_image_size']
     
     all_transforms = sitk.CompositeTransform(2)
+
+    ds_factor = transformation.reg_params['pre_downsampling_factor']
+    pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
+    post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
+
     aff_trans1 = sitk.TranslationTransform(2)
     offset_x = moving_padding[0]
     offset_y = moving_padding[2]
@@ -251,12 +264,14 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     aff_trans4 = sitk.TranslationTransform(2)
     aff_trans4.SetOffset((-fixed_padding[0], -fixed_padding[2]))
 
+    all_transforms.AddTransform(pre_downscale_transform)
     all_transforms.AddTransform(aff_trans4)
     all_transforms.AddTransform(aff_trans3)
     # all_transforms.AddTransform(displ_transform)
     all_transforms.AddTransform(transform)
     all_transforms.AddTransform(aff_trans2)
     all_transforms.AddTransform(aff_trans1)
+    all_transforms.AddTransform(post_upscale_transform)
     return all_transforms
 
 
@@ -401,8 +416,10 @@ class GreedyFHist:
         # Convert to correct format, if necessary
         moving_img = correct_img_dtype(moving_img)
         fixed_img = correct_img_dtype(fixed_img)
-        moving_img = resample_by_factor(moving_img, pre_downsampling_factor)
-        fixed_img = resample_by_factor(fixed_img, pre_downsampling_factor)
+        # moving_img = resample_by_factor(moving_img, pre_downsampling_factor)
+        # fixed_img = resample_by_factor(fixed_img, pre_downsampling_factor)
+        moving_img = resample_image_sitk(moving_img, pre_downsampling_factor)
+        fixed_img = resample_image_sitk(fixed_img, pre_downsampling_factor)
         if moving_img_mask is None:
             moving_img_mask = self.segmentation_function(moving_img)
         if fixed_img_mask is None:
@@ -871,28 +888,25 @@ class GreedyFHist:
     def transform_geojson(self,
                           geojson_data: geojson.GeoJSON,
                           transformation: SimpleITK.SimpleITK.Image,
-                          **kwargs) -> Any:
-        """Transforms geojson data using the computed transformation.
+                          **kwards) -> Any:
+        if not isinstance(geojson_data, list):
+            geometries = geojson_data['features']
+        else:
+            geometries = geojson_data
+        warped_geometries = []
+        for _, geometry in enumerate(geometries):
+            warped_geometry = geojson.utils.map_tuples(lambda coords: self.__warp_geojson_coord_tuple(coords, transformation), geometry)
+            warped_geometries.append(warped_geometry)
+        if not isinstance(geojson_data, list):
+            geojson_data['features'] = warped_geometries
+            return geojson_data
+        else:
+            return warped_geometries
 
-        Args:
-            geojson_data (geojson.Geojson): Geojson data to be transformed.
-            # TODO: Change args
-            # transformation (MultiRegResult): Transformation computed by registration.
-            args (_type_, optional): Any optional additional arguments. Defaults to None.
-
-        Returns:
-            # TODO: return geojson
-        """
-        geojson_data = copy.deepcopy(geojson_data)
-        geo_df = geojson_2_table(geojson_data)
-        # transform_result = self.transform_pointset(geo_df, transformation, **kwargs)
-        transformed_pointset = self.transform_pointset(geo_df, transformation, **kwargs)
-        warped_geo_df = geo_df.copy()
-        warped_geo_df.x = transformed_pointset[:, 0]
-        warped_geo_df.y = transformed_pointset[:, 1]
-
-        warped_geojson = convert_table_2_geo_json(geojson_data, warped_geo_df)
-        return warped_geojson
+    def __warp_geojson_coord_tuple(self, coord, transform):
+        ps = np.array([[coord[0], coord[1]]]).astype(float)
+        warped_ps = self.transform_pointset(ps, transform)
+        return (warped_ps[0, 0], warped_ps[0, 1])
 
     def __cleanup_temporary_directory(self, directory: str) -> None:
         """Removes the temporary directory.

@@ -18,6 +18,7 @@ from skimage.color import rgb2gray
 from greedyfhist.utils.utils import call_command
 from greedyfhist.custom_types import padding_type, image_shape
 
+
 def com_affine_matrix(fixed: numpy.array, moving: numpy.array) -> numpy.array:
     """
     Compute the difference in center of mass between fixed and moving image masks.
@@ -28,6 +29,7 @@ def com_affine_matrix(fixed: numpy.array, moving: numpy.array) -> numpy.array:
     mat[0, 2] = fixed_com[0] - moving_com[0]
     mat[1, 2] = fixed_com[1] - moving_com[1]
     return mat
+
 
 # Rescale functions
 def rescale_affine(small_affine_path: str, big_affine_path: str, factor: float) -> None:
@@ -40,6 +42,7 @@ def rescale_affine(small_affine_path: str, big_affine_path: str, factor: float) 
     with open(big_affine_path, 'w') as f:
         f.write(out_str)
 
+
 def rescale_affine_2(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK.Transform:
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
@@ -51,9 +54,7 @@ def rescale_affine_2(small_affine_path: str, factor: float) -> SimpleITK.SimpleI
     affine_transform.SetTranslation((new_val_1, new_val_2))
     affine_transform.SetMatrix((my_var[0], my_var[1], my_var[3], my_var[4]))
     return affine_transform
-    # out_str = f'{my_var[0]} {my_var[1]} {new_val_1}\n{my_var[3]} {my_var[4]} {new_val_2}\n{my_var[6]} {my_var[7]} {my_var[8]}'
-    # with open(big_affine_path, 'w') as f:
-    #     f.write(out_str)
+
 
 def invert_affine_transform(transform: SimpleITK.SimpleITK.AffineTransform) -> SimpleITK.SimpleITK.AffineTransform:
     rotation = transform.GetMatrix()
@@ -140,8 +141,8 @@ def rescale_warp_test(path_to_c2d: str,
     cmd = f'{path_to_c2d} -mcs {PATH_small_warp_no_pad_trim} -foreach -resample {WIDTH_original}x{HEIGHT_original} -scale {factor} -spacing 1x1mm -origin 0x0mm -endfor -omc {big_warp_path}'
     ret = call_command(cmd)
     cmdln_returns.append(ret)
-
     return cmdln_returns
+
 
 def rescale_warp(small_warp_path: str,
                  big_warp_path: str,
@@ -159,6 +160,7 @@ def rescale_warp(small_warp_path: str,
     big_warp_sitk.SetDirection(warp_sitk.GetDirection())
     big_warp_sitk.SetOrigin((0,0))
     sitk.WriteImage(big_warp_sitk, big_warp_path)
+
 
 def apply_mask(image: numpy.array, mask: numpy.array) -> numpy.array:
     return image * np.expand_dims(mask, -1).astype(np.uint8)
@@ -282,6 +284,7 @@ def empty_image(resolution: padding_type, dtype=type) -> SimpleITK.SimpleITK.Ima
     # Do I need to set origin
     return sitk_img
 
+
 def build_empty_ref_image(sitk_image: SimpleITK.SimpleITK.Image) -> SimpleITK.SimpleITK.Image:
     shape = (sitk_image.GetWidth(), sitk_image.GetHeight())
     origin = sitk_image.GetOrigin()
@@ -293,9 +296,11 @@ def build_empty_ref_image(sitk_image: SimpleITK.SimpleITK.Image) -> SimpleITK.Si
     empty_img.SetDirection(direction)
     return empty_img
 
+
 def write_empty_ref_image_to_file(image: SimpleITK.SimpleITK.Image, path: str) -> None:
     empty_image = build_empty_ref_image(image)
     sitk.WriteImage(empty_image, path)
+
 
 def cropping(mask: numpy.array) -> Tuple[numpy.array, padding_type]:
     p = np.argwhere(mask == 1)
@@ -306,6 +311,7 @@ def cropping(mask: numpy.array) -> Tuple[numpy.array, padding_type]:
     cropped_mask = mask[min_x:max_x, min_y:max_y]
     return cropped_mask, (min_x, max_x, min_y, max_y)    
 
+
 def add_cropped_region(img: numpy.array, original_shape: image_shape, cropping: padding_type) -> numpy.array:
     rh_x = original_shape[0]-cropping[1]
     rh_y = original_shape[1]-cropping[3]
@@ -315,16 +321,30 @@ def add_cropped_region(img: numpy.array, original_shape: image_shape, cropping: 
         img_uncropped = np.pad(img, ((cropping[0], rh_x), (cropping[2], rh_y), (0,0)))
     return img_uncropped
 
+
 def resample_by_factor(img: numpy.array, factor: float) -> numpy.array:
-    img2 = cv2.resize(img, (int(img.shape[1]//factor), int(img.shape[0]//factor)))
+    h, w = img.shape[:2]
+    img2 = cv2.resize(img, (int(w*factor), int(h*factor)))
     return img2
 
-# def resize_image(img: numpy.array, shape: image_shape, interpolation: str ='NN') -> numpy.array:
-#     if interpolation == 'NN':
-#         interpolation_mode = cv2.INTER_NEAREST
-#     else:
-#         interpolation_mode = cv2.INTER_LINEAR
-#     return cv2.resize(img, (shape[1], shape[0]), interpolation_mode)
+
+def resample_image_sitk(image: numpy.array, scaling_factor: float, ref_image_shape: Optional[Tuple[int, int]] = None):
+    if ref_image_shape is None:
+        shape = image.shape[:2]
+        ref_image_shape = (int(shape[0]*scaling_factor), int(shape[1]*scaling_factor))
+    transform = sitk.ScaleTransform(2, (1/scaling_factor, 1/scaling_factor))
+    ref_img = sitk.GetImageFromArray(np.zeros(ref_image_shape))
+    
+    sitk_image = sitk.GetImageFromArray(image, True)
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetReferenceImage(ref_img)
+    resampler.SetInterpolator(sitk.sitkLinear)
+    resampler.SetDefaultPixelValue(0)
+    resampler.SetTransform(transform)
+    warped_image_sitk = resampler.Execute(sitk_image)
+    resampled_image_np = sitk.GetArrayFromImage(warped_image_sitk)
+    return resampled_image_np
+    
 
 def resize_image(img: numpy.array, shape: image_shape, interpolation: str ='NN') -> numpy.array:
     if interpolation == 'NN':
