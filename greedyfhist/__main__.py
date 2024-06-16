@@ -15,22 +15,35 @@ def cli():
 @click.option('--moving-mask', type=click.Path())  # Make this optional
 @click.option('--fixed-mask', type=click.Path())  # Make this optional
 @click.option('--path-to-greedy', type=click.Path())
-def register(moving_image,
-             fixed_image,
-             output_directory,
-             moving_mask=None,
-             fixed_mask=None,
-             path_to_greedy=None,
-             is_cmd_line=True):
-    cmdln_processor.register(
-        moving_image,
-        fixed_image,
-        output_directory,
-        moving_mask,
-        fixed_mask,
-        path_to_greedy,
-        is_cmd_line
-    )
+@click.option('--config', type=click.Path())
+def register(*args, **kwargs):
+    pass
+
+# @click.command()
+# @click.option('--moving-image', type=click.Path(), required=True)
+# @click.option('--fixed-image', type=click.Path(), required=True)
+# @click.option('--output-directory', type=click.Path(), required=True, default='out')
+# @click.option('--moving-mask', type=click.Path())  # Make this optional
+# @click.option('--fixed-mask', type=click.Path())  # Make this optional
+# @click.option('--path-to-greedy', type=click.Path())
+# @click.option()
+# def register(moving_image,
+#              fixed_image,
+#              output_directory,
+#              moving_mask=None,
+#              fixed_mask=None,
+#              path_to_greedy=None,
+#              is_cmd_line=True):
+#     cmdln_processor.register(
+#         moving_image,
+#         fixed_image,
+#         output_directory,
+#         moving_mask,
+#         fixed_mask,
+#         path_to_greedy,
+#         is_cmd_line
+#     )
+
 
 
 @click.command()

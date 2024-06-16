@@ -100,7 +100,7 @@ def affine_registration(path_to_greedy: str,
     aff_rgs['-i'] = [path_to_fixed_image, path_to_moving_image]
     aff_rgs['-o'] = path_output
     aff_rgs['-m'] = cost_fun_params
-    pyramid_iterations = 'x'.join([str(x) for x in options.affine_pyramid_iterations])
+    pyramid_iterations = 'x'.join([str(x) for x in options.affine_iteration_pyramid])
     # aff_rgs['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
     aff_rgs['-n'] = pyramid_iterations
     aff_rgs['-threads'] = options.n_threads
@@ -148,7 +148,7 @@ def deformable_registration(path_to_greedy:str,
     # def_args['-m'] = f'NCC {kernel}x{kernel}'
     def_args['-m'] = cost_fun_params
     def_args['-i'] = [path_fixed_image, path_moving_image]
-    pyramid_iterations = 'x'.join([str(x) for x in options.deformable_pyramid_iterations])
+    pyramid_iterations = 'x'.join([str(x) for x in options.nonrigid_iteration_pyramid])
     def_args['-n'] = pyramid_iterations
     # def_args['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
     # def_args['-threads'] = '32'

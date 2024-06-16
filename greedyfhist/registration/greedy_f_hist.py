@@ -393,8 +393,8 @@ class GreedyFHist:
         # path_temp = args.get('tmp_dir', join(path_output, 'tmp'))
         self.path_temp = path_temp
         self.path_output = path_output
-        affine_use_denoising = options.affine_do_denoising
-        deformable_use_denoising = options.deformable_do_denoising
+        affine_use_denoising = options.enable_affine_denoising
+        deformable_use_denoising = options.enable_deformable_denoising
         # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
         pre_downsampling_factor = options.pre_downsampling_factor
         original_moving_image_size = moving_img.shape[:2]
@@ -404,8 +404,8 @@ class GreedyFHist:
                       's2': options.greedy_opts.s2,
                       'iteration_rigid': options.greedy_opts.iteration_rigid,
                       'resolution': options.resolution,
-                      'affine_use_denoising': options.affine_do_denoising,
-                      'deformable_use_denoising': options.deformable_do_denoising,
+                      'affine_use_denoising': options.enable_affine_denoising,
+                      'deformable_use_denoising': options.enable_deformable_denoising,
                       'options': options.to_dict(),
                       'pre_downsampling_factor': options.pre_downsampling_factor,
                       'original_moving_image_size': original_moving_image_size,
@@ -451,8 +451,8 @@ class GreedyFHist:
         reg_params['resample'] = resample
         reg_params['smoothing'] = smoothing
 
-        requires_denoising = options.affine_do_denoising or options.deformable_do_denoising
-        requires_standard_preprocessing = (not options.affine_do_denoising) or (not options.deformable_do_denoising)
+        requires_denoising = options.enable_affine_denoising or options.enable_deformable_denoising
+        requires_standard_preprocessing = (not options.enable_affine_denoising) or (not options.enable_deformable_denoising)
         if requires_denoising:
             moving_img_denoised = denoise_image(moving_img, 
                                                 sp=options.moving_sr, 
@@ -508,8 +508,8 @@ class GreedyFHist:
         # Affine registration
         offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
         reg_params['offset'] = offset
-        reg_params['affine_iteration_vec'] = options.greedy_opts.affine_pyramid_iterations
-        reg_params['deformable_iteration_vec'] = options.greedy_opts.deformable_pyramid_iterations
+        reg_params['affine_iteration_vec'] = options.greedy_opts.affine_iteration_pyramid
+        reg_params['deformable_iteration_vec'] = options.greedy_opts.nonrigid_iteration_pyramid
 
         ia_init = ''
         if options.greedy_opts.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
@@ -535,7 +535,7 @@ class GreedyFHist:
             fixed_img_path = fixed_img_preprocessed.image_path
             moving_img_path = moving_img_preprocessed.image_path
 
-        if options.affine_do_registration:
+        if options.do_affine_registration:
             path_small_affine = os.path.join(path_metrics_small_resolution, 'small_affine.mat')
             aff_ret = affine_registration(self.path_to_greedy,
                                           fixed_img_path,
@@ -549,7 +549,7 @@ class GreedyFHist:
         else:
             path_small_affine = None
 
-        if options.deformable_do_registration:        
+        if options.do_nonrigid_registration:        
 
             # Diffeomorphic
             if affine_use_denoising and not deformable_use_denoising:
@@ -608,7 +608,7 @@ class GreedyFHist:
 
         # If no non-rigid registration is performed we keep the affine transform unbounded.
         # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
-        if options.deformable_do_registration and not options.keep_affine_unbounded:
+        if options.do_nonrigid_registration and not options.keep_affine_transform_unbounded:
             path_small_composite_warp = os.path.join(path_metrics_small_resolution, 'small_composite_warp.nii.gz')
             composite_warps(
                 self.path_to_greedy,
@@ -660,7 +660,7 @@ class GreedyFHist:
             displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
             backward_transform = sitk.DisplacementFieldTransform(2)
             backward_transform.SetDisplacementField(displ_field)
-        elif options.deformable_do_registration and options.keep_affine_unbounded:
+        elif options.do_nonrigid_registration and options.keep_affine_transform_unbounded:
             # First rescale affine transforms
             forward_affine_transform = rescale_affine_2(path_small_affine, factor)
             backward_affine_transform = forward_affine_transform.GetInverse()
@@ -732,7 +732,7 @@ class GreedyFHist:
         with open(reg_param_outpath, 'w') as f:
             json.dump(reg_params, f)
 
-        if options.store_cmdline_returns:
+        if options.store_commandline_logs:
             cmd_output = os.path.join(path_output, 'cmdl_returns.txt')
             with open(cmd_output, 'w') as f:
                 for ret in cmdln_returns:
@@ -776,10 +776,10 @@ class GreedyFHist:
                                ):
         if affine_options is None:
             affine_options = Options()
-            affine_options.deformable_do_registration = False
+            affine_options.do_nonrigid_registration = False
         if nonrigid_option is None:
             nonrigid_option = Options()
-        nonrigid_option.affine_do_registration = False
+        nonrigid_option.do_affine_registration = False
         # Stage1: Affine register along the the sequence.
         moving_image, moving_mask = image_mask_list[0]
         # TODO: Do i really need to do that?
@@ -796,8 +796,8 @@ class GreedyFHist:
         for (fixed_image, fixed_mask) in image_mask_list[1:]:
             # This kind of makes transformations that are all registered to the original fixed image. Consider having them only be pairwise.
             sub_options = Options()
-            sub_options.keep_affine_unbounded = True
-            sub_options.deformable_do_registration = False
+            sub_options.keep_affine_transform_unbounded = True
+            sub_options.do_nonrigid_registration = False
             reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, sub_options)
             affine_transform_lists.append(reg_result)
             # map_to_transforms[rev_idx] = (forward, backward)

@@ -12,14 +12,14 @@ def get_4_step_pyramid_iterations():
 class GreedyOptions:
 
     dim: int = 2
-    s1: float = 6.0
+    s1: float = 5.0
     s2: float = 5.0
     kernel_size: int = 10
     cost_function: str = 'ncc'
     iteration_rigid: int = 10000
     ia: str = 'ia-com-init'
-    affine_pyramid_iterations: List[int] = field(default_factory=get_3_step_pyramid_iterations)
-    deformable_pyramid_iterations: List[int] = field(default_factory=get_4_step_pyramid_iterations)
+    affine_iteration_pyramid: List[int] = field(default_factory=get_3_step_pyramid_iterations)
+    nonrigid_iteration_pyramid: List[int] = field(default_factory=get_4_step_pyramid_iterations)
     n_threads: int = 1
     use_sv: bool = False
     use_svlb: bool = False
@@ -58,20 +58,19 @@ class Options:
 
     greedy_opts: 'GreedyOptions' = field(default_factory=load_greedyoptions)
     resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
-    kernel_size: int = 10
     temporary_directory: str = 'tmp'
-    affine_do_registration: bool = True
-    deformable_do_registration: bool = True
-    affine_do_denoising: bool = True
-    deformable_do_denoising: bool = True
+    do_affine_registration: bool = True
+    do_nonrigid_registration: bool = True
+    enable_affine_denoising: bool = True
+    enable_deformable_denoising: bool = True
     moving_sr: int = 30
     moving_sp: int = 25
     fixed_sr: int = 30
     fixed_sp: int = 25
     pre_downsampling_factor: float = 1
-    store_cmdline_returns: bool = True
+    store_commandline_logs: bool = True
     remove_temporary_directory: bool = True
-    keep_affine_unbounded: bool = True
+    keep_affine_transform_unbounded: bool = True
     
     def __post_init__(self):
         self.greedy_opts = GreedyOptions()
@@ -108,4 +107,18 @@ class Options:
                 d[key] = value
         return d
 
-
+    @staticmethod
+    def parse_cmdln_dict(args_dict):
+        opts = Options()
+        for key in args_dict:
+            if key in ['greedy', 'resolution']:
+                continue
+            opts.__assign_if_present(key, args_dict)
+        if 'resolution' in args_dict:
+            resolution_str = args_dict['resolution']
+            resolution = resolution_str.split('x')
+            resolution = (int(resolution[0]), int(resolution[1]))
+            opts.resolution = resolution
+        if 'greedy' in args_dict:
+            greedy_args = args_dict['greedy']
+            opts.greedy_opts.parse_dict(greedy_args)

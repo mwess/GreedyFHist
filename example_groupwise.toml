@@ -1,0 +1,55 @@
+#[input_options]
+#
+# moving_image = MOVING_FILE_PATH
+# fixed_image = FIXED_FILE_PATH
+# moving_mask = MOVING_MASK_PATH
+# fixed_mask = FIXED_MASK_PATH
+# path_to_greedy = PATH_TO_GREEDY
+# output_directory = PATH_TO_OUTPUT_DIRECTORY
+
+[options]
+
+resolution = '1024x1024'
+temporary_directory = 'tmp'
+do_affine_registration = true
+enable_affine_denoising = true
+do_nonrigid_registration = true
+enable_nonrigid_denoising = false
+moving_sr = 30
+moving_sp = 25
+fixed_sr = 30
+fixed_sp = 25
+pre_downsampling_factor = 1
+store_commandline_logs = true
+remove_temporary_directory = true
+keep_affine_transform_unbounded = true
+
+[options.greedy]
+
+s1 = 5.0
+s2 = 5.0
+kernel_size = 10
+number_rigid_iterations = 10000
+ia = 'ia-com-init'
+affine_iteration_pyramid = [100, 50, 10]
+deformable_pyramid_iterations = [100, 100, 50, 10]
+n_threads = 1
+use_sv = false
+use_svlb = false
+yolo_segmentation_min_size = 5000
+
+
+[[input.data]]
+
+image_path = 'image_path1'
+mask_path = 'mask_path1'
+
+[[input.data]]
+
+image_path = 'image_path2'
+mask_path = 'mask_path2'
+
+[[input.data]]
+
+image_path = 'image_path3'
+mask_path = 'mask_path3'
