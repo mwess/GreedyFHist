@@ -590,7 +590,8 @@ class GreedyFHist:
         reg_params['factor'] = factor
 
         # If no non-rigid registration is performed we keep the affine transform unbounded.
-        if options.deformable_do_registration or not options.keep_affine_unbounded:
+        # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
+        if options.deformable_do_registration and not options.keep_affine_unbounded:
             path_small_composite_warp = os.path.join(path_metrics_small_resolution, 'small_composite_warp.nii.gz')
             composite_warps(
                 self.path_to_greedy,
@@ -642,6 +643,60 @@ class GreedyFHist:
             displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
             backward_transform = sitk.DisplacementFieldTransform(2)
             backward_transform.SetDisplacementField(displ_field)
+        elif options.deformable_do_registration and options.keep_affine_unbounded:
+            # First rescale affine transforms
+            forward_affine_transform = rescale_affine_2(path_small_affine, factor)
+            backward_affine_transform = forward_affine_transform.GetInverse()
+            
+            path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
+            rescale_warp(
+                path_small_warp,
+                path_big_warp,
+                (current_fixed_preprocessed.width, current_fixed_preprocessed.height),
+                (current_fixed_preprocessed.width_original,
+                 current_fixed_preprocessed.height_original),
+                factor)
+            
+            path_big_warp_inv = os.path.join(path_metrics_full_resolution, 'big_inv_warp.nii.gz')
+            rescale_warp(
+                path_small_warp_inv,
+                path_big_warp_inv,
+                (current_fixed_preprocessed.width, current_fixed_preprocessed.height),
+                (current_fixed_preprocessed.width_original,
+                 current_fixed_preprocessed.height_original),
+                factor)
+
+            displacement_field = sitk.ReadImage(path_big_warp, sitk.sitkVectorFloat64)
+            rotated_displ_field = sitk.GetArrayFromImage(displacement_field)
+            rotated_displ_field *= -1
+            rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
+            displ_field = sitk.Image(rotated_displ_field_sitk) 
+            displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
+            forward_deformable_transform = sitk.DisplacementFieldTransform(2)
+            forward_deformable_transform.SetDisplacementField(displ_field)
+            
+            inv_displacement_field = sitk.ReadImage(path_big_warp_inv, sitk.sitkVectorFloat64)
+            rotated_displ_field = sitk.GetArrayFromImage(inv_displacement_field)
+            rotated_displ_field *= -1
+            rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
+            displ_field = sitk.Image(rotated_displ_field_sitk) 
+            displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
+            backward_deformable_transform = sitk.DisplacementFieldTransform(2)
+            backward_deformable_transform.SetDisplacementField(displ_field)
+                
+            forward_transform = sitk.CompositeTransform(2)
+            forward_transform.AddTransform(forward_affine_transform)
+            forward_transform.AddTransform(forward_deformable_transform)
+            
+            backward_transform = sitk.CompositeTransform(2)
+            backward_transform.AddTransform(backward_deformable_transform)
+            backward_transform.AddTransform(backward_affine_transform)
+
+            path_small_composite_warp = ''
+            path_small_inverted_composite_warp = ''
+            path_big_composite_warp = ''
+            path_big_composite_warp_inv = ''
+
         else:
             # Set some paths to empty. Will remove them entirely later.
             path_small_composite_warp = ''

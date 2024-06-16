@@ -72,7 +72,7 @@ class Options:
     pre_downsampling_factor: float = 1
     store_cmdline_returns: bool = True
     remove_temporary_directory: bool = True
-    keep_affine_unbounded: bool = False
+    keep_affine_unbounded: bool = True
 
     
     def __post_init__(self):
