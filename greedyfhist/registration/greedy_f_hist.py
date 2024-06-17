@@ -38,13 +38,38 @@ from greedyfhist.options import RegistrationOptions
 # TODO: Write serialization
 @dataclass
 class GroupwiseRegResult:
+    """Collection of all transforms computed during groupwise registration.
+
+    Attributes
+    ----------
+    affine_transform: List[GFHTransform]
+        List of affine transforms. Affine transforms contain transform from current index of the transform in the list to the next index. 
+        Order of affine transforms is based on the order images supplied to affine registration.
+    
+    deformable_transform: List[GFHTransform]
+        List of nonrigid transforms. Each transform warps from an affinely transformed image to the fixed image.
+
+    Methods
+    -------
+        
+    get_transforms(source): int
+        Computes the end-to-end transformation from source image to fixed image.
+
+    """
 
     affine_transform: List['GFHTransform']
     deformable_transform: List['GFHTransform']
 
     def get_transforms(self,
-                       source: int,
-                       no_deformable: bool = False):
+                       source: int) -> 'RegistrationResult':
+        """Retrieves registration from one moving image indexed by 'source'.
+
+        Args:
+            source (int): Index of moving image.
+
+        Returns:
+            RegistrationResult: transformation from source to reference image.
+        """
         # TODO: At the moment only one direction works.
         transforms = self.affine_transform[source:]
         if self.deformable_transform is not None and len(self.deformable_transform) > 0:
@@ -58,12 +83,38 @@ class GroupwiseRegResult:
 
 @dataclass
 class GFHTransform:
+    """
+    Contains transform from one image space to another.
+
+    Attributes
+    ----------
+
+    size: Tuple[int, int]
+        Resolution of target image space.
+
+    transform: SimpleITK.SimpleITK.Transform
+        Transform from source to target image space.
+
+    Methods
+    -------
+
+    to_file(path): str
+        Saves GFHTransform to file.
+
+    load_transform(path): str
+        Loads transform from file.
+    """
     
     size: Tuple[int, int]
     transform: SimpleITK.SimpleITK.Transform
 
     # TODO: Check that path is directory and change name since we are storing to a directory and not to one file.
-    def to_file(self, path):
+    def to_file(self, path: str):
+        """Saves transform to hard drive. Note, transforms are flattened before storing.
+
+        Args:
+            path (str): Location to store.
+        """
         create_if_not_exists(path)
         attributes = {
             'width': self.size[0],
@@ -78,7 +129,15 @@ class GFHTransform:
 
 
     @staticmethod
-    def load_transform(path):
+    def load_transform(path: str) -> 'GFHTransform':
+        """Load transform from directory.
+
+        Args:
+            path (str): Source location
+
+        Returns:
+            GFHTransform: 
+        """
         attributes_path = join(path, 'attributes.json')
         with open(attributes_path) as f:
             attributes = json.load(f)
@@ -90,21 +149,58 @@ class GFHTransform:
 
 @dataclass
 class RegistrationResult:
+    """
+    Result of one pairwise registrations.
+
+    Attributes
+    ----------
     
-    fixed_transform: 'GFHTransform'
-    moving_transform: 'GFHTransform'
-    cmdln_returns: Optional[List[Any]] = None
+    forward_transform: GFHTransform
+        Transform from moving to fixed image space. Used for transforming image data from moving to fixed image space.
+
+    backward_transform: GFHTransform
+        Transform from fixed to moving image space. Used for transforming pointset data from moving to fixed image space.
+
+    cmdln_returns: Optional[List[subprocess.CompletedProcess]]
+        Contains log output from command line executions.
+
+    Methods
+    -------
+
+    to_file(path): str
+        Saves RegistrationResult to file.
+
+    load(path): str -> RegistrationResult
+        Load RegistrationResult from file.
+    """
+    
+    forward_transform: 'GFHTransform'
+    backward_transform: 'GFHTransform'
+    cmdln_returns: Optional[List[subprocess.CompletedProcess]] = None
     
     # TODO: Can I add cmdln_returns somehow
-    def to_file(self, path):
+    def to_file(self, path: str):
+        """Saves 'RegistrationResult' to file.
+
+        Args:
+            path (str): Directory location.
+        """
         create_if_not_exists(path)
-        fixed_transform_path = join(path, 'fixed_transform')
-        self.fixed_transform.to_file(fixed_transform_path)
-        moving_transform_path = join(path, 'moving_transform')
-        self.moving_transform.to_file(moving_transform_path)
+        forward_transform_path = join(path, 'fixed_transform')
+        self.forward_transform.to_file(forward_transform_path)
+        backward_transform_path = join(path, 'moving_transform')
+        self.backward_transform.to_file(backward_transform_path)
 
     @staticmethod
-    def load(path):
+    def load(path: str) -> 'RegistrationResult':
+        """Load RegistrationResult from location.
+
+        Args:
+            path (str): Directory.
+
+        Returns:
+            RegistrationResult: 
+        """
         fixed_transform_path = join(path, 'fixed_transform')
         fixed_transform = GFHTransform.load_transform(fixed_transform_path)
         moving_transform_path = join(path, 'moving_transform')
@@ -112,9 +208,46 @@ class RegistrationResult:
         return RegistrationResult(fixed_transform, moving_transform)
 
 
-# TODO: Rename that class (or remove it)
 @dataclass
-class RegResult:
+class InternalRegParams:
+    """
+    Collected params with several filenames, logs and registration parameters. Used to move information around for post processing.
+
+    Attributes
+    ----------
+
+    path_to_small_fixed: str
+
+    path_to_small_moving: str
+
+    path_to_small_composite: str
+
+    path_to_big_composite: str
+
+    path_to_small_inv_composite: str
+
+    path_to_big_inv_composite: str
+
+    cmdl_log: Optional[List[subprocess.CompletedProcess]]
+
+    reg_params: Optional[Any]
+
+    path_to_small_ref_image: str
+
+    sub_dir_key: int
+
+    displacement_field: SimpleITK.SimpleITK.Image
+
+    inv_displacement_field: SimpleITK.SimpleITK.Image
+
+
+    Methods
+    -------
+
+    from_directory(directory) -> InternalRegParams
+        Load from directory.
+
+    """
     path_to_small_fixed: str
     path_to_small_moving: str
     path_to_small_composite: str
@@ -128,12 +261,19 @@ class RegResult:
     displacement_field: SimpleITK.SimpleITK.Image
     inv_displacement_field: SimpleITK.SimpleITK.Image
 
-    # def store(self, directory):
-    #     # TODO: Do I even need that??? Would be more of a copy operation.
-    #     pass
-
     @classmethod
-    def from_directory(cls, directory):
+    def from_directory(cls, directory: str) -> 'InternalRegParams':
+        """Load from directory.
+
+        Args:
+            directory (str): 
+
+        Raises:
+            Exception: Thrown if directory does not exist.
+
+        Returns:
+            InternalRegResult: 
+        """
         if not exists(directory):
             raise Exception(f'Could not load transformation. Directory {directory} not found.')
         with open(join(directory, 'reg_params.json')) as f:
@@ -168,6 +308,27 @@ class RegResult:
 
 @dataclass
 class PreprocessedData:
+    """
+    Information about preprocessed image.
+
+    Attributes
+    ----------
+
+    image_path: str
+        Path to preprocessed image.
+    
+    height: int
+
+    width: int
+
+    height_padded: int
+
+    width_padded: int
+
+    height_original: int
+
+    width_original: int
+    """
     image_path: str
     height: int
     width: int
@@ -179,32 +340,55 @@ class PreprocessedData:
 
 # TODO: Write a sub function that just works with simpleitk transforms.
 def composite_sitk_transforms(transforms: List[SimpleITK.SimpleITK.Transform]) -> SimpleITK.SimpleITK.Transform:
+    """Composites all Transforms into one composite transform.
+
+    Args:
+        transforms (List[SimpleITK.SimpleITK.Transform]): 
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: 
+    """
     composited_transform = sitk.CompositeTransform(2)
     for transform in transforms:
         composited_transform.AddTransform(transform)
     return composited_transform
     
 
-def compose_transforms(gfh_transforms: List[Any]) -> 'GFHTransform':
+def compose_transforms(gfh_transforms: List['GFHTransform']) -> 'GFHTransform':
+    """Composes a list of gfh_transforms.
+
+    Args:
+        gfh_transforms (List[GFHTransform]):
+
+    Returns:
+        GFHTransform:
+    """
     composited_transform = composite_sitk_transforms([x.transform for x in gfh_transforms])
     gfh_comp_trans = GFHTransform(gfh_transforms[-1].size, composited_transform)
     return gfh_comp_trans
 
 def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-                           transformation: RegResult) -> SimpleITK.SimpleITK.Transform:
-    # TODO: Rewrite this function such that the transformation to put in the middle is passed an as argument.
-    
+                           internal_reg_params: InternalRegParams) -> SimpleITK.SimpleITK.Transform:
+    """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward affine/nonrigid registration.  
+
+    Args:
+        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
+        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: Composited end-to-end registration.
+    """
 
     # TODO: Implement transformation from fixed to moving space in case we want to go in a different direction?
-    moving_padding = transformation.reg_params['moving_padding']
-    moving_cropping = transformation.reg_params['cropping_params_mov']
-    fixed_padding = transformation.reg_params['fixed_padding']
-    fixed_cropping = transformation.reg_params['cropping_params_fix']
-    fixed_image_shape = transformation.reg_params['original_fixed_image_size']
+    moving_padding = internal_reg_params.reg_params['moving_padding']
+    moving_cropping = internal_reg_params.reg_params['cropping_params_mov']
+    fixed_padding = internal_reg_params.reg_params['fixed_padding']
+    fixed_cropping = internal_reg_params.reg_params['cropping_params_fix']
+    fixed_image_shape = internal_reg_params.reg_params['original_fixed_image_size']
 
     all_transforms = sitk.CompositeTransform(2)
     # Try adding downsampling factor
-    ds_factor = transformation.reg_params['pre_downsampling_factor']
+    ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
     pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
     post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
     
@@ -235,17 +419,26 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
 
 
 def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-                               transformation: RegResult) -> SimpleITK.SimpleITK.Transform:
+                               internal_reg_params: InternalRegParams) -> SimpleITK.SimpleITK.Transform:
+    """Pre- and appends preprocessing steps from moving and fixed image as transforms to backward affine/nonrigid registration.  
 
-    moving_padding = transformation.reg_params['moving_padding']
-    moving_cropping = transformation.reg_params['cropping_params_mov']
-    fixed_padding = transformation.reg_params['fixed_padding']
-    fixed_cropping = transformation.reg_params['cropping_params_fix']
-    moving_image_shape = transformation.reg_params['original_moving_image_size']
+    Args:
+        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
+        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: Composited end-to-end transform.
+    """
+
+    moving_padding = internal_reg_params.reg_params['moving_padding']
+    moving_cropping = internal_reg_params.reg_params['cropping_params_mov']
+    fixed_padding = internal_reg_params.reg_params['fixed_padding']
+    fixed_cropping = internal_reg_params.reg_params['cropping_params_fix']
+    moving_image_shape = internal_reg_params.reg_params['original_moving_image_size']
     
     all_transforms = sitk.CompositeTransform(2)
 
-    ds_factor = transformation.reg_params['pre_downsampling_factor']
+    ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
     pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
     post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
 
@@ -276,17 +469,30 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     return all_transforms
 
 
-def compute_transforms(transformation: RegResult) -> Tuple[SimpleITK.SimpleITK.Transform, SimpleITK.SimpleITK.Transform]:
-    forward_displacement_field = compose_reg_transforms(transformation)
-    backward_displacement_field = compose_inv_reg_transforms(transformation)
-    return forward_displacement_field, backward_displacement_field
+# def compute_transforms(transformation: InternalRegResult) -> Tuple[SimpleITK.SimpleITK.Transform, SimpleITK.SimpleITK.Transform]:
+#     forward_displacement_field = compose_reg_transforms(transformation)
+#     backward_displacement_field = compose_inv_reg_transforms(transformation)
+#     return forward_displacement_field, backward_displacement_field
 
 
-def preprocess_image(image: numpy.array,
+def preprocess_image_for_greedy(image: numpy.array,
                      kernel: int,
                      resolution: Tuple[int, int],
                      smoothing: int,
-                     tmp_dir: str):
+                     tmp_dir: str) -> 'PreprocessedData':
+    """Performs final preprocessing steps of image and saves image for greedy under the filename is 'new_small_image.nii.gz' in the provided tmp_dir.
+
+
+    Args:
+        image (numpy.array):
+        kernel (int): kernel size
+        resolution (Tuple[int, int]): resolution after downscaling
+        smoothing (int): Gaussian smoothing applied for preventing anti-aliasing.
+        tmp_dir (str): Directory for storing.
+
+    Returns:
+        PreprocessedData: Contains path to downscaled image and additional image parameters.
+    """
     small_image = resample_image_with_gaussian(image, resolution, smoothing)
     height_image = image.shape[1]
     width_image = image.shape[0]
@@ -319,7 +525,16 @@ def preprocess_image(image: numpy.array,
     return preprocessed_data
 
         
-def derive_subdir(directory, limit=1000):
+def derive_subdir(directory, limit=1000) -> Tuple[str, int]:
+    """Derives a unique subdirectory. Counts upwards until a new directory is found.
+
+    Args:
+        directory (_type_): 
+        limit (int, optional): Maximum subdir count. Defaults to 1000.
+
+    Returns:
+        Tuple[str, int]: Subdir and final count.
+    """
     for subdir_num in range(limit):
         subdir = f'{directory}/{subdir_num}'
         if not exists(subdir):
@@ -328,7 +543,15 @@ def derive_subdir(directory, limit=1000):
     return subdir, subdir_num
 
 # TODO: There is probably a better way to ensure the dtype of the image.
-def correct_img_dtype(img):
+def correct_img_dtype(img: numpy.array) -> numpy.array:
+    """Changes the image type from float to np.uint8 if necessary.
+
+    Args:
+        img (numpy.array): 
+
+    Returns:
+        numpy.array: 
+    """
     if np.issubdtype(img.dtype, np.floating):
         img = (img * 255).astype(np.uint8)
     else:
@@ -337,11 +560,25 @@ def correct_img_dtype(img):
 
 @dataclass
 class GreedyFHist:
+    """
+    Registration class. Performs registrations and transformation for paiwise images and groupwise images.
+
+    Attributes
+    ----------
+
+    name: str
+        Identifier
+
+    path_to_greedy: str
+        Path to greedy executable. Not needed if Greedy is on PATH.
+
+    segmentation_function: Optional[Callable]
+        Segmentation function for foreground segmentation.
+
+    """
 
     name: str = 'GreedyFHist'
     path_to_greedy: str = ''
-    path_temp: str = 'tmp'
-    path_output: str = 'out'
     segmentation_function: Optional[Callable] = None
 
     def register(self,
@@ -350,8 +587,11 @@ class GreedyFHist:
                  moving_img_mask: Optional[numpy.array] = None,
                  fixed_img_mask: Optional[numpy.array] = None,
                  options: Optional[RegistrationOptions] = None) -> 'RegistrationResult':
-        """Performs registration from moving_img to fixed_img. Optional tissue masks can be provided.
+        """Performs pairwise registration from moving_img to fixed_img. Optional tissue masks can be provided.
         Options are supplied via the options arguments.
+
+        Documentation of the registration algorithm can be found here: ...
+        
 
         Args:
             moving_img (numpy.array): 
@@ -361,7 +601,7 @@ class GreedyFHist:
             options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
 
         Returns:
-            Any: _description_
+            RegistrationResult: Contains computed registration result.
         """
         reg_result = self.register_(moving_img,
                                     fixed_img,
@@ -377,6 +617,18 @@ class GreedyFHist:
                  fixed_img_mask: Optional[numpy.array] = None,
                  options: Optional[RegistrationOptions] = None,                  
                  **kwargs: Dict) -> 'RegistrationResult':
+        """Computes registration from moving image to fixed image.
+
+        Args:
+            moving_img (numpy.array):
+            fixed_img (numpy.array): 
+            moving_img_mask (Optional[numpy.array], optional): Optional moving mask. Is otherwise dervied automatically. Defaults to None.
+            fixed_img_mask (Optional[numpy.array], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
+            options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+
+        Returns:
+            RegistrationResult: _description_
+        """
         # TODO: We only need a temp directory now, so get rid of output.
         if options is None:
             options = RegistrationOptions()
@@ -392,8 +644,6 @@ class GreedyFHist:
         path_output, subdir_num = derive_subdir(path_output)
         create_if_not_exists(path_output)
         # path_temp = args.get('tmp_dir', join(path_output, 'tmp'))
-        self.path_temp = path_temp
-        self.path_output = path_output
         affine_use_denoising = options.enable_affine_denoising
         deformable_use_denoising = options.enable_deformable_denoising
         # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
@@ -425,7 +675,7 @@ class GreedyFHist:
             moving_img_mask = self.segmentation_function(moving_img)
         if fixed_img_mask is None:
             fixed_img_mask = self.segmentation_function(fixed_img)
-        # Do padding
+        # Cropping and Padding
         cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
         cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
         reg_params['cropping_params_mov'] = crop_params_mov
@@ -465,14 +715,14 @@ class GreedyFHist:
 
             moving_denoised_tmp_dir = join(path_temp, 'moving_denoised')
             create_if_not_exists(moving_denoised_tmp_dir)
-            moving_denoised_preprocessed = preprocess_image(moving_img_denoised, 
+            moving_denoised_preprocessed = preprocess_image_for_greedy(moving_img_denoised, 
                                                             options.greedy_opts.kernel_size, 
                                                             options.resolution,
                                                             smoothing, 
                                                             moving_denoised_tmp_dir)
             fixed_denoised_tmp_dir = join(path_temp, 'fixed_denoised')
             create_if_not_exists(fixed_denoised_tmp_dir)
-            fixed_denoised_preprocessed = preprocess_image(fixed_img_denoised, 
+            fixed_denoised_preprocessed = preprocess_image_for_greedy(fixed_img_denoised, 
                                                            options.greedy_opts.kernel_size, 
                                                            options.resolution,
                                                            smoothing,
@@ -483,14 +733,14 @@ class GreedyFHist:
             # Metrics
             moving_tmp_dir = join(path_temp, 'moving')
             create_if_not_exists(moving_tmp_dir)
-            moving_img_preprocessed = preprocess_image(moving_img, 
+            moving_img_preprocessed = preprocess_image_for_greedy(moving_img, 
                                                        options.greedy_opts.kernel_size, 
                                                        options.resolution, 
                                                        smoothing,
                                                        moving_tmp_dir)
             fixed_tmp_dir = join(path_temp, 'fixed')
             create_if_not_exists(fixed_tmp_dir)
-            fixed_img_preprocessed = preprocess_image(fixed_img, 
+            fixed_img_preprocessed = preprocess_image_for_greedy(fixed_img, 
                                                       options.greedy_opts.kernel_size, 
                                                       options.resolution, 
                                                       smoothing,
@@ -736,7 +986,7 @@ class GreedyFHist:
 
         displacement_field = None
         inv_displacement_field = None
-        reg_result = RegResult(
+        reg_result = InternalRegParams(
             path_to_small_moving=current_moving_preprocessed.image_path,
             path_to_small_fixed=current_fixed_preprocessed.image_path,
             path_to_small_composite=path_small_composite_warp,
@@ -757,7 +1007,7 @@ class GreedyFHist:
         composited_backward_transform = compose_inv_reg_transforms(backward_transform, reg_result)
         fixed_transform = GFHTransform(original_fixed_image_size, composited_forward_transform)
         moving_transform = GFHTransform(original_moving_image_size, composited_backward_transform)
-        registration_result = RegistrationResult(fixed_transform=fixed_transform, moving_transform=moving_transform, cmdln_returns=cmdln_returns)
+        registration_result = RegistrationResult(forward_transform=fixed_transform, backward_transform=moving_transform, cmdln_returns=cmdln_returns)
         # Return this!
         
         if options.remove_temporary_directory:
@@ -769,7 +1019,23 @@ class GreedyFHist:
                                affine_options: Optional[RegistrationOptions] = None,
                                nonrigid_option: Optional[RegistrationOptions] = None,
                                skip_deformable_registration: bool = False,
-                               ):
+                               ) -> Tuple[GroupwiseRegResult, List[numpy.array]]:
+        """Performs groupwise registration on a provided image list. For each image, an optional mask can be provided. Fixed image is last image in image_mask_list.
+        Every other image is a moving image. Groupwise registration is performed in 2 steps:
+            1. Pairwise affine registration between all adjacent images is computed and applied such that each moving image is affinely registered onto the fixed image.
+            2. Nonrigid registration between each moving image and the fixed image.
+
+
+        Args:
+            image_mask_list (List[Tuple[numpy.array, Optional[numpy.array]]]): List of images. Last image is fixed image. Every other image is a moving image. For each image, 
+            an optional mask can be supplied.
+            affine_options (Optional[RegistrationOptions], optional): Affine registration options. Defaults to None.
+            nonrigid_option (Optional[RegistrationOptions], optional): Nonrigid registration options. Defaults to None.
+            skip_deformable_registration (bool, optional): Defaults to False.
+
+        Returns:
+            Tuple[GroupwiseRegResult, List[numpy.array]]: GroupwiseRegResult contains all computed transformations. List of images are either affine or nonrigid warped images.
+        """
         if affine_options is None:
             affine_options = RegistrationOptions()
             affine_options.do_nonrigid_registration = False
@@ -817,7 +1083,7 @@ class GreedyFHist:
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
             nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_option)
-            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.fixed_transform, 'LINEAR')
+            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.forward_transform, 'LINEAR')
             # Do deformable mask?
             nonrigid_warped_images.append(deformable_warped_image)
             nonrigid_transformations.append(nonrigid_reg_result)
@@ -828,6 +1094,16 @@ class GreedyFHist:
                         image: numpy.array,
                         transform: 'GFHTransform',
                         interpolation_mode: str = 'LINEAR') -> numpy.array:
+        """Transforms image data from moving to fixed image space using computed transformation.
+
+        Args:
+            image (numpy.array): 
+            transform (GFHTransform): 
+            interpolation_mode (str, optional): Defaults to 'LINEAR'.
+
+        Returns:
+            numpy.array: 
+        """
         return self.transform_image_(image,
                                      transform.transform,
                                      transform.size,
@@ -838,8 +1114,18 @@ class GreedyFHist:
                         transform: SimpleITK.SimpleITK.Transform,
                         size: Tuple[int,int],
                         interpolation_mode: str = 'LINEAR') -> numpy.array:
+        """Transforms image from moving to fixed image space.
+
+        Args:
+            image (numpy.array): 
+            transform (SimpleITK.SimpleITK.Transform): 
+            size (Tuple[int,int]): Fixed image space resolution.
+            interpolation_mode (str, optional): 'LINEAR' or 'NN'. Defaults to 'LINEAR'.
+
+        Returns:
+            numpy.array: _description_
+        """
         interpolator = sitk.sitkLinear if interpolation_mode == 'LINEAR' else sitk.sitkNearestNeighbor
-        # size = transformation_matrix.GetSize()
         ref_img = sitk.GetImageFromArray(np.zeros((size[0], size[1])), True)
         sitk_image = sitk.GetImageFromArray(image, True)
         resampler = sitk.ResampleImageFilter()
@@ -854,6 +1140,15 @@ class GreedyFHist:
     def transform_pointset(self,
                            pointset: numpy.array,
                            transform: GFHTransform) -> numpy.array:
+        """Transforms pointset from moving to fixed image space.
+
+        Args:
+            pointset (numpy.array): 
+            transform (GFHTransform): 
+
+        Returns:
+            numpy.array:
+        """
         return self.transform_pointset_(
             pointset,
             transform.transform
@@ -862,15 +1157,14 @@ class GreedyFHist:
     def transform_pointset_(self,
                          pointset: numpy.array,
                          transform: SimpleITK.SimpleITK.Transform) -> numpy.array:
-        """Transform pointset. 
+        """Transform pointset from moving to fixed image space.
     
         Args:
-            pointset (pandas.DataFrame): Supplied as a dataframe. x and y columns are used for transforming data.
-            transformation (RegResult): 
-            args (_type_, optional): Any additional arguments for transforming. Defaults to None.
+            pointset (numpy.array): 
+            transformation (SimpleITK.SimpleITK.Transform): 
     
         Returns:
-            Any: _description_
+            numpy.array: 
         """
         pointset -= 0.5
         warped_points = []
@@ -881,6 +1175,7 @@ class GreedyFHist:
         warped_pointset = np.array(warped_points)
         return warped_pointset
 
+    # TODO: Fix types for geojson.
     def transform_geojson(self,
                           geojson_data: geojson.GeoJSON,
                           transformation: SimpleITK.SimpleITK.Image,
@@ -899,7 +1194,16 @@ class GreedyFHist:
         else:
             return warped_geometries
 
-    def __warp_geojson_coord_tuple(self, coord, transform):
+    def __warp_geojson_coord_tuple(self, coord: Tuple[float, float], transform: SimpleITK.SimpleITK.Transform) -> Tuple[float, float]:
+        """Transforms coordinates from geojson data from moving to fixed image space.
+
+        Args:
+            coord (Tuple[float, float]): 
+            transform (SimpleITK.SimpleITK.Transform): 
+
+        Returns:
+            Tuple[float, float]: 
+        """
         ps = np.array([[coord[0], coord[1]]]).astype(float)
         warped_ps = self.transform_pointset(ps, transform)
         return (warped_ps[0, 0], warped_ps[0, 1])
@@ -914,6 +1218,14 @@ class GreedyFHist:
 
     @classmethod
     def load_from_config(cls, config: Dict[str, Any]) -> 'GreedyFHist':
+        """Loads GreedyFHist registerer using additional arguments supplied in config.
+
+        Args:
+            config (Dict[str, Any]): _description_
+
+        Returns:
+            GreedyFHist: _description_
+        """
         # Refers to greedy's directory. If not supplied, assumes that greedy is in PATH.
         path_to_greedy = config.get('path_to_greedy', '')
         path_to_greedy = join(path_to_greedy, 'greedy')

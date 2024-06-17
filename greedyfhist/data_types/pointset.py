@@ -23,7 +23,7 @@ class Pointset:
     def update_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
 
         pointset = self.to_numpy()
-        warped_pointset = registerer.transform_pointset(pointset, transformation.moving_transform)
+        warped_pointset = registerer.transform_pointset(pointset, transformation.backward_transform)
         
         self.data[self.x_axis] = warped_pointset[:, 0]
         self.data[self.y_axis] = warped_pointset[:, 1]

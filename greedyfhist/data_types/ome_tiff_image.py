@@ -19,7 +19,7 @@ class OMETIFFImage:
 
     def update_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
-        warped_img = registerer.transform_image(self.img, transformation.fixed_transform, interpolation)
+        warped_img = registerer.transform_image(self.img, transformation.forward_transform, interpolation)
         self.img = warped_img
         self.metadata['SizeX'] = warped_img.shape[0]
         self.metadata['SizeY'] = warped_img.shape[1]

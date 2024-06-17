@@ -9,17 +9,21 @@ from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResu
 @dataclass
 class Image:
 
-    data: Any
+    img: Any
     is_annotation: bool = False
     switch_axis: bool = False
     
     def update_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
-        warped_img = registerer.transform_image(self.img, transformation.fixed_transform, interpolation)
+        warped_img = registerer.transform_image(self.img, transformation.forward_transform, interpolation)
         self.img = warped_img
     
     def to_file(self, path):
-        sitk.WriteImage(sitk.GetImageFromArray(self.data), path)
+        if self.switch_axis:
+            img = np.moveaxis(self.img, 2, 0)
+        else:
+            img = self.img
+        sitk.WriteImage(sitk.GetImageFromArray(img), path)
     
     @classmethod
     def load_data(cls, dct):

@@ -12,7 +12,7 @@ import toml
 from greedyfhist.utils.image import read_image
 from greedyfhist.utils.io import create_if_not_exists, read_config
 from greedyfhist.utils.geojson_utils import read_geojson
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegResult, RegistrationResult
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, InternalRegParams, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
 
 
@@ -127,7 +127,7 @@ def transform(transformation,
          annotations,
          coordinates,
          geojsons):
-    transformation_ = RegResult.from_directory(transformation)
+    transformation_ = InternalRegParams.from_directory(transformation)
     config = {
         'path_to_greedy': path_to_greedy
     }
