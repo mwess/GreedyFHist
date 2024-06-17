@@ -12,7 +12,7 @@ import toml
 from greedyfhist.utils.image import read_image
 from greedyfhist.utils.io import create_if_not_exists, read_config
 from greedyfhist.utils.geojson_utils import read_geojson
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegResult
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegResult, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
 
 
@@ -29,6 +29,34 @@ def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str],
     moving_mask_path = config.get('moving_mask', None)
     fixed_mask_path = config.get('fixed_mask', None)
     return moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path
+
+def derive_type(path):
+    if path.endswith('.geojson'):
+        return 'geojson'
+    if path.endswith('.csv'):
+        return 'pointset'
+    return 'image'
+    
+
+def load_data(data):
+    path = data['path']
+    type_ = data.get('type', None)
+    if type_ is None:
+        type_ = derive_type(path) 
+    if type_ == 'geojson':
+        with open(path) as f:
+            geojson_data = geojson.load(f)
+    elif type_ == 'pointset':
+        pass
+    elif type_ == 'annotation':
+        pass
+        
+    
+
+
+def transform_data(data: Dict, registerer: GreedyFHist, registration_result: RegistrationResult):
+    pass
+    # Load data
 
 def register(moving_image_path=None,
              fixed_image_path=None,
@@ -84,6 +112,12 @@ def register(moving_image_path=None,
         options=registration_options
     )
     registration_result.to_file(output_directory_registrations)
+
+    if 'input' not in config:
+        return
+    additional_datas = config['input'].get('additional_data', [])
+    for data in additional_datas:
+        transform_data(data, registerer, registration_result)
 
 
 def transform(transformation,
