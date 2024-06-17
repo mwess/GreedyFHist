@@ -14,6 +14,7 @@ import SimpleITK as sitk
 from skimage.transform import resize
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
+import tifffile
 
 from greedyfhist.utils.utils import call_command
 from greedyfhist.custom_types import padding_type, image_shape
@@ -354,3 +355,14 @@ def resize_image(img: numpy.array, shape: image_shape, interpolation: str ='NN')
         # interpolation_mode = cv2.INTER_LINEAR
         interpolation_mode = 1
     return resize(img, (shape[0], shape[1]), order=interpolation_mode)
+
+    
+def read_image(fpath: str, squeeze=False) -> numpy.array:
+    if fpath.endswith('.ome.tiff') or fpath.endswith('.ome.tif'):
+        image = tifffile.imread(fpath)
+        return image
+    sitk_image = sitk.ReadImage(fpath)
+    image = sitk.GetArrayFromImage(sitk_image)
+    if squeeze:
+        image = np.squeeze(image)
+    return image

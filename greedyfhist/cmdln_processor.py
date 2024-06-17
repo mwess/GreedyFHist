@@ -1,44 +1,89 @@
+import logging
 import os
 from os.path import join
+from typing import Dict, List, Optional, Tuple
 
 import geojson
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
+import toml
 
-from greedyfhist.utils.io import read_sitk_if_not_none, create_if_not_exists, read_config
-from greedyfhist.utils.geojson_utils import read_geojson, geojson_2_table
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, get_default_args, RegResult
+from greedyfhist.utils.image import read_image
+from greedyfhist.utils.io import create_if_not_exists, read_config
+from greedyfhist.utils.geojson_utils import read_geojson
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegResult
+from greedyfhist.options.options import RegistrationOptions
 
 
-def register(moving_image,
-             fixed_image,
-             output_directory,
-             moving_mask=None,
-             fixed_mask=None,
+logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
+
+def all_paths_are_none(path_list: List[str]) -> bool:
+    return all(map(lambda x: x is None, path_list))
+
+def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    if config is None:
+        return None, None, None, None
+    moving_image_path = config.get('moving_image', None)
+    fixed_image_path = config.get('fixed_image', None)
+    moving_mask_path = config.get('moving_mask', None)
+    fixed_mask_path = config.get('fixed_mask', None)
+    return moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path
+
+def register(moving_image_path=None,
+             fixed_image_path=None,
+             output_directory=None,
+             moving_mask_path=None,
+             fixed_mask_path=None,
              path_to_greedy=None,
-             is_cmd_line=True):
-    # print(f'Moving image: {moving}')
-    mov_img = sitk.GetArrayFromImage(sitk.ReadImage(moving_image))
-    fix_img = sitk.GetArrayFromImage(sitk.ReadImage(fixed_image))
-    mov_mask = read_sitk_if_not_none(moving_mask)
-    fix_mask = read_sitk_if_not_none(fixed_mask)
-    args = get_default_args()
-    if is_cmd_line:
-        reg_dir = f'{output_directory}/registration/0'
-        create_if_not_exists(output_directory)
-        create_if_not_exists(reg_dir)
+             config_path=None):
+    """
+    Works as follows:
+    1. Loads everything from config
+    2. Override everything from config with manually specified args.
+    """
+    logging.info('Starting registration.')
+    if config_path is not None:
+        with open(config_path) as f:
+            config = toml.load(f)
     else:
-        reg_dir = output_directory
-    args['output_dir'] = reg_dir
-    args['tmp_dir'] = join(reg_dir, 'tmp')
-    create_if_not_exists(args['tmp_dir'])
-    if path_to_greedy is None:
+        config = {}
+    if 'gfh_options' in config:
+        registration_options = RegistrationOptions.parse_cmdln_dict(config['gfh_options'])
+    else:
+        registration_options = RegistrationOptions.default_options()
+    if all_paths_are_none([moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path]):
+        moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path = get_paths_from_config(config.get('input', None))
+    if moving_image_path is None and fixed_image_path is None:
+        pass # Throw error
+    if 'options' in config:
+        # TODO: Should I add collision avoidance?
+        output_directory = config['options'].get('output_directory', 'out')
+        path_to_greedy = config['options'].get('path_to_greedy', '')
+    else:
+        output_directory = 'out'
         path_to_greedy = ''
-    config = {
-        'path_to_greedy': path_to_greedy
-    }
-    GreedyFHist.load_from_config(config).register(mov_img, fix_img, mov_mask, fix_mask, args)
+    
+    # Setup file structure
+    output_directory_registrations = join(output_directory, 'registrations')
+    create_if_not_exists(output_directory_registrations)
+        
+    
+    moving_image = read_image(moving_image_path)
+    fixed_image = read_image(fixed_image_path)
+    moving_mask = read_image(moving_mask_path, True) if moving_mask_path is not None else None
+    fixed_mask = read_image(fixed_mask_path, True) if fixed_mask_path is not None else None
+    
+    registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
+
+    registration_result = registerer.register(
+        moving_image,
+        fixed_image,
+        moving_mask,
+        fixed_mask,
+        options=registration_options
+    )
+    registration_result.to_file(output_directory_registrations)
 
 
 def transform(transformation,

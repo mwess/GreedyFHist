@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 
 def get_3_step_pyramid_iterations():
@@ -34,7 +34,7 @@ class GreedyOptions:
     def __assign_if_present(self, key, args_dict):
         if key in args_dict:
             value = args_dict[key]
-            if key in self.__anotations__:
+            if key in self.__annotations__:
                 self.__setattr__(key, value)
 
     def to_dict(self):
@@ -44,7 +44,7 @@ class GreedyOptions:
         return d
             
     @staticmethod
-    def load_options():
+    def default_options():
         return GreedyOptions()
 
 def load_greedyoptions():
@@ -54,11 +54,10 @@ def load_default_resolution():
     return (1024, 1024)
 
 @dataclass
-class Options:
+class RegistrationOptions:
 
-    greedy_opts: 'GreedyOptions' = field(default_factory=load_greedyoptions)
+    greedy_opts: 'GreedyOptions' = field(default_factory=GreedyOptions.default_options)
     resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
-    temporary_directory: str = 'tmp'
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
     enable_affine_denoising: bool = True
@@ -67,36 +66,20 @@ class Options:
     moving_sp: int = 25
     fixed_sr: int = 30
     fixed_sp: int = 25
-    pre_downsampling_factor: float = 1
-    store_commandline_logs: bool = True
-    remove_temporary_directory: bool = True
+    pre_downsampling_factor: Union[float, str] = 1
     keep_affine_transform_unbounded: bool = True
+    temporary_directory: str = 'tmp'
+    remove_temporary_directory: bool = True
     
     def __post_init__(self):
         self.greedy_opts = GreedyOptions()
     
-    def parse_dict(self, args_dict):
-        # First collect all greedy parameters
-        greedy_args = self.__collect_greedy_args(args_dict)
-        for key in args_dict:
-            self.__assign_if_present(key, args_dict)
-        self.greedy_opts.parse_dict(greedy_args)
-
-    def __collect_greedy_args(self, args_dict):
-        greedy_args = {}
-        for key in args_dict:
-            if key.startswith('greedy_'):
-                g_key = key.lstrip('greedy_')
-                value = args_dict[key]
-                greedy_args[g_key] = value
-        return greedy_args
-
     def __assign_if_present(self, key, args_dict):
         if key in args_dict:
             value = args_dict[key]
             if key in self.__annotations__:
                 self.__setattr__(key, value)
-
+    
     def to_dict(self):
         d = {}
         for key in self.__annotations__:
@@ -109,7 +92,7 @@ class Options:
 
     @staticmethod
     def parse_cmdln_dict(args_dict):
-        opts = Options()
+        opts = RegistrationOptions()
         for key in args_dict:
             if key in ['greedy', 'resolution']:
                 continue
@@ -122,3 +105,8 @@ class Options:
         if 'greedy' in args_dict:
             greedy_args = args_dict['greedy']
             opts.greedy_opts.parse_dict(greedy_args)
+        return opts
+
+    @staticmethod
+    def default_options():
+        return RegistrationOptions()

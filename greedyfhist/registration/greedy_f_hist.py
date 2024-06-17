@@ -32,7 +32,7 @@ from greedyfhist.utils.image import (
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps
 from greedyfhist.utils.geojson_utils import geojson_2_table, convert_table_2_geo_json
 from greedyfhist.segmentation.segmenation import load_yolo_segmentation
-from greedyfhist.options import Options
+from greedyfhist.options import RegistrationOptions
 
 
 # TODO: Write serialization
@@ -73,6 +73,7 @@ class GFHTransform:
         with open(attributes_path, 'w') as f:
             json.dump(attributes, f)
         transform_path = join(path, 'transform.txt')
+        self.transform.FlattenTransform()
         sitk.WriteTransform(self.transform, transform_path)
 
 
@@ -348,7 +349,7 @@ class GreedyFHist:
                  fixed_img: numpy.array,
                  moving_img_mask: Optional[numpy.array] = None,
                  fixed_img_mask: Optional[numpy.array] = None,
-                 options: Optional[Options] = None) -> Any:
+                 options: Optional[RegistrationOptions] = None) -> 'RegistrationResult':
         """Performs registration from moving_img to fixed_img. Optional tissue masks can be provided.
         Options are supplied via the options arguments.
 
@@ -374,11 +375,11 @@ class GreedyFHist:
                  fixed_img: numpy.array,
                  moving_img_mask: Optional[numpy.array] = None,
                  fixed_img_mask: Optional[numpy.array] = None,
-                 options: Optional[Options] = None,                  
-                 **kwargs: Dict) -> 'RegResult':
+                 options: Optional[RegistrationOptions] = None,                  
+                 **kwargs: Dict) -> 'RegistrationResult':
         # TODO: We only need a temp directory now, so get rid of output.
         if options is None:
-            options = Options()
+            options = RegistrationOptions()
         # Step 1: Set up all the parameters and filenames as necessary.
         # Clean this up.
         path_temp = options.temporary_directory
@@ -728,15 +729,10 @@ class GreedyFHist:
 
         # Check those 2
 
-        reg_param_outpath = os.path.join(path_output, 'reg_params.json')
-        with open(reg_param_outpath, 'w') as f:
-            json.dump(reg_params, f)
+        # reg_param_outpath = os.path.join(path_output, 'reg_params.json')
+        # with open(reg_param_outpath, 'w') as f:
+        #     json.dump(reg_params, f)
 
-        if options.store_commandline_logs:
-            cmd_output = os.path.join(path_output, 'cmdl_returns.txt')
-            with open(cmd_output, 'w') as f:
-                for ret in cmdln_returns:
-                    f.write(f'{ret}\n')
 
         displacement_field = None
         inv_displacement_field = None
@@ -770,15 +766,15 @@ class GreedyFHist:
 
     def groupwise_registration(self,
                                image_mask_list: List[Tuple[numpy.array, Optional[numpy.array]]],
-                               affine_options: Optional[Options] = None,
-                               nonrigid_option: Optional[Options] = None,
+                               affine_options: Optional[RegistrationOptions] = None,
+                               nonrigid_option: Optional[RegistrationOptions] = None,
                                skip_deformable_registration: bool = False,
                                ):
         if affine_options is None:
-            affine_options = Options()
+            affine_options = RegistrationOptions()
             affine_options.do_nonrigid_registration = False
         if nonrigid_option is None:
-            nonrigid_option = Options()
+            nonrigid_option = RegistrationOptions()
         nonrigid_option.do_affine_registration = False
         # Stage1: Affine register along the the sequence.
         moving_image, moving_mask = image_mask_list[0]
@@ -795,7 +791,7 @@ class GreedyFHist:
         affine_transform_lists = []
         for (fixed_image, fixed_mask) in image_mask_list[1:]:
             # This kind of makes transformations that are all registered to the original fixed image. Consider having them only be pairwise.
-            sub_options = Options()
+            sub_options = RegistrationOptions()
             sub_options.keep_affine_transform_unbounded = True
             sub_options.do_nonrigid_registration = False
             reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, sub_options)

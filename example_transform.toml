@@ -1,0 +1,26 @@
+#[input_options]
+#
+# moving_image = MOVING_FILE_PATH
+# fixed_image = FIXED_FILE_PATH
+# moving_mask = MOVING_MASK_PATH
+# fixed_mask = FIXED_MASK_PATH
+# output_directory = PATH_TO_OUTPUT_DIRECTORY
+# annotation_path = moving_annotation_path
+[input]
+
+# moving_image = 'MOVING_FILE_PATH'
+# fixed_image = 'FIXED_FILE_PATH'
+# moving_mask = 'MOVING_MASK_PATH'
+# fixed_mask = 'FIXED_MASK_PATH'
+transform_path = 'out/registration'
+
+data = [
+    'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.ome.tif',
+    'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.geojson',
+    ]
+
+[options]
+
+output_directory = 'out'
+path_to_greedy = ''
+

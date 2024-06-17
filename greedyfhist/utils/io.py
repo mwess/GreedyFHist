@@ -75,6 +75,7 @@ def read_sitk_if_not_none(path: str) -> Optional[SimpleITK.SimpleITK.Image]:
     return None
 
 
+# TODO: Remove?!
 def read_config(path: str) -> Dict:
     with open(path) as f:
         if path.endswith('.json'):

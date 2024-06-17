@@ -9,15 +9,29 @@ def cli():
 
 
 @click.command()
-@click.option('--moving-image', type=click.Path(), required=True)
-@click.option('--fixed-image', type=click.Path(), required=True)
-@click.option('--output-directory', type=click.Path(), required=True, default='out')
+@click.option('--moving-image', type=click.Path())
+@click.option('--fixed-image', type=click.Path())
+@click.option('--output-directory', type=click.Path(), default='out')
 @click.option('--moving-mask', type=click.Path())  # Make this optional
 @click.option('--fixed-mask', type=click.Path())  # Make this optional
 @click.option('--path-to-greedy', type=click.Path())
 @click.option('--config', type=click.Path())
-def register(*args, **kwargs):
-    pass
+def register(moving_image,
+             fixed_image,
+             output_directory,
+             moving_mask=None,
+             fixed_mask=None,
+             path_to_greedy=None,
+             config=None):
+    cmdln_processor.register(
+        moving_image,
+        fixed_image,
+        output_directory,
+        moving_mask,
+        fixed_mask,
+        path_to_greedy,
+        config 
+    )
 
 # @click.command()
 # @click.option('--moving-image', type=click.Path(), required=True)
