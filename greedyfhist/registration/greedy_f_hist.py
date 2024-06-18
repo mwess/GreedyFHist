@@ -32,7 +32,9 @@ from greedyfhist.utils.image import (
     get_symmetric_padding,
     cropping,
     resample_image_sitk,
-    derive_resampling_factor
+    derive_resampling_factor,
+    realign_displacement_field,
+    translation_length
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps
 from greedyfhist.segmentation.segmenation import load_yolo_segmentation
@@ -168,6 +170,9 @@ class RegistrationResult:
     cmdln_returns: Optional[List[subprocess.CompletedProcess]]
         Contains log output from command line executions.
 
+    reg_params: Dict
+        Contains internally computed registration parameters.
+
     Methods
     -------
 
@@ -181,8 +186,9 @@ class RegistrationResult:
     forward_transform: 'GFHTransform'
     backward_transform: 'GFHTransform'
     cmdln_returns: Optional[List[subprocess.CompletedProcess]] = None
+    reg_params: Optional[Dict] = None
     
-    # TODO: Can I add cmdln_returns somehow
+    # TODO: Can I add cmdln_returns and reg_params somehow
     def to_file(self, path: str):
         """Saves 'RegistrationResult' to file.
 
@@ -392,9 +398,14 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
 
     all_transforms = sitk.CompositeTransform(2)
     # Try adding downsampling factor
-    ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
-    pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
-    post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
+    # ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
+    # pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
+    # post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
+
+    mov_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
+    fix_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
+    pre_downscale_transform = sitk.ScaleTransform(2, (1/mov_ds_factor, 1/mov_ds_factor))
+    post_upscale_transform = sitk.ScaleTransform(2, (fix_ds_factor, fix_ds_factor))
     
     aff_trans1 = sitk.TranslationTransform(2)
     offset_x = -moving_padding[0]
@@ -442,9 +453,14 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     
     all_transforms = sitk.CompositeTransform(2)
 
-    ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
-    pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
-    post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
+    # ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
+    # pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
+    # post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
+    
+    mov_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
+    fix_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
+    pre_downscale_transform = sitk.ScaleTransform(2, (1/fix_ds_factor, 1/fix_ds_factor))
+    post_upscale_transform = sitk.ScaleTransform(2, (mov_ds_factor, mov_ds_factor))
 
     aff_trans1 = sitk.TranslationTransform(2)
     offset_x = moving_padding[0]
@@ -654,11 +670,15 @@ class GreedyFHist:
         path_output, subdir_num = derive_subdir(path_output)
         create_if_not_exists(path_output)
         # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
-        pre_downsampling_factor = options.pre_downsampling_factor
-        if pre_downsampling_factor == 'auto':
+        pre_sampling_factor = options.pre_sampling_factor
+        if pre_sampling_factor == 'auto':
             # TODO: Separate between moving and fixed resampling factor
             moving_resampling_factor = derive_resampling_factor(moving_img)
             fixed_resampling_factor = derive_resampling_factor(fixed_img)
+        else:
+            moving_resampling_factor = pre_sampling_factor
+            fixed_resampling_factor = pre_sampling_factor
+
         original_moving_image_size = moving_img.shape[:2]
         original_fixed_image_size = fixed_img.shape[:2]
 
@@ -669,7 +689,9 @@ class GreedyFHist:
                       'affine_use_denoising': options.enable_affine_denoising,
                       'deformable_use_denoising': options.enable_deformable_denoising,
                       'options': options.to_dict(),
-                      'pre_downsampling_factor': options.pre_downsampling_factor,
+                      'pre_downsampling_factor': options.pre_sampling_factor,
+                      'moving_resampling_factor': moving_resampling_factor,
+                      'fixed_resampling_factor': fixed_resampling_factor,
                       'original_moving_image_size': original_moving_image_size,
                       'original_fixed_image_size': original_fixed_image_size
                       }
@@ -678,16 +700,19 @@ class GreedyFHist:
         # Convert to correct format, if necessary
         moving_img = correct_img_dtype(moving_img)
         fixed_img = correct_img_dtype(fixed_img)
-        moving_img = resample_image_sitk(moving_img, pre_downsampling_factor)
-        fixed_img = resample_image_sitk(fixed_img, pre_downsampling_factor)
+        # moving_img = resample_image_sitk(moving_img, pre_downsampling_factor)
+        # fixed_img = resample_image_sitk(fixed_img, pre_downsampling_factor)
+        moving_img = resample_image_sitk(moving_img, moving_resampling_factor)
+        fixed_img = resample_image_sitk(fixed_img, fixed_resampling_factor)
         if moving_img_mask is None:
             moving_img_mask = self.segmentation_function(moving_img)
         else:
-            moving_img_mask = resample_image_sitk(moving_img_mask, pre_downsampling_factor)
+            # moving_img_mask = resample_image_sitk(moving_img_mask, pre_downsampling_factor)
+            moving_img_mask = resample_image_sitk(moving_img_mask, moving_resampling_factor)
         if fixed_img_mask is None:
             fixed_img_mask = self.segmentation_function(fixed_img)
         else:
-            fixed_img_mask = resample_image_sitk(fixed_img_mask, pre_downsampling_factor)
+            fixed_img_mask = resample_image_sitk(fixed_img_mask, fixed_resampling_factor)
         # Cropping and Padding
         cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
         cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
@@ -771,10 +796,6 @@ class GreedyFHist:
         # 3. Registration
         # Affine registration
         #TODO: I think this offset can be kept a lot smaller. Try out different things.
-        offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
-        reg_params['offset'] = offset
-        reg_params['affine_iteration_vec'] = options.greedy_opts.affine_iteration_pyramid
-        reg_params['deformable_iteration_vec'] = options.greedy_opts.nonrigid_iteration_pyramid
 
         ia_init = ''
         if options.greedy_opts.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
@@ -784,10 +805,17 @@ class GreedyFHist:
             init_mat = com_affine_matrix(fixed_img_mask, moving_img_mask)
             write_mat_to_file(init_mat, init_mat_path)
             ia_init = ['-ia', f'{init_mat_path}']
+            reg_params['com_x'] = init_mat[0, 2]
+            reg_params['com_y'] = init_mat[1, 2]
+            offset = int(translation_length(init_mat[0,2], init_mat[0,1]))
         elif options.greedy_opts.ia == 'ia-image-centers':
             ia_init = ['-ia-image-centers', '']
+            offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
         else:
             print(f'Unknown ia option: {options.greedy_opts.ia}.')
+            offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
+        reg_params['offset'] = offset
+
 
         if options.enable_affine_denoising:
             current_fixed_preprocessed = fixed_denoised_preprocessed
@@ -801,6 +829,7 @@ class GreedyFHist:
             moving_img_path = moving_img_preprocessed.image_path
 
         if options.do_affine_registration:
+            reg_params['affine_iteration_vec'] = options.greedy_opts.affine_iteration_pyramid
             path_small_affine = os.path.join(path_metrics_small_resolution, 'small_affine.mat')
             aff_ret = affine_registration(self.path_to_greedy,
                                           fixed_img_path,
@@ -815,7 +844,8 @@ class GreedyFHist:
             path_small_affine = None
 
         if options.do_nonrigid_registration:        
-
+            
+            reg_params['deformable_iteration_vec'] = options.greedy_opts.nonrigid_iteration_pyramid
             # Diffeomorphic
             if options.enable_affine_denoising and not options.enable_deformable_denoising:
                 # Map paths back
@@ -908,23 +938,8 @@ class GreedyFHist:
                  current_moving_preprocessed.height_original),
                 factor)
 
-            displacement_field = sitk.ReadImage(path_big_composite_warp, sitk.sitkVectorFloat64)
-            rotated_displ_field = sitk.GetArrayFromImage(displacement_field)
-            rotated_displ_field *= -1
-            rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-            displ_field = sitk.Image(rotated_displ_field_sitk) 
-            displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-            forward_transform = sitk.DisplacementFieldTransform(2)
-            forward_transform.SetDisplacementField(displ_field)
-            
-            inv_displacement_field = sitk.ReadImage(path_big_composite_warp_inv, sitk.sitkVectorFloat64)
-            rotated_displ_field = sitk.GetArrayFromImage(inv_displacement_field)
-            rotated_displ_field *= -1
-            rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-            displ_field = sitk.Image(rotated_displ_field_sitk) 
-            displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-            backward_transform = sitk.DisplacementFieldTransform(2)
-            backward_transform.SetDisplacementField(displ_field)
+            forward_deformable_transform = realign_displacement_field(path_big_warp)
+            backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
         elif options.do_nonrigid_registration and options.keep_affine_transform_unbounded:
             # First rescale affine transforms
             forward_affine_transform = rescale_affine(path_small_affine, factor)
@@ -948,23 +963,8 @@ class GreedyFHist:
                  current_fixed_preprocessed.height_original),
                 factor)
 
-            displacement_field = sitk.ReadImage(path_big_warp, sitk.sitkVectorFloat64)
-            rotated_displ_field = sitk.GetArrayFromImage(displacement_field)
-            rotated_displ_field *= -1
-            rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-            displ_field = sitk.Image(rotated_displ_field_sitk) 
-            displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-            forward_deformable_transform = sitk.DisplacementFieldTransform(2)
-            forward_deformable_transform.SetDisplacementField(displ_field)
-            
-            inv_displacement_field = sitk.ReadImage(path_big_warp_inv, sitk.sitkVectorFloat64)
-            rotated_displ_field = sitk.GetArrayFromImage(inv_displacement_field)
-            rotated_displ_field *= -1
-            rotated_displ_field_sitk = sitk.GetImageFromArray(rotated_displ_field, True)
-            displ_field = sitk.Image(rotated_displ_field_sitk) 
-            displ_field = sitk.Cast(displ_field, sitk.sitkVectorFloat64)
-            backward_deformable_transform = sitk.DisplacementFieldTransform(2)
-            backward_deformable_transform.SetDisplacementField(displ_field)
+            forward_deformable_transform = realign_displacement_field(path_big_warp)
+            backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
                 
             forward_transform = sitk.CompositeTransform(2)
             forward_transform.AddTransform(forward_affine_transform)
@@ -1021,7 +1021,7 @@ class GreedyFHist:
         composited_backward_transform = compose_inv_reg_transforms(backward_transform, reg_result)
         fixed_transform = GFHTransform(original_fixed_image_size, composited_forward_transform)
         moving_transform = GFHTransform(original_moving_image_size, composited_backward_transform)
-        registration_result = RegistrationResult(forward_transform=fixed_transform, backward_transform=moving_transform, cmdln_returns=cmdln_returns)
+        registration_result = RegistrationResult(forward_transform=fixed_transform, backward_transform=moving_transform, cmdln_returns=cmdln_returns, reg_params=reg_params)
         # Return this!
         
         if options.remove_temporary_directory:

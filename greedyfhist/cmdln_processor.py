@@ -10,7 +10,7 @@ import SimpleITK as sitk
 import toml
 
 from greedyfhist.utils.image import read_image
-from greedyfhist.utils.io import create_if_not_exists, read_config
+from greedyfhist.utils.io import create_if_not_exists
 from greedyfhist.utils.geojson_utils import read_geojson
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, InternalRegParams, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
@@ -180,44 +180,44 @@ def transform(transformation,
             geojson.dump(warped_geojson_data, f)
 
 
-def register_by_config(config_path):
-    config = read_config(config_path)
-    path_to_greedy = config.get('path_to_greedy', None)
-    if config['mode'] == 'multi-step-registration':
-        # Setup directory structure
-        output_directory = config_path['output_directory']
-        create_if_not_exists(output_directory)
-        output_reg_dir = join(output_directory, 'registration')
-        create_if_not_exists(output_reg_dir)
-        output_transform_dir = join(output_directory, 'transforms')
-        create_if_not_exists(output_transform_dir)
-        image_configs = config['data']
-        n_regs = len(image_configs) - 1
-        # Load data
-        moving_image = config['data'][0]['image']
-        moving_mask = config['data'][0].get('mask', None)
-        moving_image_name = os.path.basename(moving_image).rsplit('.', maxsplit=1)[0]
-        moving_mask_name = os.path.basename(moving_mask).rsplit('.', maxsplit=1)[0] if moving_mask is not None else None
-        for idx, image_config in enumerate(image_configs[1:]):
-            create_if_not_exists(output_directory)
-            cur_output_reg_dir = f'{output_reg_dir}/{idx}'
-            fixed_image = image_config['image']
-            fixed_mask = image_config.get('mask', None)
-            register(moving_image,
-                fixed_image,
-                cur_output_reg_dir,
-                moving_mask=moving_mask,
-                fixed_mask=fixed_mask,
-                path_to_greedy=path_to_greedy,
-                is_cmd_line=False)
-            transform_path = cur_output_reg_dir
-            cur_output_trf_dir = f'{output_transform_dir}/{idx}'
-            transform(transform_path,
-                cur_output_trf_dir,
-                path_to_greedy,
-                moving_image,
-                annotations=[moving_mask])
-            moving_image = join(cur_output_trf_dir, moving_image_name)
-            moving_mask = join(cur_output_trf_dir, moving_mask_name) if moving_mask is not None else None
-        # TODO: Continue here!!!
-        # TODO: Add support for transforming multiregistrations.
+# def register_by_config(config_path):
+#     config = read_config(config_path)
+#     path_to_greedy = config.get('path_to_greedy', None)
+#     if config['mode'] == 'multi-step-registration':
+#         # Setup directory structure
+#         output_directory = config_path['output_directory']
+#         create_if_not_exists(output_directory)
+#         output_reg_dir = join(output_directory, 'registration')
+#         create_if_not_exists(output_reg_dir)
+#         output_transform_dir = join(output_directory, 'transforms')
+#         create_if_not_exists(output_transform_dir)
+#         image_configs = config['data']
+#         n_regs = len(image_configs) - 1
+#         # Load data
+#         moving_image = config['data'][0]['image']
+#         moving_mask = config['data'][0].get('mask', None)
+#         moving_image_name = os.path.basename(moving_image).rsplit('.', maxsplit=1)[0]
+#         moving_mask_name = os.path.basename(moving_mask).rsplit('.', maxsplit=1)[0] if moving_mask is not None else None
+#         for idx, image_config in enumerate(image_configs[1:]):
+#             create_if_not_exists(output_directory)
+#             cur_output_reg_dir = f'{output_reg_dir}/{idx}'
+#             fixed_image = image_config['image']
+#             fixed_mask = image_config.get('mask', None)
+#             register(moving_image,
+#                 fixed_image,
+#                 cur_output_reg_dir,
+#                 moving_mask=moving_mask,
+#                 fixed_mask=fixed_mask,
+#                 path_to_greedy=path_to_greedy,
+#                 is_cmd_line=False)
+#             transform_path = cur_output_reg_dir
+#             cur_output_trf_dir = f'{output_transform_dir}/{idx}'
+#             transform(transform_path,
+#                 cur_output_trf_dir,
+#                 path_to_greedy,
+#                 moving_image,
+#                 annotations=[moving_mask])
+#             moving_image = join(cur_output_trf_dir, moving_image_name)
+#             moving_mask = join(cur_output_trf_dir, moving_mask_name) if moving_mask is not None else None
+#         # TODO: Continue here!!!
+#         # TODO: Add support for transforming multiregistrations.

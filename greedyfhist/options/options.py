@@ -17,20 +17,47 @@ class GreedyOptions:
     Some options are extended/overwritten.
 
     Attributes:
-        dim: Should always be set to 2.
-        s1: pre sigma value for nonrigid registration.
-        s2: post sigma value for nonrigid registration.
-        kernel_size: kernel size for 'ncc' kernel metric.
-        cost_function: cost function used to optimize the registration. Should always be set to 'ncc'.
-        rigid_iterations: Number of rigid iterations during initial registration of affine registration.
-        ia: Initial image alignment. 'ia-com-init' is a custom option for using the center-of-mass of image masks. Other options can be taken from Greedy. 
-        affine_iteration_pyramid: Iterations in the multiresolution pyramid.
-        nonrigid_iteration_pyramid: Iterations in the multiresolution pyramid.
-        n_threads: Number of threads. Defaults to 1, but 8 has shown the fastest registrations.
-        use_sv: Additional greedy option for nonrigid registration.
-        use_svlb: Additional experimental greedy option for nonrigid registration.
-        exp: Additional value used in conjunction with use_svlb.
-        yolo_segmentation_min_size: Threshold for recognition of tissue. Everything smaller is removed from masks.
+        dim: int 
+            Should always be set to 2.
+            
+        s1: float
+            pre sigma value for nonrigid registration.
+            
+        s2: float
+            post sigma value for nonrigid registration.
+            
+        kernel_size: int
+            kernel size for 'ncc' kernel metric.
+            
+        cost_function: str
+            cost function used to optimize the registration. Should always be set to 'ncc'.
+            
+        rigid_iterations: int
+            Number of rigid iterations during initial registration of affine registration.
+            
+        ia: str
+            Initial image alignment. 'ia-com-init' is a custom option for using the center-of-mass of image masks. Other options can be taken from Greedy. 
+            
+        affine_iteration_pyramid: List[int]
+            Iterations in the multiresolution pyramid.
+            
+        nonrigid_iteration_pyramid: List[int] 
+            Iterations in the multiresolution pyramid.
+            
+        n_threads: int
+            Number of threads. Defaults to 1, but 8 has shown the fastest registrations.
+            
+        use_sv: bool
+            Additional greedy option for nonrigid registration.
+            
+        use_svlb: bool
+            Additional experimental greedy option for nonrigid registration.
+            
+        exp: Optional[int]
+            Additional value used in conjunction with use_svlb.
+            
+        yolo_segmentation_min_size: int
+            Threshold for recognition of tissue. Everything smaller is removed from masks.
     """
 
     dim: int = 2
@@ -47,7 +74,7 @@ class GreedyOptions:
     use_svlb: bool = False
     exp: Optional[int] = None
     # TODO: Parse this option correctly.
-    yolo_segmentation_min_size=5000
+    yolo_segmentation_min_size: int =5000
 
     def parse_dict(self, args_dict: Dict):
         """Function made to automatically parse attributes from dictionary. 
@@ -101,6 +128,67 @@ def load_default_resolution():
 
 @dataclass
 class RegistrationOptions:
+    """
+    Contains all the options that can be used to register a moving to a fixed image.
+    
+    greedy_opts: 'GreedyOptions'
+        Contains options that are affecting Greedy directly.
+        
+    resolution: Tuple[int, int]
+        Image resolution after downscaling for Greedy.
+
+    do_affine_registration: bool = True
+        Whether an affine registration is performed or not.
+        
+    do_nonrigid_registration: bool = True
+        Whether a deformable registration is performed or not.
+        
+    enable_affine_denoising: bool = True
+        Whether images are denoised prior to affine registration.
+        
+    enable_deformable_denoising: bool = True
+        Whether images are denoised prior to nonrigid registration.
+        
+    moving_sr: int = 30
+        Color window radius for mean shift filtering in moving image.
+
+    moving_sp: int = 25
+        Pixel window readius for mean shift filtering in moving image.
+        
+    fixed_sr: int = 30
+        Color window radius for mean shift filtering in fixed image.
+        
+    fixed_sp: int = 25
+        Pixel window radius for mean shift filtering in fixed image.
+        
+    pre_sampling_factor: Union[float, str] = 1
+        Sampling factor prior to preprocessing. Does not
+        affect registration accuracy, but can help to speed up the 
+        registration considerable, especially for large images. If
+        the factor is a float it is interpreted as a scaling factor
+        that is applied on both images prior to preprocessing. If
+        'auto', then the pre_sampling_auto_factor is used to
+        scale both images to have a maximum resolution of that factor.
+        
+    pre_sampling_auto_factor: Optional[int] = 3500
+        Determines the maximum resolution if pre_sampling_factor is
+        set to 'auto'. Ignored otherwise.
+        Helpful when image size is unkown or resolution between moving
+        and fixed image varies too much.
+        
+    keep_affine_transform_unbounded: bool = True
+        If true, keeps affine transform unbounded. Otherwise, affine
+        transform is translated into a displacement field. Should be
+        set to True.
+        
+    temporary_directory: str = 'tmp'
+        Temporary directory used for storing Greedy in- and output.
+        
+    remove_temporary_directory: bool = True
+        Sets whether the temporary directory is removed after
+        registration.
+
+    """
 
     greedy_opts: 'GreedyOptions' = field(default_factory=GreedyOptions.default_options)
     resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
@@ -112,7 +200,8 @@ class RegistrationOptions:
     moving_sp: int = 25
     fixed_sr: int = 30
     fixed_sp: int = 25
-    pre_downsampling_factor: Union[float, str] = 1
+    pre_sampling_factor: Union[float, str] = 1
+    pre_sampling_auto_factor: Optional[int] = 3500
     keep_affine_transform_unbounded: bool = True
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
@@ -121,6 +210,12 @@ class RegistrationOptions:
         self.greedy_opts = GreedyOptions()
     
     def __assign_if_present(self, key, args_dict):
+        """Assigns value of given key in args_dict if key in class's __annotations__.
+
+        Args:
+            key (_type_):
+            args_dict (_type_):
+        """
         if key in args_dict:
             value = args_dict[key]
             if key in self.__annotations__:
@@ -137,7 +232,18 @@ class RegistrationOptions:
         return d
 
     @staticmethod
-    def parse_cmdln_dict(args_dict):
+    def parse_cmdln_dict(args_dict: Dict) -> 'RegistrationOptions':
+        """Sets all values in dictionary that have a matching key in 
+        class's __annotation__ field. key/value pairs for GreedyOpts
+        are put in a sub dict, called 'greedy'. 'resolution' is in
+        string, e.g. '1024x1024'.
+
+        Args:
+            args_dict (Dict): _description_
+
+        Returns:
+            RegistrationOptions: _description_
+        """
         opts = RegistrationOptions()
         for key in args_dict:
             if key in ['greedy', 'resolution']:

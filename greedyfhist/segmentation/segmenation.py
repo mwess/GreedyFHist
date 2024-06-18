@@ -22,15 +22,6 @@ def fill_hole(mask):
     return filled
 
 
-# def preprocess_for_segmentation(image: numpy.array):
-#     image = cv2.resize(image, (640, 640))
-#     image_gray = cv2.cvtColor(image, cv2.RGB2GRAY)
-#     img2 = denoise_tv_chambolle(image_gray, weight=0.1, channel_axis=-1)
-#     img2 = (img2 * 255).astype(np.uint8)
-#     preprocessed_image = np.stack((img2, img2, img2))
-#     return preprocessed_image
-
-
 def preprocess_for_segmentation(image: numpy.array):
     image = cv2.resize(image, (640, 640))
     image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -39,13 +30,6 @@ def preprocess_for_segmentation(image: numpy.array):
     preprocessed_image = np.stack((img2, img2, img2))
     preprocessed_image = np.moveaxis(preprocessed_image, 0, 2)
     return preprocessed_image
-
-
-# def preprocess_for_segmentation(image):
-#     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-#     image = cv2.resize(image, (640, 640))
-#     image = np.dstack((image, image, image))
-#     return image
 
 
 def resolve_path_to_model():
