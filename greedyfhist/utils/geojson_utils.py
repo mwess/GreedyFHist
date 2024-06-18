@@ -1,3 +1,5 @@
+# TODO: That whole file might not be needed anymore.
+
 import geojson
 import pandas as pd
 import numpy as np

@@ -1,5 +1,10 @@
-from collections import OrderedDict
-import copy
+"""GreedyFHist, the registration algorithm, includes pairwise/groupwise registration, transform for various file formats. 
+
+This module handles the core registration functionality via the 
+GreedyFHist class. Results are exported as GroupwiseRegResult or 
+RegistrationResult. 
+"""
+
 from dataclasses import dataclass
 import json
 import os
@@ -17,7 +22,7 @@ import SimpleITK as sitk
 from greedyfhist.utils.io import create_if_not_exists, write_mat_to_file, clean_if_exists
 from greedyfhist.utils.image import (
     rescale_warp,
-    rescale_affine_2,
+    rescale_affine,
     denoise_image,
     apply_mask,
     com_affine_matrix,
@@ -26,11 +31,10 @@ from greedyfhist.utils.image import (
     pad_asym,
     get_symmetric_padding,
     cropping,
-    resample_by_factor,
-    resample_image_sitk
+    resample_image_sitk,
+    derive_resampling_factor
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps
-from greedyfhist.utils.geojson_utils import geojson_2_table, convert_table_2_geo_json
 from greedyfhist.segmentation.segmenation import load_yolo_segmentation
 from greedyfhist.options import RegistrationOptions
 
@@ -480,18 +484,22 @@ def preprocess_image_for_greedy(image: numpy.array,
                      resolution: Tuple[int, int],
                      smoothing: int,
                      tmp_dir: str) -> 'PreprocessedData':
-    """Performs final preprocessing steps of image and saves image for greedy under the filename is 'new_small_image.nii.gz' in the provided tmp_dir.
+    """Performs final preprocessing steps of image and saves image for 
+    greedy under the filename is 'new_small_image.nii.gz' in the 
+    provided tmp_dir.
 
 
     Args:
         image (numpy.array):
         kernel (int): kernel size
         resolution (Tuple[int, int]): resolution after downscaling
-        smoothing (int): Gaussian smoothing applied for preventing anti-aliasing.
+        smoothing (int): Gaussian smoothing applied for preventing 
+                         anti-aliasing.
         tmp_dir (str): Directory for storing.
 
     Returns:
-        PreprocessedData: Contains path to downscaled image and additional image parameters.
+        PreprocessedData: Contains path to downscaled image and 
+                          additional image parameters.
     """
     small_image = resample_image_with_gaussian(image, resolution, smoothing)
     height_image = image.shape[1]
@@ -562,6 +570,8 @@ def correct_img_dtype(img: numpy.array) -> numpy.array:
 class GreedyFHist:
     """
     Registration class. Performs registrations and transformation for paiwise images and groupwise images.
+
+    GreedyFHist should be initialized via the classmethod `from_config` as it ensures that the segmentation_function is loaded correctly.
 
     Attributes
     ----------
@@ -643,17 +653,18 @@ class GreedyFHist:
         path_output = join(path_output, 'registrations')
         path_output, subdir_num = derive_subdir(path_output)
         create_if_not_exists(path_output)
-        # path_temp = args.get('tmp_dir', join(path_output, 'tmp'))
-        affine_use_denoising = options.enable_affine_denoising
-        deformable_use_denoising = options.enable_deformable_denoising
         # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
         pre_downsampling_factor = options.pre_downsampling_factor
+        if pre_downsampling_factor == 'auto':
+            # TODO: Separate between moving and fixed resampling factor
+            moving_resampling_factor = derive_resampling_factor(moving_img)
+            fixed_resampling_factor = derive_resampling_factor(fixed_img)
         original_moving_image_size = moving_img.shape[:2]
         original_fixed_image_size = fixed_img.shape[:2]
 
         reg_params = {'s1': options.greedy_opts.s1,
                       's2': options.greedy_opts.s2,
-                      'iteration_rigid': options.greedy_opts.iteration_rigid,
+                      'iteration_rigid': options.greedy_opts.rigid_iterations,
                       'resolution': options.resolution,
                       'affine_use_denoising': options.enable_affine_denoising,
                       'deformable_use_denoising': options.enable_deformable_denoising,
@@ -667,14 +678,16 @@ class GreedyFHist:
         # Convert to correct format, if necessary
         moving_img = correct_img_dtype(moving_img)
         fixed_img = correct_img_dtype(fixed_img)
-        # moving_img = resample_by_factor(moving_img, pre_downsampling_factor)
-        # fixed_img = resample_by_factor(fixed_img, pre_downsampling_factor)
         moving_img = resample_image_sitk(moving_img, pre_downsampling_factor)
         fixed_img = resample_image_sitk(fixed_img, pre_downsampling_factor)
         if moving_img_mask is None:
             moving_img_mask = self.segmentation_function(moving_img)
+        else:
+            moving_img_mask = resample_image_sitk(moving_img_mask, pre_downsampling_factor)
         if fixed_img_mask is None:
             fixed_img_mask = self.segmentation_function(fixed_img)
+        else:
+            fixed_img_mask = resample_image_sitk(fixed_img_mask, pre_downsampling_factor)
         # Cropping and Padding
         cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
         cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
@@ -757,6 +770,7 @@ class GreedyFHist:
 
         # 3. Registration
         # Affine registration
+        #TODO: I think this offset can be kept a lot smaller. Try out different things.
         offset = int((height + (options.greedy_opts.kernel_size * 4)) / 10)
         reg_params['offset'] = offset
         reg_params['affine_iteration_vec'] = options.greedy_opts.affine_iteration_pyramid
@@ -775,7 +789,7 @@ class GreedyFHist:
         else:
             print(f'Unknown ia option: {options.greedy_opts.ia}.')
 
-        if affine_use_denoising:
+        if options.enable_affine_denoising:
             current_fixed_preprocessed = fixed_denoised_preprocessed
             current_moving_preprocessed = moving_denoised_preprocessed
             fixed_img_path = fixed_denoised_preprocessed.image_path
@@ -803,7 +817,7 @@ class GreedyFHist:
         if options.do_nonrigid_registration:        
 
             # Diffeomorphic
-            if affine_use_denoising and not deformable_use_denoising:
+            if options.enable_affine_denoising and not options.enable_deformable_denoising:
                 # Map paths back
                 fixed_img_path = fixed_img_preprocessed.image_path
                 moving_img_path = moving_img_preprocessed.image_path
@@ -913,7 +927,7 @@ class GreedyFHist:
             backward_transform.SetDisplacementField(displ_field)
         elif options.do_nonrigid_registration and options.keep_affine_transform_unbounded:
             # First rescale affine transforms
-            forward_affine_transform = rescale_affine_2(path_small_affine, factor)
+            forward_affine_transform = rescale_affine(path_small_affine, factor)
             backward_affine_transform = forward_affine_transform.GetInverse()
             
             path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
@@ -973,7 +987,7 @@ class GreedyFHist:
             path_big_composite_warp_inv = ''
             # TODO: Do I need to -1 this transformation? (Because the direction was different for the displacement field. Though things seem to work with
             # affine transformation.) Check!!
-            forward_transform = rescale_affine_2(path_small_affine, factor)
+            forward_transform = rescale_affine(path_small_affine, factor)
             backward_transform = forward_transform.GetInverse()
             # backward_transform = invert_affine_transform(forward_transform)
 

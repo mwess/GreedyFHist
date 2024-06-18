@@ -1,3 +1,3 @@
 from .greedy_f_hist import (
-    GreedyFHist
+    GreedyFHist, RegistrationResult, GroupwiseRegResult
 )

@@ -22,16 +22,16 @@ def fill_hole(mask):
     return filled
 
 
+# def preprocess_for_segmentation(image: numpy.array):
+#     image = cv2.resize(image, (640, 640))
+#     image_gray = cv2.cvtColor(image, cv2.RGB2GRAY)
+#     img2 = denoise_tv_chambolle(image_gray, weight=0.1, channel_axis=-1)
+#     img2 = (img2 * 255).astype(np.uint8)
+#     preprocessed_image = np.stack((img2, img2, img2))
+#     return preprocessed_image
+
+
 def preprocess_for_segmentation(image: numpy.array):
-    image = cv2.resize(image, (640, 640))
-    image_gray = cv2.cvtColor(image, cv2.RGB2GRAY)
-    img2 = denoise_tv_chambolle(image_gray, weight=0.1, channel_axis=-1)
-    img2 = (img2 * 255).astype(np.uint8)
-    preprocessed_image = np.stack((img2, img2, img2))
-    return preprocessed_image
-
-
-def preprocess_for_segmentation2(image: numpy.array):
     image = cv2.resize(image, (640, 640))
     image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     img2 = denoise_tv_chambolle(image_gray, weight=0.1, channel_axis=-1)
@@ -41,11 +41,11 @@ def preprocess_for_segmentation2(image: numpy.array):
     return preprocessed_image
 
 
-def preprocess_for_segmentation(image):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    image = cv2.resize(image, (640, 640))
-    image = np.dstack((image, image, image))
-    return image
+# def preprocess_for_segmentation(image):
+#     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#     image = cv2.resize(image, (640, 640))
+#     image = np.dstack((image, image, image))
+#     return image
 
 
 def resolve_path_to_model():
@@ -64,7 +64,7 @@ def load_yolo_segmentation():
 
 
     def _predict(image, min_area_size: int = 10000, fill_holes: bool = True):
-        preprocessed_image = preprocess_for_segmentation2(image)
+        preprocessed_image = preprocess_for_segmentation(image)
         preprocessed_image = (np.expand_dims(np.moveaxis(preprocessed_image, 2, 0), 0) / 255.).astype(np.float32)
 
         outputs = ort_session.run(output_names, {'images': preprocessed_image}, None)

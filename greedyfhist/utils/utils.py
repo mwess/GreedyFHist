@@ -33,12 +33,6 @@ def build_cmd_string(path_to_exec: str, args: Dict[str, Union[str, List[str]]]) 
     return cmd
 
 
-def scale_table(df, factor):
-    df.x = df.x / factor
-    df.y = df.y / factor
-    return df
-
-
 def composite_warps(path_to_greedy: str,
                     path_small_affine: Optional[str],
                     path_small_warp: Optional[str],
@@ -105,7 +99,7 @@ def affine_registration(path_to_greedy: str,
     aff_rgs['-n'] = pyramid_iterations
     aff_rgs['-threads'] = options.n_threads
     aff_rgs['-dof'] = '12'
-    aff_rgs['-search'] = f'{options.iteration_rigid} 180 {offset}'.split()  # Replaced 360 with any for rotation parameter
+    aff_rgs['-search'] = f'{options.rigid_iterations} 180 {offset}'.split()  # Replaced 360 with any for rotation parameter
     aff_rgs['-gm-trim'] = f'{options.kernel_size}x{options.kernel_size}'
     aff_rgs['-a'] = ''  # Doesnt get param how to parse?
     aff_rgs[ia[0]] = ia[1]
