@@ -16,20 +16,21 @@
 moving_image = 'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.ome.tif'
 fixed_image = 'examples/data/geojson_example/001 M+ V6 HES.vsi - 20x_BF_03.ome.tif'
 
-[[input.data.image]]
+[[input.transform_data.image]]
 
 path = 'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.ome.tif'
+type = 'ome.tif'
 
-[[input.data.annotation]]
+[[input.transform_data.annotation]]
 
 path = 'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.ome.tif'
 invert_axis = true
 
-[[input.data.geojson]]
+[[input.transform_data.geojson]]
 
 path = 'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.geojson'
 
-[[input.data.pointset]]
+[[input.transform_data.pointset]]
 
 path = 'examples/data/geojson_example/001 M- V7 HES.vsi - 20x_BF_03.csv'
 index_col = 0

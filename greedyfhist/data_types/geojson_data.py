@@ -33,6 +33,16 @@ class GeoJsonData:
         warped_data = registerer.transform_geojson(data, transformation.backward_transform)
         return GeoJsonData(warped_data, geojson_data.path)
     
+    @staticmethod
+    def load_and_transform_data(path: str, 
+                                registerer: GreedyFHist,
+                                transformation: RegistrationResult,
+                                switch_axis: bool = False,
+                                is_annotation: bool = False):
+        geojson_data = GeoJsonData.load_from_path(path)
+        warped_geojson_data = GeoJsonData.transform_data(geojson_data, registerer, transformation)
+        return warped_geojson_data
+    
     @classmethod
     def load_data(cls, dct: Dict) -> 'GeoJsonData':
         path = dct['path']

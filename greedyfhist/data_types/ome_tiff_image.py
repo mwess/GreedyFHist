@@ -74,6 +74,16 @@ class OMETIFFImage:
                                    switch_axis=image.switch_axis)
         return warped_image
     
+    @staticmethod
+    def load_and_transform_data(path: str, 
+                                registerer: GreedyFHist,
+                                transformation: RegistrationResult,
+                                switch_axis: bool = False,
+                                is_annotation: bool = False):
+        ome_tiff_image = OMETIFFImage.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
+        warped_ome_tiff_image = OMETIFFImage.transform_data(ome_tiff_image, registerer, transformation)
+        return warped_ome_tiff_image
+    
     @classmethod
     def load_from_config(cls, dct):
         path = dct['path']

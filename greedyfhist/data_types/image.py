@@ -31,6 +31,16 @@ class Image:
             switch_axis=image.switch_axis
         )
     
+    @staticmethod
+    def load_and_transform_data(path: str, 
+                                registerer: GreedyFHist,
+                                transformation: RegistrationResult,
+                                switch_axis: bool = False,
+                                is_annotation: bool = False):
+        image = Image.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
+        warped_image = Image.transform_data(image, registerer, transformation)
+        return warped_image
+
     @classmethod
     def load_data_from_config(cls, dct):
         path = dct['path']
