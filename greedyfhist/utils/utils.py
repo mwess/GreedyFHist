@@ -145,7 +145,6 @@ def deformable_registration(path_to_greedy:str,
     pyramid_iterations = 'x'.join([str(x) for x in options.nonrigid_iteration_pyramid])
     def_args['-n'] = pyramid_iterations
     # def_args['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
-    # def_args['-threads'] = '32'
     def_args['-threads'] = options.n_threads
     def_args['-s'] = [f'{options.s1}vox', f'{options.s2}vox']
     def_args['-o'] = output_warp
