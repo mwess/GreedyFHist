@@ -354,3 +354,9 @@ def apply_transformation(output_directory: str,
         warped_data = GeoJsonData.transform_data(data)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
         warped_data.to_file(target_path)               
+
+
+def groupwise_registration(source_directory: str = None,
+                           output_directory: str = None,
+                           config_path: str = None):
+    pass
