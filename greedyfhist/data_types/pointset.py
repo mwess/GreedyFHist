@@ -72,6 +72,17 @@ class Pointset:
             index_col=pointset.index_col,
             header=pointset.header
         )
+    
+    @staticmethod
+    def load_and_transform_data(path: str, 
+                                registerer: GreedyFHist,
+                                transformation: RegistrationResult,
+                                switch_axis: bool = False,
+                                is_annotation: bool = False):
+        pointset = Pointset.load_from_path(path)
+        warped_pointset = Pointset.transform_data(pointset, registerer, transformation)
+        return warped_pointset
+        
 
     @classmethod
     def load_data(cls, dct: Dict) -> 'Pointset':
