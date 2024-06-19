@@ -14,7 +14,7 @@ from greedyfhist.utils.io import create_if_not_exists
 from greedyfhist.utils.geojson_utils import read_geojson
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, InternalRegParams, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
-from greedyfhist.data_types import OMETIFFImage, Image, Pointset, GeoJsonData
+from greedyfhist.data_types import OMETIFFImage, DefaultImage, Pointset, GeoJsonData
 
 
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
@@ -52,7 +52,7 @@ def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str],
 
 def guess_load_transform_data(path: str,
                               registerer: GreedyFHist,
-                              transformation: RegistrationResult) -> Union[OMETIFFImage, Image, Pointset, GeoJsonData]:
+                              transformation: RegistrationResult) -> Union[OMETIFFImage, DefaultImage, Pointset, GeoJsonData]:
     """Utility function that determines filetype from path, then applies
     the transformation and returns the warped data.
 
@@ -72,7 +72,7 @@ def guess_load_transform_data(path: str,
     if path.endswith('geojson'):
         return GeoJsonData.load_and_transform_data(path, registerer, transformation)
     else:
-        image_data = Image.load_and_transform_data(path, registerer, transformation)
+        image_data = DefaultImage.load_and_transform_data(path, registerer, transformation)
         return image_data
 
 
@@ -80,7 +80,7 @@ def guess_load_transform_image_data(path: str,
                               registerer: GreedyFHist,
                               transformation: RegistrationResult,
                               is_annotation: bool = False, 
-                              switch_axis: bool = False) -> Union[OMETIFFImage, Image]:
+                              switch_axis: bool = False) -> Union[OMETIFFImage, DefaultImage]:
     """Utility function that loads images based on file ending. Image
     data can be interpreted as either image or annotation and axis can
     be switched (might be necessary for multilabel outputs from QuPath).
@@ -94,7 +94,7 @@ def guess_load_transform_image_data(path: str,
         switch_axis (bool, optional): If True, switches axis 0 and 2. Defaults to False.
 
     Returns:
-        Union[OMETIFFImage, Image]: Warped imge data.
+        Union[OMETIFFImage, DefaultImage]: Warped imge data.
     """
     if path.endswith('ome.tiff') or path.endswith('ome.tif'):
         ome_data = OMETIFFImage.load_and_transform_data(path, 
@@ -104,7 +104,7 @@ def guess_load_transform_image_data(path: str,
                                                         switch_axis=switch_axis)
         return ome_data
     else:
-        image_data = Image.load_and_transform_data(path, 
+        image_data = DefaultImage.load_and_transform_data(path, 
                                                    registerer,
                                                    transformation,
                                                    is_annotation=is_annotation, 
@@ -125,19 +125,19 @@ def get_type_from_config(config: Dict) -> str:
         str: 
     """
     type_ = config.get('type', None)
-    if type_ in ['ome.tif', 'ome.tiff', 'image']:
+    if type_ in ['ome.tif', 'ome.tiff', 'default']:
         return type_
     else:
         path = config['path']
         if path.endswith('ome.tif') or path.endswith('ome.tiff'):
             return 'ome.tif'
         else:
-            return 'image'
+            return 'default'
 
 
 def guess_load_transform_image_from_config(config: Dict, 
                               registerer: GreedyFHist,
-                              transformation: RegistrationResult) -> Union[OMETIFFImage, Image]:
+                              transformation: RegistrationResult) -> Union[OMETIFFImage, DefaultImage]:
     """Utility function that loads images based on config object. Image
     data can be interpreted as either image or annotation and axis can
     be switched (might be necessary for multilabel outputs from QuPath).
@@ -149,7 +149,7 @@ def guess_load_transform_image_from_config(config: Dict,
         transformation (RegistrationResult): Transformation for warping from moving to fixed image space.
 
     Returns:
-        Union[OMETIFFImage, Image]: Warped data.
+        Union[OMETIFFImage, DefaultImage]: Warped data.
     """
     type_ = get_type_from_config(config)
     if type_ in ['ome.tiff', 'ome.tif']:
@@ -157,8 +157,8 @@ def guess_load_transform_image_from_config(config: Dict,
         warped_ome_data = OMETIFFImage.transform_data(ome_data, registerer, transformation)
         return warped_ome_data
     else:
-        image_data = Image.load_data_from_config(config)
-        warped_image_data = Image.transform_data(image_data,
+        image_data = DefaultImage.load_data_from_config(config)
+        warped_image_data = DefaultImage.transform_data(image_data,
                                            registerer,
                                            transformation)
         return warped_image_data
@@ -294,12 +294,12 @@ def apply_transformation(output_directory: str,
 
     Args:
         output_directory (str): _description_
-        images (_type_): _description_
-        annotations (_type_): _description_
-        pointsets (_type_): _description_
-        geojsons (_type_): _description_
-        config (_type_): _description_
-        registerer (_type_, optional): _description_. Defaults to None.
+        images (List[str]): _description_
+        annotations (List[str]): _description_
+        pointsets (List[str]): _description_
+        geojsons (List[str]): _description_
+        config (List[str]): _description_
+        registerer (List[str], optional): _description_. Defaults to None.
         registration_result (RegistrationResult, optional): _description_. Defaults to None.
         registration_result_path (str, optional): _description_. Defaults to None.
     """

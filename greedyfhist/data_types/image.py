@@ -8,7 +8,7 @@ import SimpleITK as sitk
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
 
 @dataclass
-class Image:
+class DefaultImage:
 
     data: numpy.array
     is_annotation: bool = False
@@ -22,10 +22,10 @@ class Image:
         sitk.WriteImage(sitk.GetImageFromArray(img), path)
     
     @staticmethod
-    def transform_data(image: 'Image', registerer: GreedyFHist, transformation: RegistrationResult) -> 'Image':
+    def transform_data(image: 'DefaultImage', registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
         interpolation = 'LINEAR' if not image.is_annotation else 'NN'
         warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
-        return Image(
+        return DefaultImage(
             data=warped_data,
             is_annotation=image.is_annotation,
             switch_axis=image.switch_axis
@@ -37,8 +37,8 @@ class Image:
                                 transformation: RegistrationResult,
                                 switch_axis: bool = False,
                                 is_annotation: bool = False):
-        image = Image.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
-        warped_image = Image.transform_data(image, registerer, transformation)
+        image = DefaultImage.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
+        warped_image = DefaultImage.transform_data(image, registerer, transformation)
         return warped_image
 
     @classmethod
@@ -52,7 +52,7 @@ class Image:
         return cls(img, is_annotation, switch_axis)
     
     @classmethod
-    def load_data_from_path(cls, path: str, switch_axis: bool = False, is_annotation: bool = False) -> 'Image':
+    def load_data_from_path(cls, path: str, switch_axis: bool = False, is_annotation: bool = False) -> 'DefaultImage':
         data = sitk.GetArrayFromImage(sitk.ReadImage(path))
         if switch_axis:
             data = np.moveaxis(data, 0, 2)
