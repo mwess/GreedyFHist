@@ -21,13 +21,21 @@ def cli():
 @click.option('--fixed-mask', type=click.Path())  # Make this optional
 @click.option('--path-to-greedy', type=click.Path())
 @click.option('--config', type=click.Path())
+@click.option('--transform-images', type=click.Path(), multiple=True, default=[])
+@click.option('--transform-annotations', type=click.Path(), multiple=True, default=[])
+@click.option('--transform-pointsets', type=click.Path(), multiple=True, default=[])
+@click.option('--transform-geojsons', type=click.Path(), multiple=True, default=[])
 def register(moving_image,
              fixed_image,
              output_directory,
              moving_mask=None,
              fixed_mask=None,
              path_to_greedy=None,
-             config=None):
+             config=None,
+             images=None,
+             annotations=None,
+             pointsets=None,
+             geojsons=None):
     cmdln_processor.register(
         moving_image,
         fixed_image,
@@ -35,21 +43,23 @@ def register(moving_image,
         moving_mask,
         fixed_mask,
         path_to_greedy,
-        config 
+        config,
+        images,
+        annotations,
+        pointsets,
+        geojsons
     )
 
 # TODO: Fix this. Should only be needed for 
 @click.command()
 @click.option('--transformation', type=click.Path(), required=True)
 @click.option('--output-directory', type=click.Path(), default='warp_out')
-@click.option('--path-to-greedy', type=click.Path(), default='')
 @click.option('--images', type=click.Path(), multiple=True, default=[])
 @click.option('--annotations', type=click.Path(), multiple=True, default=[])
 @click.option('--coordinates', type=click.Path(), multiple=True, default=[])
 @click.option('--geojsons', type=click.Path(), multiple=True, default=[])
 def transform(transformation,
          output_directory,
-         path_to_greedy,
          images,
          annotations,
          coordinates,
