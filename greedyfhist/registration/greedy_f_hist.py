@@ -1025,7 +1025,7 @@ class GreedyFHist:
         # Return this!
         
         if options.remove_temporary_directory:
-            self.__cleanup_temporary_directory(path_temp)        
+            self.__cleanup_temporary_directory(options.temporary_directory)        
         return registration_result
 
     def groupwise_registration(self,

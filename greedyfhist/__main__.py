@@ -25,38 +25,38 @@ def groupwise_registration(source_directory,
 @click.command()
 @click.option('--moving-image', type=click.Path())
 @click.option('--fixed-image', type=click.Path())
-@click.option('--output-directory', type=click.Path(), default='out')
+@click.option('--output-directory', type=click.Path())
 @click.option('--moving-mask', type=click.Path())  # Make this optional
 @click.option('--fixed-mask', type=click.Path())  # Make this optional
 @click.option('--path-to-greedy', type=click.Path())
 @click.option('--config', type=click.Path())
-@click.option('--transform-images', type=click.Path(), multiple=True, default=[])
-@click.option('--transform-annotations', type=click.Path(), multiple=True, default=[])
-@click.option('--transform-pointsets', type=click.Path(), multiple=True, default=[])
-@click.option('--transform-geojsons', type=click.Path(), multiple=True, default=[])
-def register(moving_image,
-             fixed_image,
-             output_directory,
+@click.option('--transform-images', type=click.Path(), multiple=True)
+@click.option('--transform-annotations', type=click.Path(), multiple=True)
+@click.option('--transform-pointsets', type=click.Path(), multiple=True)
+@click.option('--transform-geojsons', type=click.Path(), multiple=True)
+def register(moving_image=None,
+             fixed_image=None,
+             output_directory=None,
              moving_mask=None,
              fixed_mask=None,
              path_to_greedy=None,
              config=None,
-             images=None,
-             annotations=None,
-             pointsets=None,
-             geojsons=None):
+             transform_images=None,
+             transform_annotations=None,
+             transform_pointsets=None,
+             transform_geojsons=None):
     cmdln_processor.register(
-        moving_image,
-        fixed_image,
-        output_directory,
-        moving_mask,
-        fixed_mask,
-        path_to_greedy,
-        config,
-        images,
-        annotations,
-        pointsets,
-        geojsons
+        moving_image_path=moving_image,
+        fixed_image_path=fixed_image,
+        output_directory=output_directory,
+        moving_mask_path=moving_mask,
+        fixed_mask_path=fixed_mask,
+        path_to_greedy=path_to_greedy,
+        config_path=config,
+        additional_images=transform_images,
+        additional_annotations=transform_annotations,
+        additional_pointsets=transform_pointsets,
+        additional_geojsons=transform_geojsons
     )
 
 # TODO: Fix this. Should only be needed for 

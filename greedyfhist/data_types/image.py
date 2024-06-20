@@ -21,6 +21,15 @@ class DefaultImage:
             img = self.data
         sitk.WriteImage(sitk.GetImageFromArray(img), path)
     
+    def transform_data_method(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
+        interpolation = 'LINEAR' if not self.is_annotation else 'NN'
+        warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)
+        return DefaultImage(
+            data=warped_data,
+            is_annotation=self.is_annotation,
+            switch_axis=self.switch_axis
+        )
+
     @staticmethod
     def transform_data(image: 'DefaultImage', registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
         interpolation = 'LINEAR' if not image.is_annotation else 'NN'
@@ -42,7 +51,7 @@ class DefaultImage:
         return warped_image
 
     @classmethod
-    def load_data_from_config(cls, dct):
+    def load_from_config(cls, dct):
         path = dct['path']
         switch_axis = dct.get('switch_axis', False)
         is_annotation = dct.get('is_annotation', False)
@@ -52,7 +61,7 @@ class DefaultImage:
         return cls(img, is_annotation, switch_axis)
     
     @classmethod
-    def load_data_from_path(cls, path: str, switch_axis: bool = False, is_annotation: bool = False) -> 'DefaultImage':
+    def load_from_path(cls, path: str, switch_axis: bool = False, is_annotation: bool = False) -> 'DefaultImage':
         data = sitk.GetArrayFromImage(sitk.ReadImage(path))
         if switch_axis:
             data = np.moveaxis(data, 0, 2)
