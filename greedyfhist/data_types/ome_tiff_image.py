@@ -1,18 +1,19 @@
 from dataclasses import dataclass
 from typing import Dict
+import xml.etree.ElementTree as ET
 
 import numpy
 import numpy as np
-from pyometiff import OMETIFFReader, OMETIFFWriter
+# from pyometiff import OMETIFFReader, OMETIFFWriter
+import tifffile
 
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
 
 
-# TODO: Fix this. The ome tiff written to file is kind of inefficient. Either switch to Tifffile or find out how to fix this with pyometiff.
 @dataclass
 class OMETIFFImage:
     """
-    Class for processing OMETIFFImage. 
+    Class for processing TIFF and OMETIFF images. 
     
     
     Attributes
@@ -24,9 +25,11 @@ class OMETIFFImage:
     path: str
         Original file path.
         
-    metadata: Dict
-        OME TIFF metadata information. Necessary for writing back 
-        to OME TIFF.
+    tif: tifffile.tifffile.TiffFile 
+        Connection to tif image information.
+
+    is_ome: bool
+        Indicates whether the read file is ome.
         
     is_annotation: bool
         If OME TIFF is an annotation this should be set to True, so 
@@ -43,54 +46,80 @@ class OMETIFFImage:
     
     data: numpy.array
     path: str
-    metadata: Dict
+    is_ome: bool
+    tif: tifffile.tifffile.TiffFile
     is_annotation: bool = False
     switch_axis: bool = False
-
-    def to_file(self, path):
-        metadata = self.metadata.copy()
-        if self.switch_axis:
-            img = np.moveaxis(self.data, 2, 0)
-        else:
-            img = self.data
-        # explicit_tiffdata=False
-        dimension_order = metadata['DimOrder BF Array']
-        writer = OMETIFFWriter(
-            fpath=path,
-            dimension_order=dimension_order,
-            array=img,
-            metadata=metadata,
-            explicit_tiffdata=False
-        )
-        writer.write()
     
-    def transform_data_method(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'OMETIFFImage':
+
+    def to_file(self, path: str):
+        if self.is_ome:
+            self.to_ome_tiff_file(path)
+        else:
+            self.to_tiff_file(path)
+
+    def to_tiff_file(self, path: str):
+        if self.switch_axis and len(self.data.shape) > 2:
+            data = np.moveaxis(self.data, 2, 0)
+        else:
+            data = self.data
+        tifffile.imwrite(path, data)        
+
+    def to_ome_tiff_file(self, path: str):
+        metadata = self.__get_metadata()
+        if len(self.data.shape) == 2:
+            options = {}
+        else:
+            options = dict(photometric='rgb')
+        
+        if self.switch_axis and len(self.data.shape) > 2:
+            data = np.moveaxis(self.data, 2, 0)
+        else:
+            data = self.data
+
+        with tifffile.TiffWriter(path, bigtiff=True) as tif:
+            tif.write(
+                data,
+                metadata=metadata,
+                **options
+            )
+
+    def __get_metadata(self) -> str:
+        root = ET.fromstring(self.tif.ome_metadata)
+        ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
+        elem = root.findall('*/ns0:Pixels', ns)[0]
+        metadata = elem.attrib
+        # metadata['axes'] = 'TCYXS'
+        del metadata['SizeX']
+        del metadata['SizeY']
+        del metadata['SizeC']
+        del metadata['SizeT']
+        del metadata['SizeZ']
+        del metadata['DimensionOrder']
+        return metadata
+    
+    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'OMETIFFImage':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
-        warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)
-        metadata = self.metadata.copy()
-        metadata['SizeX'] = warped_data.shape[0]
-        metadata['SizeY'] = warped_data.shape[1]        
+        warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)    
         return OMETIFFImage(
             data=warped_data,
             path=self.path,
-            metadata=metadata,
+            is_ome=self.is_ome,
+            tif=self.tif,
             is_annotation=self.is_annotation,
             switch_axis=self.switch_axis
         )
 
-    @staticmethod
-    def transform_data(image: 'OMETIFFImage', registerer: GreedyFHist, transformation: RegistrationResult):
-        interpolation = 'LINEAR' if not image.is_annotation else 'NN'
-        warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
-        metadata = image.metadata.copy()
-        metadata['SizeX'] = warped_data.shape[0]
-        metadata['SizeY'] = warped_data.shape[1]
-        warped_image= OMETIFFImage(data=warped_data, 
-                                   path=image.path,
-                                   metadata=metadata, 
-                                   is_annotation=image.is_annotation, 
-                                   switch_axis=image.switch_axis)
-        return warped_image
+    # @staticmethod
+    # def transform_data(image: 'OMETIFFImage', registerer: GreedyFHist, transformation: RegistrationResult):
+    #     interpolation = 'LINEAR' if not image.is_annotation else 'NN'
+    #     warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
+    #     warped_image= OMETIFFImage(data=warped_data, 
+    #                                path=image.path,
+    #                                tif=image.tif,
+    #                                is_annotation=image.is_annotation, 
+    #                                switch_axis=image.switch_axis)
+    #     return warped_image
     
     @staticmethod
     def load_and_transform_data(path: str, 
@@ -99,7 +128,7 @@ class OMETIFFImage:
                                 switch_axis: bool = False,
                                 is_annotation: bool = False):
         ome_tiff_image = OMETIFFImage.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
-        warped_ome_tiff_image = OMETIFFImage.transform_data(ome_tiff_image, registerer, transformation)
+        warped_ome_tiff_image = ome_tiff_image.transform_data(registerer, transformation)
         return warped_ome_tiff_image
     
     @classmethod
@@ -107,17 +136,24 @@ class OMETIFFImage:
         path = dct['path']
         switch_axis = dct.get('switch_axis', False)
         is_annotation = dct.get('is_annotation', False)
-        reader = OMETIFFReader(fpath=path)
-        img, metadata, xml_metadata = reader.read()
-        if switch_axis:
+        tif = tifffile.TiffFile(path)
+        img = tif.asarray()
+        if switch_axis and len(img.shape) > 2:
             img = np.moveaxis(img, 0, 2)
-        return cls(img, path, metadata, is_annotation, switch_axis)
+        if path.endswith('ome.tif') or path.endswith('ome.tiff'):
+            is_ome = True
+        else:
+            is_ome = False            
+        return cls(img, path, is_ome, tif, is_annotation, switch_axis)
         
     @classmethod
     def load_from_path(cls, path, switch_axis=False, is_annotation=False):
-        reader = OMETIFFReader(fpath=path)
-        img, metadata, xml_metadata = reader.read()
-        if switch_axis:
+        tif = tifffile.TiffFile(path)
+        img = tif.asarray()
+        if switch_axis and len(img.shape) > 2:
             img = np.moveaxis(img, 0, 2)
-        return cls(img, path, metadata, is_annotation, switch_axis)
-        
+        if path.endswith('ome.tif') or path.endswith('ome.tiff'):
+            is_ome = True
+        else:
+            is_ome = False
+        return cls(img, path, is_ome, tif, is_annotation, switch_axis)

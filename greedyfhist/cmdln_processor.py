@@ -64,7 +64,7 @@ def guess_load_transform_data(path: str,
     Returns:
         _type_: Warped data.
     """
-    if path.endswith('ome.tiff') or path.endswith('ome.tif'):
+    if path.endswith('tiff') or path.endswith('tif'):
         warped_ome_data = OMETIFFImage.load_and_transform_data(path, registerer, transformation)
         return warped_ome_data
     if path.endswith('csv'):
@@ -121,7 +121,7 @@ def guess_load_transform_image_data(path: str,
     Returns:
         Union[OMETIFFImage, DefaultImage]: Warped imge data.
     """
-    if path.endswith('ome.tiff') or path.endswith('ome.tif'):
+    if path.endswith('tiff') or path.endswith('tif'):
         ome_data = OMETIFFImage.load_and_transform_data(path, 
                                                         registerer,
                                                         transformation,
@@ -133,7 +133,7 @@ def guess_load_transform_image_data(path: str,
                                                    registerer,
                                                    transformation,
                                                    is_annotation=is_annotation, 
-                                                   switch_axis=switch_axis)
+                                                   switch_axis=False)
         return image_data
 
 
@@ -150,12 +150,12 @@ def get_type_from_config(config: Dict) -> str:
         str: 
     """
     type_ = config.get('type', None)
-    if type_ in ['ome.tif', 'ome.tiff', 'default']:
+    if type_ in ['tif', 'tiff', 'default']:
         return type_
     else:
         path = config['path']
-        if path.endswith('ome.tif') or path.endswith('ome.tiff'):
-            return 'ome.tif'
+        if path.endswith('tif') or path.endswith('tiff'):
+            return 'tif'
         else:
             return 'default'
         
@@ -169,7 +169,7 @@ def guess_and_load_image(path: str) -> Union[OMETIFFImage, DefaultImage]:
     Returns:
         Union[OMETIFFImage, DefaultImage]: Loaded image.
     """
-    if path.endswith('ome.tiff') or path.endswith('ome.tif'):
+    if path.endswith('tiff') or path.endswith('tif'):
         return OMETIFFImage.load_from_path(path)
     return DefaultImage.load_from_path(path)
 
@@ -193,14 +193,13 @@ def guess_load_transform_image_from_config(config: Dict,
         Union[OMETIFFImage, DefaultImage]: Warped data.
     """
     type_ = get_type_from_config(config)
-    if type_ in ['ome.tiff', 'ome.tif']:
+    if type_ in ['tiff', 'tif']:
         ome_data = OMETIFFImage.load_from_config(config)
-        warped_ome_data = OMETIFFImage.transform_data(ome_data, registerer, transformation)
+        warped_ome_data = ome_data.transform_data(registerer, transformation)
         return warped_ome_data
     else:
         image_data = DefaultImage.load_from_config(config)
-        warped_image_data = DefaultImage.transform_data(image_data,
-                                           registerer,
+        warped_image_data = image_data.transform_data(registerer,
                                            transformation)
         return warped_image_data
 
@@ -330,7 +329,7 @@ def register(moving_image_path: Optional[str] = None,
 
     if warp_moving_image:
         logging.info('Saving warped image.')
-        warped_moving_image = moving_image.transform_data_method(registerer, registration_result)
+        warped_moving_image = moving_image.transform_data(registerer, registration_result)
         output_directory_transformation_data = join(output_directory, 'transformed_data')
         create_if_not_exists(output_directory_transformation_data)
         target_path = derive_output_path(output_directory_transformation_data, os.path.basename(moving_image.path))
@@ -376,7 +375,7 @@ def apply_transformation(output_directory: str,
         registration_result (RegistrationResult, optional): _description_. Defaults to None.
         registration_result_path (str, optional): _description_. Defaults to None.
     """
-    
+    logging.info('Applying transformation to additional data.')
     if registerer is None:
         # We can load GreedyFHist without greedy for this.
         registerer = GreedyFHist.load_from_config({})
@@ -386,25 +385,32 @@ def apply_transformation(output_directory: str,
 
     output_directory_transformed_data = join(output_directory, 'transformed_data')
     create_if_not_exists(output_directory_transformed_data)
+    logging.info('Working on commandline arguments.')
+    logging.info('Warping images.')
     for path in images:
         warped_data = guess_load_transform_image_data(path, registerer, registration_result, is_annotation=False, switch_axis=False)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
         warped_data.to_file(target_path)
+    logging.info('Warping annotations.')
     for path in annotations:
-        warped_data = guess_load_transform_image_data(path, is_annotation=True, switch_axis=True)
+        warped_data = guess_load_transform_image_data(path, registerer, registration_result, is_annotation=True, switch_axis=True)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
         warped_data.to_file(target_path)
+    logging.info('Warping pointsets.')        
     for path in pointsets:
         data = Pointset.load_from_path(path)
-        warped_data = Pointset.transform_data(data)
+        warped_data = Pointset.transform_data(data, registerer, registration_result)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
-        warped_data.to_file(target_path)        
+        warped_data.to_file(target_path)   
+    logging.info('Warping geojsons.')         
     for path in geojsons:
         data = GeoJsonData.load_from_path(path)
-        warped_data = GeoJsonData.transform_data(data)
+        warped_data = GeoJsonData.transform_data(data, registerer, registration_result)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
         warped_data.to_file(target_path)      
 
+    logging.info('Working on arguments from config.')
+    logging.info('Warping images and annotations.')
     if 'input' not in config:
         return    
     transform_config = config['input'].get('transform', None)
@@ -415,12 +421,14 @@ def apply_transformation(output_directory: str,
         warped_data = guess_load_transform_image_from_config(config, registerer, registration_result)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
         warped_data.to_file(target_path)
+    logging.info('Warping pointsets.')    
     additional_pointsets = transform_config.get('pointsets', [])
     for config in additional_pointsets:
         pointset = Pointset.load_data(config)
         warped_pointset = Pointset.transform_data(pointset)
         target_path = derive_output_path(output_directory_transformed_data, os.path.basename(path))
         warped_pointset.to_file(target_path)        
+    logging.info('Warping geojsons.')
     additional_geojsons = transform_config.get('geojsons', [])
     for path in additional_geojsons:
         data = GeoJsonData.load_from_path(path)

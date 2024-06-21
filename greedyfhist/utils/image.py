@@ -167,7 +167,7 @@ def resample_image_sitk(image: numpy.array,
     
     
 def read_image(fpath: str, squeeze=False) -> numpy.array:
-    if fpath.endswith('.ome.tiff') or fpath.endswith('.ome.tif'):
+    if fpath.endswith('tiff') or fpath.endswith('tif'):
         image = tifffile.imread(fpath)
         return image
     sitk_image = sitk.ReadImage(fpath)

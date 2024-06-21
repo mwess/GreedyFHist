@@ -57,21 +57,36 @@ class Pointset:
         header = True if self.header is not None else False
         self.data.to_csv(path, index=index, header=header)
 
-    @staticmethod
-    def transform_data(pointset: 'Pointset', registerer: GreedyFHist, transformation: RegistrationResult):
-        pointset_data = pointset.to_numpy()
+    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
+        pointset_data = self.to_numpy()
         warped_pointset_data = registerer.transform_pointset(pointset_data, transformation.backward_transform)
-        warped_data = pointset.data.copy()
-        warped_data[pointset.x_axis] = warped_pointset_data[:, 0]
-        warped_data[pointset.y_axis] = warped_pointset_data[:, 1]
+        warped_data = self.data.copy()
+        warped_data[self.x_axis] = warped_pointset_data[:, 0]
+        warped_data[self.y_axis] = warped_pointset_data[:, 1]
         return Pointset(
             data=warped_data,
-            path=pointset.path,
-            x_axis=pointset.x_axis,
-            y_axis=pointset.y_axis,
-            index_col=pointset.index_col,
-            header=pointset.header
+            path=self.path,
+            x_axis=self.x_axis,
+            y_axis=self.y_axis,
+            index_col=self.index_col,
+            header=self.header
         )
+
+    # @staticmethod
+    # def transform_data(pointset: 'Pointset', registerer: GreedyFHist, transformation: RegistrationResult):
+    #     pointset_data = pointset.to_numpy()
+    #     warped_pointset_data = registerer.transform_pointset(pointset_data, transformation.backward_transform)
+    #     warped_data = pointset.data.copy()
+    #     warped_data[pointset.x_axis] = warped_pointset_data[:, 0]
+    #     warped_data[pointset.y_axis] = warped_pointset_data[:, 1]
+    #     return Pointset(
+    #         data=warped_data,
+    #         path=pointset.path,
+    #         x_axis=pointset.x_axis,
+    #         y_axis=pointset.y_axis,
+    #         index_col=pointset.index_col,
+    #         header=pointset.header
+    #     )
     
     @staticmethod
     def load_and_transform_data(path: str, 
@@ -80,7 +95,7 @@ class Pointset:
                                 switch_axis: bool = False,
                                 is_annotation: bool = False):
         pointset = Pointset.load_from_path(path)
-        warped_pointset = Pointset.transform_data(pointset, registerer, transformation)
+        warped_pointset = pointset.transform_data(registerer, transformation)
         return warped_pointset
         
 

@@ -21,7 +21,7 @@ class DefaultImage:
             img = self.data
         sitk.WriteImage(sitk.GetImageFromArray(img), path)
     
-    def transform_data_method(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
+    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
         warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)
         return DefaultImage(
@@ -30,15 +30,15 @@ class DefaultImage:
             switch_axis=self.switch_axis
         )
 
-    @staticmethod
-    def transform_data(image: 'DefaultImage', registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
-        interpolation = 'LINEAR' if not image.is_annotation else 'NN'
-        warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
-        return DefaultImage(
-            data=warped_data,
-            is_annotation=image.is_annotation,
-            switch_axis=image.switch_axis
-        )
+    # @staticmethod
+    # def transform_data(image: 'DefaultImage', registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
+    #     interpolation = 'LINEAR' if not image.is_annotation else 'NN'
+    #     warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
+    #     return DefaultImage(
+    #         data=warped_data,
+    #         is_annotation=image.is_annotation,
+    #         switch_axis=image.switch_axis
+    #     )
     
     @staticmethod
     def load_and_transform_data(path: str, 
@@ -47,7 +47,7 @@ class DefaultImage:
                                 switch_axis: bool = False,
                                 is_annotation: bool = False):
         image = DefaultImage.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
-        warped_image = DefaultImage.transform_data(image, registerer, transformation)
+        warped_image = image.transform_data(registerer, transformation)
         return warped_image
 
     @classmethod
