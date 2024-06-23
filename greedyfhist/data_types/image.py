@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import os
+from os.path import join, exists
 from typing import Any
 
 import numpy
@@ -6,11 +8,13 @@ import numpy as np
 import SimpleITK as sitk
 
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
+from greedyfhist.utils.io import derive_output_path
 
 @dataclass
 class DefaultImage:
 
     data: numpy.array
+    path: str
     is_annotation: bool = False
     switch_axis: bool = False
     
@@ -20,6 +24,13 @@ class DefaultImage:
         else:
             img = self.data
         sitk.WriteImage(sitk.GetImageFromArray(img), path)
+
+    def to_directory(self, directory: str):
+        fname = os.path.basename(self.path)
+        output_path = derive_output_path(directory, fname)
+        self.fo_file(output_path)
+
+        
     
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
@@ -58,11 +69,11 @@ class DefaultImage:
         img = sitk.GetArrayFromImage(sitk.ReadImage(path))
         if switch_axis:
             img = np.moveaxis(img, 0, 2)
-        return cls(img, is_annotation, switch_axis)
+        return cls(img, path, is_annotation, switch_axis)
     
     @classmethod
     def load_from_path(cls, path: str, switch_axis: bool = False, is_annotation: bool = False) -> 'DefaultImage':
         data = sitk.GetArrayFromImage(sitk.ReadImage(path))
         if switch_axis:
             data = np.moveaxis(data, 0, 2)
-        return cls(data, is_annotation, switch_axis)
+        return cls(data, path, is_annotation, switch_axis)

@@ -57,6 +57,11 @@ class Pointset:
         header = True if self.header is not None else False
         self.data.to_csv(path, index=index, header=header)
 
+    def to_directory(self, directory: str):
+        fname = os.path.basename(self.path)
+        output_path = derive_output_path(directory, fname)
+        self.fo_file(output_path)
+
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
         pointset_data = self.to_numpy()
         warped_pointset_data = registerer.transform_pointset(pointset_data, transformation.backward_transform)

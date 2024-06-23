@@ -10,11 +10,11 @@ import SimpleITK as sitk
 import toml
 
 from greedyfhist.utils.image import read_image
-from greedyfhist.utils.io import create_if_not_exists
+from greedyfhist.utils.io import create_if_not_exists, derive_output_path
 from greedyfhist.utils.geojson_utils import read_geojson
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, InternalRegParams, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
-from greedyfhist.data_types import OMETIFFImage, DefaultImage, Pointset, GeoJsonData
+from greedyfhist.data_types import OMETIFFImage, DefaultImage, Pointset, GeoJsonData, HistologySection
 
 
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
@@ -74,6 +74,11 @@ def guess_load_transform_data(path: str,
     else:
         image_data = DefaultImage.load_and_transform_data(path, registerer, transformation)
         return image_data
+    
+
+def load_data(config: Dict) -> Any:
+    type_ = config['type']
+    if type_ == 'ome'
 
 
 def resolve_variable(selector: str, 
@@ -137,7 +142,7 @@ def guess_load_transform_image_data(path: str,
         return image_data
 
 
-def get_type_from_config(config: Dict) -> str:
+def get_image_type_from_config(config: Dict) -> str:
     """Derive image type from given config.
     First, tries to use the type key in config.
     If that isnt found, uses the filenames to 
@@ -160,18 +165,22 @@ def get_type_from_config(config: Dict) -> str:
             return 'default'
         
 
-def guess_and_load_image(path: str) -> Union[OMETIFFImage, DefaultImage]:
+def guess_and_load_image(path: str, 
+                         is_annotation: Optional[bool] = False,
+                         switch_axis: Optional[bool] = False) -> Union[OMETIFFImage, DefaultImage]:
     """Guess image type and return guessed image types.
 
     Args:
         path (str): Path to image file.
+        is_annotation: Passed on to loading image.
+        switch_axis: Passed on to loading image.
 
     Returns:
         Union[OMETIFFImage, DefaultImage]: Loaded image.
     """
     if path.endswith('tiff') or path.endswith('tif'):
-        return OMETIFFImage.load_from_path(path)
-    return DefaultImage.load_from_path(path)
+        return OMETIFFImage.load_from_path(path, is_annotation=is_annotation, switch_axis=switch_axis)
+    return DefaultImage.load_from_path(path, is_annotation=is_annotation, switch_axis=switch_axis)
 
 
 
@@ -192,7 +201,7 @@ def guess_load_transform_image_from_config(config: Dict,
     Returns:
         Union[OMETIFFImage, DefaultImage]: Warped data.
     """
-    type_ = get_type_from_config(config)
+    type_ = get_image_type_from_config(config)
     if type_ in ['tiff', 'tif']:
         ome_data = OMETIFFImage.load_from_config(config)
         warped_ome_data = ome_data.transform_data(registerer, transformation)
@@ -204,26 +213,159 @@ def guess_load_transform_image_from_config(config: Dict,
         return warped_image_data
 
 
-def derive_output_path(directory: str, fname: str, limit: int = 1000) -> str:
-    """Generates a unique output path. If path is already existing,
-    adds a counter value until a unique path is found.
+def load_histology_section(image_path: str,
+                           additional_images: List[str] = None,
+                           additional_annotations: List[str] = None,
+                           additional_pointsets: List[str] = None,
+                           additional_geojsons: List[str] = None,
+                           mask_path: Optional[str] = None):
+    image = guess_and_load_image(image_path)
+    if mask_path is not None:
+        mask = guess_and_load_image(mask_path)
+    else:
+        mask = None
+    additional_data = []
+    for path in additional_images:
+        ad_image = guess_and_load_image(path)
+        additional_data.append(ad_image)
+    for path in additional_annotations:
+        ad_image = guess_and_load_image(path, is_annotation=True)
+        additional_data.append(ad_image)
+    for path in additional_pointsets:
+        ps = Pointset.load_from_path(path)
+        additional_data.append(ps)
+    for path in additional_geojsons:
+        gs = GeoJsonData.load_from_path(path)
+        additional_data.append(gs)
+    histology_section = HistologySection(ref_image=image,
+                                         ref_mask=None,
+                                         additional_data=additional_data)
+    return histology_section
+        
+
+def register2(moving_image_path: Optional[str] = None,
+             fixed_image_path: Optional[str] = None,
+             output_directory: Optional[str] = None,
+             moving_mask_path: Optional[str] = None,
+             fixed_mask_path: Optional[str] = None,
+             path_to_greedy: Optional[str] = None,
+             config_path: Optional[str] = None,
+             additional_images: Optional[List[str]] = None,
+             additional_annotations: Optional[List[str]] = None,
+             additional_pointsets: Optional[List[str]] = None,
+             additional_geojsons: Optional[List[str]] = None):
+    """Performs GreedyFHist registration between moving and fixed image followed by
+    transformation of provided data. GreedyFHist parameters are read from the 
+    config file. Otherwise, uses default. Optionally, masks are loaded included
+    in the registration. After registration, additionally provided data is transformed.
+
 
     Args:
-        directory (str): target directory
-        fname (str): target filename
-        limit (int, optional): Limit number to prevent endless loops. Defaults to 1000.
-
-    Returns:
-        str: Target path
+        moving_image_path (Optional[str], optional): Defaults to None.
+        fixed_image_path (Optional[str], optional): Defaults to None.
+        output_directory (Optional[str], optional): Defaults to None.
+        moving_mask_path (Optional[str], optional): Defaults to None.
+        fixed_mask_path (Optional[str], optional): Defaults to None.
+        path_to_greedy (Optional[str], optional): Defaults to None.
+        config_path (Optional[str], optional): Defaults to None.
+        additional_images (Optional[List[str]], optional): Defaults to None.
+        additional_annotations (Optional[List[str]], optional): Defaults to None.
+        additional_pointsets (Optional[List[str]], optional): Defaults to None.
+        additional_geojsons (Optional[List[str]], optional): Defaults to None.
     """
-    target_path = join(directory, fname)
-    if not os.path.exists(target_path):
-        return target_path
-    for suffix in range(limit):
-        new_target_path = f'{target_path}_{suffix}'
-        if not os.path.exists(new_target_path):
-            return new_target_path
-    return target_path
+    logging.info('Starting registration process.')
+    if additional_images is None:
+        additional_images = []
+    if additional_annotations is None:
+        additional_annotations = []
+    if additional_pointsets is None:
+        additional_pointsets = []
+    if additional_geojsons is None:
+        additional_geojsons = []
+    
+    if config_path is not None:
+        with open(config_path) as f:
+            config = toml.load(f)
+    else:
+        config = {}
+    if 'gfh_options' in config:
+        registration_options = RegistrationOptions.parse_cmdln_dict(config['gfh_options'])
+    else:
+        registration_options = RegistrationOptions.default_options()
+    logging.info('Registration options are loaded.')
+    if all_paths_are_none([moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path]):
+        moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path = get_paths_from_config(config.get('input', None))
+    if moving_image_path is None and fixed_image_path is None:
+        raise Exception('No moving and fixed image path provided!')
+    if 'options' in config:
+        # TODO: Should I add collision avoidance?
+        output_directory = config['options'].get('output_directory', 'out')
+        path_to_greedy = config['options'].get('path_to_greedy', '')
+    else:
+        output_directory = 'out'
+        path_to_greedy = ''
+
+    output_directory = resolve_variable('output_directory', output_directory, config.get('options', None), 'out')
+    path_to_greedy = resolve_variable('path_to_greedy', path_to_greedy, config.get('options', None), '')
+    warp_moving_image = resolve_variable('warp_moving_image', None, config.get('options', None), True)
+    save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)
+
+    moving_histology_section = load_histology_section(
+        image_path=moving_image_path,
+        additional_images=additional_images,
+        additional_annotations=additional_annotations,
+        additional_pointsets=additional_pointsets,
+        additional_geojsons=additional_geojsons,
+        mask_path=moving_mask_path
+    )
+    
+    # Setup file structure
+    output_directory_registrations = join(output_directory, 'registrations')
+    create_if_not_exists(output_directory_registrations)
+
+    # moving_image = read_image(moving_image_path)
+    # moving_mask = read_image(moving_mask_path, True) if moving_mask_path is not None else None
+
+    fixed_image = guess_and_load_image(fixed_image_path)
+    fixed_mask = guess_and_load_image(fixed_mask_path, is_annotation=True) if fixed_mask_path is not None else None
+
+    logging.info('Loaded images. Starting registration.')
+    logging.info(f'Registration options: {registration_options}')
+    registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
+
+    registration_result = registerer.register(
+        moving_histology_section.ref_image.data,
+        fixed_image.data,
+        moving_histology_section.ref_mask.data,
+        fixed_mask.data,
+        options=registration_options
+    )
+    logging.info('Registration finished.')
+    if save_transform_to_file:
+        registration_result.to_file(output_directory_registrations)
+        logging.info('Registration saved.')
+
+    
+
+    if warp_moving_image:
+        logging.info('Saving warped image.')
+        warped_moving_image = moving_image.transform_data(registerer, registration_result)
+        output_directory_transformation_data = join(output_directory, 'transformed_data')
+        create_if_not_exists(output_directory_transformation_data)
+        target_path = derive_output_path(output_directory_transformation_data, os.path.basename(moving_image.path))
+        warped_moving_image.to_file(target_path)
+
+
+
+    apply_transformation(output_directory=output_directory,
+                         images=additional_images,
+                         annotations=additional_annotations,
+                         pointsets=additional_pointsets,
+                         geojsons=additional_geojsons,
+                         config=config,
+                         registerer=registerer,
+                         registration_result=registration_result)
+    
 
 def register(moving_image_path: Optional[str] = None,
              fixed_image_path: Optional[str] = None,

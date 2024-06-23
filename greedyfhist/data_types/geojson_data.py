@@ -27,6 +27,10 @@ class GeoJsonData:
         with open(path, 'w') as f:
             geojson.dump(self.data, f)
 
+    def to_directory(self, directory: str):
+        fname = os.path.basename(self.path)
+        output_path = derive_output_path(directory, fname)
+        self.fo_file(output_path)
 
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'GeoJsonData':
         data = self.data.copy()

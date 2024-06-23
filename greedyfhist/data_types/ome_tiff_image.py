@@ -58,6 +58,11 @@ class OMETIFFImage:
         else:
             self.to_tiff_file(path)
 
+    def to_directory(self, directory: str):
+        fname = os.path.basename(self.path)
+        output_path = derive_output_path(directory, fname)
+        self.fo_file(output_path)
+
     def to_tiff_file(self, path: str):
         if self.switch_axis and len(self.data.shape) > 2:
             data = np.moveaxis(self.data, 2, 0)
