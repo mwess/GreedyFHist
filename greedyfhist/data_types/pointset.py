@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 from typing import Any, Dict, Optional
 
 import numpy
@@ -8,6 +9,7 @@ import pandas
 import pandas as pd
 
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
+from greedyfhist.utils.io import derive_output_path
 
 @dataclass
 class Pointset:

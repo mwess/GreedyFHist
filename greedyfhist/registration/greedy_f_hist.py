@@ -81,9 +81,9 @@ class GroupwiseRegResult:
         if self.deformable_transform is not None and len(self.deformable_transform) > 0:
             transforms.append(self.deformable_transform[source])
         # Composite transforms
-        composited_fixed_transform = compose_transforms([x.fixed_transform for x in transforms])
-        composited_moving_transform = compose_transforms([x.moving_transform for x in transforms][::-1])
-        reg_result = RegistrationResult(composited_fixed_transform, composited_moving_transform)
+        composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
+        composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
+        reg_result = RegistrationResult(composited_forward_transform, composited_backward_transform)
         return reg_result
     
 
@@ -903,7 +903,7 @@ class GreedyFHist:
 
         # If no non-rigid registration is performed we keep the affine transform unbounded.
         # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
-        if options.do_nonrigid_registration and not options.keep_affine_transform_unbounded:
+        if options.do_nonrigid_registration and not options.keep_affine_transform_unbounded and options.do_affine_registration:
             path_small_composite_warp = os.path.join(path_metrics_small_resolution, 'small_composite_warp.nii.gz')
             composite_warps(
                 self.path_to_greedy,
@@ -940,7 +940,7 @@ class GreedyFHist:
 
             forward_deformable_transform = realign_displacement_field(path_big_warp)
             backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
-        elif options.do_nonrigid_registration and options.keep_affine_transform_unbounded:
+        elif options.do_nonrigid_registration and options.keep_affine_transform_unbounded and options.do_affine_registration:
             # First rescale affine transforms
             forward_affine_transform = rescale_affine(path_small_affine, factor)
             backward_affine_transform = forward_affine_transform.GetInverse()
@@ -979,7 +979,42 @@ class GreedyFHist:
             path_big_composite_warp = ''
             path_big_composite_warp_inv = ''
 
+        elif options.do_nonrigid_registration and not options.do_affine_registration:
+            # First rescale affine transforms       
+            path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
+            rescale_warp(
+                path_small_warp,
+                path_big_warp,
+                (current_fixed_preprocessed.width, current_fixed_preprocessed.height),
+                (current_fixed_preprocessed.width_original,
+                 current_fixed_preprocessed.height_original),
+                factor)
+            
+            path_big_warp_inv = os.path.join(path_metrics_full_resolution, 'big_inv_warp.nii.gz')
+            rescale_warp(
+                path_small_warp_inv,
+                path_big_warp_inv,
+                (current_fixed_preprocessed.width, current_fixed_preprocessed.height),
+                (current_fixed_preprocessed.width_original,
+                 current_fixed_preprocessed.height_original),
+                factor)
+
+            forward_deformable_transform = realign_displacement_field(path_big_warp)
+            backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
+                
+            forward_transform = sitk.CompositeTransform(2)
+            forward_transform.AddTransform(forward_deformable_transform)
+            
+            backward_transform = sitk.CompositeTransform(2)
+            backward_transform.AddTransform(backward_deformable_transform)
+
+            path_small_composite_warp = ''
+            path_small_inverted_composite_warp = ''
+            path_big_composite_warp = ''
+            path_big_composite_warp_inv = ''
+
         else:
+            # This case is triggered when no nonrigid registration is computed.
             # Set some paths to empty. Will remove them entirely later.
             path_small_composite_warp = ''
             path_small_inverted_composite_warp = ''
@@ -1092,7 +1127,7 @@ class GreedyFHist:
         for idx, (moving_image, moving_mask) in enumerate(image_mask_list[:-1]):
             if moving_mask is None:
                 moving_mask = self.segmentation_function(moving_image)
-            composited_fixed_transform = compose_transforms([x.fixed_transform for x in affine_transform_lists][idx:])
+            composited_fixed_transform = compose_transforms([x.forward_transform for x in affine_transform_lists][idx:])
             # composited_moving_transform = compose_transforms([x.moving_transform for x in transform_lists][idx:][::-1])
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')

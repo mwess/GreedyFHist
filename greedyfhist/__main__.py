@@ -12,13 +12,9 @@ def cli():
 # IDEA: Write image with associated annotations in a list.
 # Then just register all of that and write in separate directories as a result.
 @click.command()
-@click.option('--source_directory', type=click.Path())
-@click.option('--output_directory', type=click.Path())
 @click.option('--config', type=click.Path())
-def groupwise_registration(source_directory,
-                           output_directory,
-                           config):
-    cmdln_processor.groupwise_registration(source_directory, output_directory, config)
+def groupwise_registration(config):
+    cmdln_processor.groupwise_registration(config)
 
 
 
@@ -45,7 +41,7 @@ def register(moving_image=None,
              transform_annotation=None,
              transform_pointset=None,
              transform_geojson=None):
-    cmdln_processor.register(
+    cmdln_processor.register2(
         moving_image_path=moving_image,
         fixed_image_path=fixed_image,
         output_directory=output_directory,
@@ -89,6 +85,7 @@ def transform(transformation,
 
 cli.add_command(register)
 cli.add_command(transform)
+cli.add_command(groupwise_registration)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict
 import xml.etree.ElementTree as ET
+import os
 
 import numpy
 import numpy as np
@@ -8,6 +9,7 @@ import numpy as np
 import tifffile
 
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
+from greedyfhist.utils.io import derive_output_path
 
 
 @dataclass
@@ -137,7 +139,7 @@ class OMETIFFImage:
         return warped_ome_tiff_image
     
     @classmethod
-    def load_from_config(cls, dct):
+    def load_data(cls, dct):
         path = dct['path']
         switch_axis = dct.get('switch_axis', False)
         is_annotation = dct.get('is_annotation', False)

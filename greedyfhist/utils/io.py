@@ -2,6 +2,7 @@
 Contains io helper functions
 """
 import os
+from os.path import join
 from pathlib import Path
 import shutil
 

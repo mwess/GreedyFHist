@@ -76,9 +76,9 @@ def guess_load_transform_data(path: str,
         return image_data
     
 
-def load_data(config: Dict) -> Any:
-    type_ = config['type']
-    if type_ == 'ome'
+# def load_data(config: Dict) -> Any:
+#     type_ = config['type']
+#     if type_ == 'ome'
 
 
 def resolve_variable(selector: str, 
@@ -201,17 +201,91 @@ def guess_load_transform_image_from_config(config: Dict,
     Returns:
         Union[OMETIFFImage, DefaultImage]: Warped data.
     """
+    image = load_image_from_config(config)
+    warped_image = image.transform_data(registerer, transformation)
+    return warped_image
+    # type_ = get_image_type_from_config(config)
+    # if type_ in ['tiff', 'tif']:
+    #     ome_data = OMETIFFImage.load_from_config(config)
+    #     warped_ome_data = ome_data.transform_data(registerer, transformation)
+    #     return warped_ome_data
+    # else:
+    #     image_data = DefaultImage.load_from_config(config)
+    #     warped_image_data = image_data.transform_data(registerer,
+    #                                        transformation)
+    #     return warped_image_data
+    
+def load_image_from_config(config: Dict) -> Union[DefaultImage, OMETIFFImage]:
+    """Load image based on config.
+
+    Args:
+        config (Dict):
+
+    Returns:
+        Union[DefaultImage, OMETIFFIMage]: 
+    """
     type_ = get_image_type_from_config(config)
     if type_ in ['tiff', 'tif']:
-        ome_data = OMETIFFImage.load_from_config(config)
-        warped_ome_data = ome_data.transform_data(registerer, transformation)
-        return warped_ome_data
-    else:
-        image_data = DefaultImage.load_from_config(config)
-        warped_image_data = image_data.transform_data(registerer,
-                                           transformation)
-        return warped_image_data
+        return OMETIFFImage.load_data(config)
+    return DefaultImage.load_data(config)
 
+
+def guess_type(path: str) -> str:
+    if path.endswith('geojson'):
+        return 'geojson'
+    if path.endswith('csv'):
+        return 'pointset'
+    if path.endswith('tiff') or path.endswith('tif'):
+        return 'tiff'
+    return 'default'
+
+
+def load_data_from_config(config: Dict) -> Union[DefaultImage, OMETIFFImage, Pointset, GeoJsonData]:
+    type_ = config.get('type', None)
+    if type_ is None:
+        type_ = guess_type(config['path'])
+    if type_ == 'geojson':
+        return GeoJsonData.load_data(config)
+    if type_ == 'pointset':
+        return Pointset.load_data(config)
+    if type_ == 'default':
+        return DefaultImage.load_data(config)
+    if type_ in ['tif', 'tiff']:
+        return OMETIFFImage.load_data(config)
+    # Throw an error message otherwise.
+
+def load_sections(section_configs: Dict) -> List[HistologySection]:
+    sections = []
+    sorted_keys = sorted(section_configs.keys(), key=lambda x: int(x.replace('section', '')))
+    for key in sorted_keys:
+        section_config = section_configs[key]
+        histology_section = load_histology_section_from_config(section_config)
+        sections.append(histology_section)
+    return sections
+
+
+def load_histology_section_from_config(config: Dict) -> HistologySection:
+    ref_img_config = config.get('reference_image', None)
+    if ref_img_config is not None:
+        reference_image = load_image_from_config(ref_img_config)
+    else:
+        reference_image = None
+    ref_mask_config = config.get('reference_mask', None)
+    if ref_mask_config is not None:
+        reference_mask = load_image_from_config(ref_img_config)
+    else:
+        reference_mask = None
+    additional_data_config = config.get('additional_data', [])
+    ad_data = []
+    for ad_config in additional_data_config:
+        data = load_data_from_config(ad_config)
+        ad_data.append(data)
+    return HistologySection(
+        ref_image=reference_image,
+        ref_mask=reference_mask,
+        additional_data=ad_data
+    )
+    
 
 def load_histology_section(image_path: str,
                            additional_images: List[str] = None,
@@ -333,11 +407,13 @@ def register2(moving_image_path: Optional[str] = None,
     logging.info(f'Registration options: {registration_options}')
     registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
 
+    moving_mask = moving_histology_section.ref_mask.data if moving_histology_section.ref_mask is not None else None
+    fixed_mask = fixed_mask.data if fixed_mask is not None else None
     registration_result = registerer.register(
         moving_histology_section.ref_image.data,
         fixed_image.data,
-        moving_histology_section.ref_mask.data,
-        fixed_mask.data,
+        moving_mask,
+        fixed_mask,
         options=registration_options
     )
     logging.info('Registration finished.')
@@ -349,10 +425,10 @@ def register2(moving_image_path: Optional[str] = None,
 
     if warp_moving_image:
         logging.info('Saving warped image.')
-        warped_moving_image = moving_image.transform_data(registerer, registration_result)
+        warped_moving_image = moving_histology_section.ref_image.transform_data(registerer, registration_result)
         output_directory_transformation_data = join(output_directory, 'transformed_data')
         create_if_not_exists(output_directory_transformation_data)
-        target_path = derive_output_path(output_directory_transformation_data, os.path.basename(moving_image.path))
+        target_path = derive_output_path(output_directory_transformation_data, os.path.basename(moving_histology_section.ref_image.path))
         warped_moving_image.to_file(target_path)
 
 
@@ -579,7 +655,68 @@ def apply_transformation(output_directory: str,
         warped_data.to_file(target_path)               
 
 
-def groupwise_registration(source_directory: str = None,
-                           output_directory: str = None,
-                           config_path: str = None):
-    pass
+def groupwise_registration(config_path: str):
+    with open(config_path) as f:
+        config = toml.load(f)
+    if 'gfh_options' in config:
+        registration_options = RegistrationOptions.parse_cmdln_dict(config['gfh_options'])
+    else:
+        registration_options = RegistrationOptions.default_options()
+    if 'options' in config:
+        # TODO: Should I add collision avoidance?
+        output_directory = config['options'].get('output_directory', 'out')
+        path_to_greedy = config['options'].get('path_to_greedy', '')
+    else:
+        output_directory = 'out'
+        path_to_greedy = ''
+
+    path_to_greedy = resolve_variable('path_to_greedy', path_to_greedy, config.get('options', None), '')
+    registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
+
+    sections = load_sections(config['input'])
+
+    img_mask_list = []
+    for section in sections:
+        img = section.ref_image.data
+        mask = section.ref_mask.data if section.ref_mask is not None else None
+        img_mask_list.append((img, mask))
+    group_reg, _ = registerer.groupwise_registration(img_mask_list, 
+                                                     affine_options=registration_options)
+    transforms = []
+    for idx in range(len(img_mask_list)-1):
+        transform = group_reg.get_transforms(idx)
+        transforms.append(transform)
+
+    # warped_sections = []
+    for idx, section in enumerate(sections[:-1]):
+        section_output_directory = join(output_directory, f'{idx}')
+        create_if_not_exists(section_output_directory)
+        section_output_directory_transform = join(section_output_directory, 'registration')
+        create_if_not_exists(section_output_directory_transform)
+        transform = transforms[idx]
+        transform.to_file(section_output_directory_transform)
+        warped_section = section.apply_transformation(transform, registerer)
+        section_output_directory_data = join(section_output_directory, 'transformed_data')
+        create_if_not_exists(section_output_directory_data)
+        warped_section.to_directory(section_output_directory_data)
+        # warped_sections.append(warped_section)
+
+        # break
+    # warped_sections.append(sections[-1].copy())
+    
+
+
+# #     transform_list.append(transform)
+# img_mask_list = []
+# for section in section_list:
+#     img = section.image.data
+#     # mask = section.get_annotations_by_names('tissue_mask').data if section.get_annotations_by_names('tissue_mask') is not None else None
+#     mask = None
+#     if section.id_ == 7:
+#         mask = section.get_annotations_by_names('tissue_mask').data
+#     img_mask_list.append((img, mask))
+# # img_mask_list = img_mask_list[:4]
+# start = time.time()
+# transforms, group_reg = registerer.groupwise_registration(img_mask_list)
+# end = time.time()
+# print(f'Duration: {end - start}')

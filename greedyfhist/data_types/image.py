@@ -28,7 +28,7 @@ class DefaultImage:
     def to_directory(self, directory: str):
         fname = os.path.basename(self.path)
         output_path = derive_output_path(directory, fname)
-        self.fo_file(output_path)
+        self.to_file(output_path)
 
         
     
@@ -37,6 +37,7 @@ class DefaultImage:
         warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)
         return DefaultImage(
             data=warped_data,
+            path=self.path,
             is_annotation=self.is_annotation,
             switch_axis=self.switch_axis
         )
@@ -62,7 +63,7 @@ class DefaultImage:
         return warped_image
 
     @classmethod
-    def load_from_config(cls, dct):
+    def load_data(cls, dct):
         path = dct['path']
         switch_axis = dct.get('switch_axis', False)
         is_annotation = dct.get('is_annotation', False)

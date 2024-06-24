@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional, Any, List
 
 import numpy
 
@@ -51,11 +52,11 @@ class HistologySection:
         if registerer is None:
             registerer = GreedyFHist.load_from_config({})
         if self.ref_image is not None:
-            warped_ref_image = registerer.transform_image(self.ref_image, registration_result, 'LINEAR')
+            warped_ref_image = self.ref_image.transform_data(registerer, registration_result)
         else:
             warped_ref_image = None
         if self.ref_mask is not None:
-            warped_ref_mask = registerer.transform_image(self.ref_mask, registration_result, 'NN')
+            warped_ref_mask = self.ref_mask.transform_data(registerer, registration_result)
         else:
             warped_ref_mask = None
         warped_additional_data = []
