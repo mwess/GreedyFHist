@@ -16,10 +16,10 @@ class DefaultImage:
     data: numpy.array
     path: str
     is_annotation: bool = False
-    switch_axis: bool = False
+    keep_axis: bool = False
     
     def to_file(self, path):
-        if self.switch_axis:
+        if self.keep_axis:
             img = np.moveaxis(self.data, 2, 0)
         else:
             img = self.data
@@ -31,7 +31,6 @@ class DefaultImage:
         self.to_file(output_path)
 
         
-    
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
         warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)
@@ -39,7 +38,7 @@ class DefaultImage:
             data=warped_data,
             path=self.path,
             is_annotation=self.is_annotation,
-            switch_axis=self.switch_axis
+            keep_axis=self.keep_axis
         )
 
     # @staticmethod
@@ -56,25 +55,26 @@ class DefaultImage:
     def load_and_transform_data(path: str, 
                                 registerer: GreedyFHist,
                                 transformation: RegistrationResult,
-                                switch_axis: bool = False,
+                                keep_axis: bool = True,
                                 is_annotation: bool = False):
-        image = DefaultImage.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
+        image = DefaultImage.load_from_path(path, keep_axis=keep_axis, is_annotation=is_annotation)
         warped_image = image.transform_data(registerer, transformation)
         return warped_image
 
     @classmethod
     def load_data(cls, dct):
         path = dct['path']
-        switch_axis = dct.get('switch_axis', False)
+        switch_axis = dct.get('keep_axis', True)
         is_annotation = dct.get('is_annotation', False)
-        img = sitk.GetArrayFromImage(sitk.ReadImage(path))
-        if switch_axis:
-            img = np.moveaxis(img, 0, 2)
-        return cls(img, path, is_annotation, switch_axis)
-    
-    @classmethod
-    def load_from_path(cls, path: str, switch_axis: bool = False, is_annotation: bool = False) -> 'DefaultImage':
         data = sitk.GetArrayFromImage(sitk.ReadImage(path))
         if switch_axis:
             data = np.moveaxis(data, 0, 2)
         return cls(data, path, is_annotation, switch_axis)
+    
+    @classmethod
+    def load_from_path(cls, path: str, keep_axis: bool = True, is_annotation: bool = False) -> 'DefaultImage':
+        data = sitk.GetArrayFromImage(sitk.ReadImage(path))
+        if is_annotation and not keep_axis:
+            data = np.moveaxis(data, 0, 2)
+        print('default image', data.shape)
+        return cls(data, path, is_annotation, keep_axis)

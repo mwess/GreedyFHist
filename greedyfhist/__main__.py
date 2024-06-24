@@ -41,7 +41,7 @@ def register(moving_image=None,
              transform_annotation=None,
              transform_pointset=None,
              transform_geojson=None):
-    cmdln_processor.register2(
+    cmdln_processor.register(
         moving_image_path=moving_image,
         fixed_image_path=fixed_image,
         output_directory=output_directory,

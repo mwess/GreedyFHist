@@ -62,7 +62,7 @@ class Pointset:
     def to_directory(self, directory: str):
         fname = os.path.basename(self.path)
         output_path = derive_output_path(directory, fname)
-        self.fo_file(output_path)
+        self.to_file(output_path)
 
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
         pointset_data = self.to_numpy()

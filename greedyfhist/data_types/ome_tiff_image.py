@@ -63,7 +63,7 @@ class OMETIFFImage:
     def to_directory(self, directory: str):
         fname = os.path.basename(self.path)
         output_path = derive_output_path(directory, fname)
-        self.fo_file(output_path)
+        self.to_file(output_path)
 
     def to_tiff_file(self, path: str):
         if self.switch_axis and len(self.data.shape) > 2:
@@ -107,7 +107,14 @@ class OMETIFFImage:
     
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'OMETIFFImage':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
-        warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)    
+        if not self.is_annotation or len(self.data.shape) < 3:
+            warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)    
+        else:
+            warped_datas = []
+            for channel_idx in range(self.data.shape[-1]):
+                warped_layer = registerer.transform_image(self.data[:,:,channel_idx], transformation.forward_transform, interpolation)
+                warped_datas.append(warped_layer)
+            warped_data = np.dstack(warped_datas)
         return OMETIFFImage(
             data=warped_data,
             path=self.path,
@@ -116,17 +123,6 @@ class OMETIFFImage:
             is_annotation=self.is_annotation,
             switch_axis=self.switch_axis
         )
-
-    # @staticmethod
-    # def transform_data(image: 'OMETIFFImage', registerer: GreedyFHist, transformation: RegistrationResult):
-    #     interpolation = 'LINEAR' if not image.is_annotation else 'NN'
-    #     warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
-    #     warped_image= OMETIFFImage(data=warped_data, 
-    #                                path=image.path,
-    #                                tif=image.tif,
-    #                                is_annotation=image.is_annotation, 
-    #                                switch_axis=image.switch_axis)
-    #     return warped_image
     
     @staticmethod
     def load_and_transform_data(path: str, 
@@ -154,13 +150,14 @@ class OMETIFFImage:
         return cls(img, path, is_ome, tif, is_annotation, switch_axis)
         
     @classmethod
-    def load_from_path(cls, path, switch_axis=False, is_annotation=False):
+    def load_from_path(cls, path, keep_axis=False, is_annotation=False):
         tif = tifffile.TiffFile(path)
         img = tif.asarray()
-        if switch_axis and len(img.shape) > 2:
+        if is_annotation and not keep_axis and len(img.shape) > 2:
             img = np.moveaxis(img, 0, 2)
         if path.endswith('ome.tif') or path.endswith('ome.tiff'):
             is_ome = True
         else:
             is_ome = False
-        return cls(img, path, is_ome, tif, is_annotation, switch_axis)
+        print('image shape', img.shape)
+        return cls(img, path, is_ome, tif, is_annotation, keep_axis)
