@@ -32,6 +32,21 @@ def com_affine_matrix(fixed: numpy.array, moving: numpy.array) -> numpy.array:
     return mat
 
 
+def get_com_offset(mat: numpy.array) -> float:
+    """
+    Computes the translation offset of the given matrix.
+    
+    Args:
+        mat (numpy.array):
+            transform matrix
+            
+    Returns:
+        translation offset
+    """
+    translation = mat[:2, 2]
+    return np.sqrt(np.square(translation[0]) + np.square(translation[1]))
+
+
 def rescale_affine(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK.Transform:
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))

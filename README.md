@@ -1,5 +1,7 @@
-# GreedyFHist
+# About
+
 GreedyFHist - Registration of stained histology images.
+
 
 # Important!
 
