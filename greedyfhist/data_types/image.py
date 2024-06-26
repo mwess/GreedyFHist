@@ -30,7 +30,6 @@ class DefaultImage:
         output_path = derive_output_path(directory, fname)
         self.to_file(output_path)
 
-        
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'
         warped_data = registerer.transform_image(self.data, transformation.forward_transform, interpolation)
@@ -41,16 +40,6 @@ class DefaultImage:
             keep_axis=self.keep_axis
         )
 
-    # @staticmethod
-    # def transform_data(image: 'DefaultImage', registerer: GreedyFHist, transformation: RegistrationResult) -> 'DefaultImage':
-    #     interpolation = 'LINEAR' if not image.is_annotation else 'NN'
-    #     warped_data = registerer.transform_image(image.data, transformation.forward_transform, interpolation)
-    #     return DefaultImage(
-    #         data=warped_data,
-    #         is_annotation=image.is_annotation,
-    #         switch_axis=image.switch_axis
-    #     )
-    
     @staticmethod
     def load_and_transform_data(path: str, 
                                 registerer: GreedyFHist,

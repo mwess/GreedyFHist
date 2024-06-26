@@ -38,12 +38,6 @@ class GeoJsonData:
         data = self.data.copy()
         warped_data = registerer.transform_geojson(data, transformation.backward_transform)
         return GeoJsonData(warped_data, self.path)
-
-    # @staticmethod
-    # def transform_data(geojson_data: 'GeoJsonData', registerer: GreedyFHist, transformation: RegistrationResult) -> 'GeoJsonData':
-    #     data = geojson_data.data.copy()
-    #     warped_data = registerer.transform_geojson(data, transformation.backward_transform)
-    #     return GeoJsonData(warped_data, geojson_data.path)
     
     @staticmethod
     def load_and_transform_data(path: str, 

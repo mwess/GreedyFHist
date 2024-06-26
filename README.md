@@ -11,6 +11,11 @@ This code needs some more tweaking before it can be used properly. These are the
 - Tutorial.
 - Maybe some additional features.
 
+
+TODO:
+- Split affine and nonrigid options.
+- Test functionality.
+
 If you use any of this code, please cite: 
 
 @article{wess2024spatial,

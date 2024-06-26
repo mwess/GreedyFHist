@@ -159,5 +159,4 @@ class OMETIFFImage:
             is_ome = True
         else:
             is_ome = False
-        print('image shape', img.shape)
         return cls(img, path, is_ome, tif, is_annotation, keep_axis)

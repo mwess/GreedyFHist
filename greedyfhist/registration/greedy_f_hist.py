@@ -36,9 +36,9 @@ from greedyfhist.utils.image import (
     realign_displacement_field,
     translation_length
 )
-from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps
+from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps, affine_registration2, deformable_registration2
 from greedyfhist.segmentation.segmenation import load_yolo_segmentation
-from greedyfhist.options import RegistrationOptions
+from greedyfhist.options import RegistrationOptions, RegistrationOptions2, PreprocessingOptions
 
 
 # TODO: Write serialization
@@ -493,6 +493,34 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
 #     forward_displacement_field = compose_reg_transforms(transformation)
 #     backward_displacement_field = compose_inv_reg_transforms(transformation)
 #     return forward_displacement_field, backward_displacement_field
+def preprocessing(image: numpy.array,
+                  preprocessing_options: PreprocessingOptions,
+                  resolution: Tuple[int, int],
+                  kernel_size: int,
+                  tmp_path: str
+                  ):
+    create_if_not_exists(tmp_path)
+    if preprocessing_options.enable_denoising:
+        image = denoise_image(image,
+                              sp=preprocessing_options.moving_sr,
+                              sr=preprocessing_options.moving_sp)
+    tmp_dir = join(tmp_path, 'preprocessed')
+    create_if_not_exists(tmp_dir)
+    resample = resolution[0] / image.shape[0] * 100
+    smoothing = max(int(100 / (2 * resample)), 1) + 1    
+    image_preprocessed = preprocess_image_for_greedy(image,
+                                                     kernel_size,
+                                                     resolution,
+                                                     smoothing,
+                                                     tmp_dir)
+    return image_preprocessed
+
+def affine_transform_to_file(transform, fpath):
+    mat = transform.GetMatrix()
+    trans = transform.GetTranslation()
+    mat_str = f'{mat[0]} {mat[1]} {trans[0]}\n{mat[2]} {mat[3]} {trans[1]}\n0 0 1'
+    with open(fpath, 'w') as f:
+        f.write(mat_str)
 
 
 def preprocess_image_for_greedy(image: numpy.array,
@@ -635,6 +663,399 @@ class GreedyFHist:
                                     fixed_img_mask,
                                     options)
         return reg_result 
+
+    def register2_(self,
+                 moving_img: numpy.array,
+                 fixed_img: numpy.array,
+                 moving_img_mask: Optional[numpy.array] = None,
+                 fixed_img_mask: Optional[numpy.array] = None,
+                 options: Optional[RegistrationOptions2] = None,                  
+                 **kwargs: Dict) -> 'RegistrationResult':
+        """Computes registration from moving image to fixed image.
+
+        Args:
+            moving_img (numpy.array):
+            fixed_img (numpy.array): 
+            moving_img_mask (Optional[numpy.array], optional): Optional moving mask. Is otherwise dervied automatically. Defaults to None.
+            fixed_img_mask (Optional[numpy.array], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
+            options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+
+        Returns:
+            RegistrationResult: _description_
+        """
+        if options is None:
+            options = RegistrationOptions2()
+        path_temp = options.temporary_directory
+        clean_if_exists(path_temp)
+        path_temp, _ = derive_subdir(path_temp)
+        create_if_not_exists(path_temp)
+        path_output = join(path_temp, 'output')
+        create_if_not_exists(path_output)
+        path_output = join(path_output, 'registrations')
+        path_output, subdir_num = derive_subdir(path_output)
+        create_if_not_exists(path_output)
+        # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
+        pre_sampling_factor = options.pre_sampling_factor
+        if pre_sampling_factor == 'auto':
+            # TODO: Separate between moving and fixed resampling factor
+            moving_resampling_factor = derive_resampling_factor(moving_img)
+            fixed_resampling_factor = derive_resampling_factor(fixed_img)
+        else:
+            moving_resampling_factor = pre_sampling_factor
+            fixed_resampling_factor = pre_sampling_factor
+
+        original_moving_image_size = moving_img.shape[:2]
+        original_fixed_image_size = fixed_img.shape[:2]
+
+        reg_params = {
+                        'moving_resampling_factor': moving_resampling_factor,
+                        'fixed_resampling_factor': fixed_resampling_factor,
+                        'original_moving_image_size': original_moving_image_size,
+                        'original_fixed_image_size': original_fixed_image_size
+                        }
+
+        cmdln_returns = []
+        # Convert to correct format, if necessary
+        moving_img = correct_img_dtype(moving_img)
+        fixed_img = correct_img_dtype(fixed_img)
+        # moving_img = resample_image_sitk(moving_img, pre_downsampling_factor)
+        # fixed_img = resample_image_sitk(fixed_img, pre_downsampling_factor)
+        moving_img = resample_image_sitk(moving_img, moving_resampling_factor)
+        fixed_img = resample_image_sitk(fixed_img, fixed_resampling_factor)
+        if moving_img_mask is None:
+            moving_img_mask = self.segmentation_function(moving_img)
+        else:
+            # moving_img_mask = resample_image_sitk(moving_img_mask, pre_downsampling_factor)
+            moving_img_mask = resample_image_sitk(moving_img_mask, moving_resampling_factor)
+        if fixed_img_mask is None:
+            fixed_img_mask = self.segmentation_function(fixed_img)
+        else:
+            fixed_img_mask = resample_image_sitk(fixed_img_mask, fixed_resampling_factor)
+        # Cropping and Padding
+        cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
+        cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
+        reg_params['cropping_params_mov'] = crop_params_mov
+        reg_params['cropping_params_fix'] = crop_params_fix
+        reg_params['original_shape_fixed_image'] = fixed_img.shape
+        cropped_moving_img = moving_img[crop_params_mov[0]:crop_params_mov[1], crop_params_mov[2]:crop_params_mov[3]]
+        cropped_fixed_img = fixed_img[crop_params_fix[0]:crop_params_fix[1], crop_params_fix[2]:crop_params_fix[3]]
+        moving_pad, fixed_pad = get_symmetric_padding(cropped_moving_img, cropped_fixed_img)
+        moving_img = pad_asym(cropped_moving_img, moving_pad)
+        fixed_img = pad_asym(cropped_fixed_img, fixed_pad)
+        moving_img_mask = pad_asym(cropped_moving_mask, moving_pad)
+        fixed_img_mask = pad_asym(cropped_fixed_mask, fixed_pad)
+        reg_params['moving_padding'] = moving_pad
+        reg_params['fixed_padding'] = fixed_pad
+        moving_img = apply_mask(moving_img, moving_img_mask)
+        fixed_img = apply_mask(fixed_img, fixed_img_mask)
+        _, cropping_padded_mov_mask = cropping(moving_img_mask)
+        _, cropping_padded_fix_mask = cropping(fixed_img_mask)
+        reg_params['cropped_padded_mov_mask'] = cropping_padded_mov_mask
+        reg_params['cropped_padded_fix_mask'] = cropping_padded_fix_mask
+
+        path_metrics = os.path.join(path_output, 'metrics')
+        path_metrics_small_resolution = os.path.join(path_metrics, 'small_resolution')
+        path_metrics_full_resolution = os.path.join(path_metrics, 'full_resolution')
+
+        create_if_not_exists(path_metrics)
+        create_if_not_exists(path_metrics_small_resolution)
+        create_if_not_exists(path_metrics_full_resolution)
+
+        if options.do_affine_registration:
+            moving_affine_path = join(path_temp, 'affine_moving_preprocessing')
+            fixed_affine_path = join(path_temp, 'affine_fixed_preprocessing')
+            moving_img_preprocessed = preprocessing(moving_img,
+                                                    options.affine_registration_options.preprocessing_options,
+                                                    options.affine_registration_options.resolution,
+                                                    options.affine_registration_options.kernel_size,
+                                                    moving_affine_path)
+            fixed_img_preprocessed = preprocessing(fixed_img,
+                                                options.affine_registration_options.preprocessing_options,
+                                                options.affine_registration_options.resolution,
+                                                options.affine_registration_options.kernel_size,
+                                                fixed_affine_path)
+            height = fixed_img_preprocessed.height
+            
+            ia_init = ''
+            if options.affine_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
+                # Use Segmentation masks to compute center of mass initialization
+                # Check that masks are np.arrays
+                init_mat_path = os.path.join(path_temp, 'Affine_init.mat')
+                init_mat = com_affine_matrix(fixed_img_mask, moving_img_mask)
+                write_mat_to_file(init_mat, init_mat_path)
+                ia_init = ['-ia', f'{init_mat_path}']
+                reg_params['com_x'] = init_mat[0, 2]
+                reg_params['com_y'] = init_mat[1, 2]
+                offset = int(translation_length(init_mat[0,2], init_mat[0,1]))
+            elif options.affine_registration_options.ia == 'ia-image-centers':
+                ia_init = ['-ia-image-centers', '']
+                offset = int((height + (options.affine_registration_options.kernel_size * 4)) / 10)
+            else:
+                print(f'Unknown ia option: {options.affine_registration_options.ia}.')
+                offset = int((height + (options.affine_registration_options.kernel_size * 4)) / 10)
+            reg_params['offset'] = offset
+            reg_params['affine_iteration_vec'] = options.affine_registration_options.iteration_pyramid
+            path_small_affine = os.path.join(path_metrics_small_resolution, 'small_affine.mat')
+            aff_ret = affine_registration2(self.path_to_greedy,
+                                            fixed_img_preprocessed.image_path,
+                                            moving_img_preprocessed.image_path,
+                                            path_small_affine,
+                                            offset,
+                                            ia_init,
+                                            options.affine_registration_options
+                                            )
+            cmdln_returns.append(aff_ret)    
+        else:
+            path_small_affine = None  
+
+        if options.do_nonrigid_registration:    
+            if options.do_affine_registration:
+                src_resolution = options.affine_registration_options.resolution[0]
+                dst_resolution = options.nonrigid_registration_options.resolution[0]
+
+                resample = src_resolution / dst_resolution * 100
+                tmp_factor = 100 / resample    
+                affine_transform = rescale_affine(path_small_affine, tmp_factor)
+                
+                nonrigid_affine_trans_path = join(path_metrics_small_resolution, 'nr_aff_trans.mat')
+                affine_transform_to_file(affine_transform, nonrigid_affine_trans_path)
+            else:
+                nonrigid_affine_trans_path = None
+                resample = None
+
+                
+            
+            reg_params['deformable_iteration_vec'] = options.nonrigid_registration_options.iteration_pyramid
+            # Diffeomorphic
+            moving_nr_path = join(path_temp, 'nr_moving_preprocessing')
+            fixed_nr_path = join(path_temp, 'nr_fixed_preprocessing')
+            moving_img_preprocessed = preprocessing(moving_img,
+                                                    options.nonrigid_registration_options.preprocessing_options,
+                                                    options.nonrigid_registration_options.resolution,
+                                                    options.nonrigid_registration_options.kernel_size,
+                                                    moving_nr_path)
+            fixed_img_preprocessed = preprocessing(fixed_img,
+                                                options.nonrigid_registration_options.preprocessing_options,
+                                                options.nonrigid_registration_options.resolution,
+                                                options.nonrigid_registration_options.kernel_size,
+                                                fixed_nr_path)
+            height = fixed_img_preprocessed.height
+
+
+            path_small_warp = os.path.join(path_metrics_small_resolution, 'small_warp.nii.gz')
+            path_small_warp_inv = os.path.join(path_metrics_small_resolution, 'small_inv_warp.nii.gz')
+
+            ia_init = ''
+            if options.nonrigid_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
+                # Use Segmentation masks to compute center of mass initialization
+                # Check that masks are np.arrays
+                init_mat_path = os.path.join(path_temp, 'Affine_init.mat')
+                init_mat = com_affine_matrix(fixed_img_mask, moving_img_mask)
+                write_mat_to_file(init_mat, init_mat_path)
+                ia_init = ['-ia', f'{init_mat_path}']
+                reg_params['com_x'] = init_mat[0, 2]
+                reg_params['com_y'] = init_mat[1, 2]
+                offset = int(translation_length(init_mat[0,2], init_mat[0,1]))
+            elif options.nonrigid_registration_options.ia == 'ia-image-centers':
+                ia_init = ['-ia-image-centers', '']
+                offset = int((height + (options.nonrigid_registration_options.kernel_size * 4)) / 10)
+            else:
+                print(f'Unknown ia option: {options.nonrigid_registration_options.ia}.')
+                offset = int((height + (options.nonrigid_registration_options.kernel_size * 4)) / 10)
+
+
+
+            deformable_reg_ret = deformable_registration2(self.path_to_greedy,
+                                                            fixed_img_preprocessed.image_path,
+                                                            moving_img_preprocessed.image_path,
+                                                            options.nonrigid_registration_options,
+                                                            output_warp=path_small_warp,
+                                                            output_inv_warp=path_small_warp_inv,
+                                                            affine_pre_transform=nonrigid_affine_trans_path,
+                                                            ia=ia_init)
+            cmdln_returns.append(deformable_reg_ret)
+        else:
+            path_small_warp = None
+            path_small_warp_inv = None            
+
+        # Write small ref image to file for warping of coordinates
+        small_fixed = sitk.ReadImage(fixed_img_preprocessed.image_path)
+        empty_fixed_img = small_fixed[:,:]
+        empty_fixed_img[:,:] = 0
+        path_to_small_ref_image = join(path_output, 'small_ref_image.nii.gz')
+        sitk.WriteImage(empty_fixed_img, path_to_small_ref_image)
+
+        # reg_params['factor'] = factor
+
+        # If no non-rigid registration is performed we keep the affine transform unbounded.
+        # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
+        if options.do_nonrigid_registration:
+            no_2_orig_resample = options.nonrigid_registration_options.resolution[0] / moving_img.shape[0] * 100
+            no_2_orig_factor = 100 / no_2_orig_resample            
+            if options.do_affine_registration and not options.affine_registration_options.keep_affine_transform_unbounded:
+                path_small_composite_warp = os.path.join(path_metrics_small_resolution, 'small_composite_warp.nii.gz')
+                composite_warps(
+                    self.path_to_greedy,
+                    nonrigid_affine_trans_path,
+                    path_small_warp,
+                    path_to_small_ref_image,
+                    path_small_composite_warp            
+                )
+                path_big_composite_warp = os.path.join(path_metrics_full_resolution, 'big_composite_warp.nii.gz')
+                rescale_warp(
+                    path_small_composite_warp,
+                    path_big_composite_warp,
+                    (fixed_img_preprocessed.width, fixed_img_preprocessed.height),
+                    (fixed_img_preprocessed.width_original,
+                        fixed_img_preprocessed.height_original),
+                    no_2_orig_factor)
+                path_small_inverted_composite_warp = os.path.join(path_metrics_small_resolution, 'small_inv_composite_warp.nii.gz')
+                composite_warps(
+                    self.path_to_greedy,
+                    nonrigid_affine_trans_path,
+                    path_small_warp_inv,
+                    path_to_small_ref_image,
+                    path_small_inverted_composite_warp,
+                    invert=True 
+                )
+                path_big_composite_warp_inv = os.path.join(path_metrics_full_resolution, 'big_inv_composite_warp.nii.gz')
+                rescale_warp(
+                    path_small_inverted_composite_warp,
+                    path_big_composite_warp_inv,
+                    (moving_img_preprocessed.width, moving_img_preprocessed.height),
+                    (moving_img_preprocessed.width_original,
+                        moving_img_preprocessed.height_original),
+                    no_2_orig_factor)
+
+                forward_deformable_transform = realign_displacement_field(path_big_warp)
+                backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
+            elif options.affine_registration_options.keep_affine_transform_unbounded and options.do_affine_registration:
+                # First rescale affine transforms
+                aff_2_orig_resample = options.affine_registration_options.resolution[0] / moving_img.shape[0] * 100
+                aff_2_orig_factor = 100 / aff_2_orig_resample 
+
+                forward_affine_transform = rescale_affine(path_small_affine, aff_2_orig_factor)
+                backward_affine_transform = forward_affine_transform.GetInverse()
+                
+                path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
+                rescale_warp(
+                    path_small_warp,
+                    path_big_warp,
+                    (fixed_img_preprocessed.width, fixed_img_preprocessed.height),
+                    (fixed_img_preprocessed.width_original,
+                        fixed_img_preprocessed.height_original),
+                    no_2_orig_factor)
+                
+                path_big_warp_inv = os.path.join(path_metrics_full_resolution, 'big_inv_warp.nii.gz')
+                rescale_warp(
+                    path_small_warp_inv,
+                    path_big_warp_inv,
+                    (fixed_img_preprocessed.width, fixed_img_preprocessed.height),
+                    (fixed_img_preprocessed.width_original,
+                        fixed_img_preprocessed.height_original),
+                    no_2_orig_factor)
+
+                forward_deformable_transform = realign_displacement_field(path_big_warp)
+                backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
+                    
+                forward_transform = sitk.CompositeTransform(2)
+                forward_transform.AddTransform(forward_affine_transform)
+                forward_transform.AddTransform(forward_deformable_transform)
+                
+                backward_transform = sitk.CompositeTransform(2)
+                backward_transform.AddTransform(backward_deformable_transform)
+                backward_transform.AddTransform(backward_affine_transform)
+
+                path_small_composite_warp = ''
+                path_small_inverted_composite_warp = ''
+                path_big_composite_warp = ''
+                path_big_composite_warp_inv = ''
+
+            elif not options.do_affine_registration:
+                # First rescale affine transforms       
+                path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
+                rescale_warp(
+                    path_small_warp,
+                    path_big_warp,
+                    (fixed_img_preprocessed.width, fixed_img_preprocessed.height),
+                    (fixed_img_preprocessed.width_original,
+                        fixed_img_preprocessed.height_original),
+                    no_2_orig_factor)
+                
+                path_big_warp_inv = os.path.join(path_metrics_full_resolution, 'big_inv_warp.nii.gz')
+                rescale_warp(
+                    path_small_warp_inv,
+                    path_big_warp_inv,
+                    (fixed_img_preprocessed.width, fixed_img_preprocessed.height),
+                    (fixed_img_preprocessed.width_original,
+                        fixed_img_preprocessed.height_original),
+                    no_2_orig_factor)
+
+                forward_deformable_transform = realign_displacement_field(path_big_warp)
+                backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
+                    
+                forward_transform = sitk.CompositeTransform(2)
+                forward_transform.AddTransform(forward_deformable_transform)
+                
+                backward_transform = sitk.CompositeTransform(2)
+                backward_transform.AddTransform(backward_deformable_transform)
+
+                path_small_composite_warp = ''
+                path_small_inverted_composite_warp = ''
+                path_big_composite_warp = ''
+                path_big_composite_warp_inv = ''
+
+        else:
+            # This case is triggered when no nonrigid registration is computed.
+            aff_2_orig_resample = options.affine_registration_options.resolution[0] / moving_img.shape[0] * 100
+            aff_2_orig_factor = 100 / aff_2_orig_resample            
+            # Set some paths to empty. Will remove them entirely later.
+            path_small_composite_warp = ''
+            path_small_inverted_composite_warp = ''
+            path_big_composite_warp = ''
+            path_big_composite_warp_inv = ''
+            # TODO: Do I need to -1 this transformation? (Because the direction was different for the displacement field. Though things seem to work with
+            # affine transformation.) Check!!
+            forward_transform = rescale_affine(path_small_affine, aff_2_orig_factor)
+            backward_transform = forward_transform.GetInverse()
+            # backward_transform = invert_affine_transform(forward_transform)
+
+        # Check those 2
+
+        # reg_param_outpath = os.path.join(path_output, 'reg_params.json')
+        # with open(reg_param_outpath, 'w') as f:
+        #     json.dump(reg_params, f)
+
+
+        displacement_field = None
+        inv_displacement_field = None
+        reg_result = InternalRegParams(
+            path_to_small_moving=moving_img_preprocessed.image_path,
+            path_to_small_fixed=fixed_img_preprocessed.image_path,
+            path_to_small_composite=path_small_composite_warp,
+            path_to_big_composite=path_big_composite_warp,
+            path_to_small_inv_composite=path_small_inverted_composite_warp,
+            path_to_big_inv_composite=path_big_composite_warp_inv,
+            cmdl_log=cmdln_returns,
+            reg_params=reg_params,
+            path_to_small_ref_image=path_to_small_ref_image,
+            sub_dir_key=subdir_num,
+            displacement_field=displacement_field,
+            inv_displacement_field=inv_displacement_field
+        )
+
+        # TODO: For affine transforms: Write function to convert all 5 transforms into a single transform.
+        # TODO: Add option to compress all 5 transforms into a single displacement field.
+        composited_forward_transform = compose_reg_transforms(forward_transform, reg_result)
+        composited_backward_transform = compose_inv_reg_transforms(backward_transform, reg_result)
+        fixed_transform = GFHTransform(original_fixed_image_size, composited_forward_transform)
+        moving_transform = GFHTransform(original_moving_image_size, composited_backward_transform)
+        registration_result = RegistrationResult(forward_transform=fixed_transform, backward_transform=moving_transform, cmdln_returns=cmdln_returns, reg_params=reg_params)
+        # Return this!
+        if options.remove_temporary_directory:
+            self.__cleanup_temporary_directory(options.temporary_directory)        
+        return registration_result
+
 
     def register_(self,
                  moving_img: numpy.array,
