@@ -28,3 +28,16 @@ GreedyFHist has one external dependency, which is `greedy` (https://sites.google
 
 If `greedy` cannot be installed using the official documentation, we have also provided a Dockerfile. 
 
+Either build the Dockerfile locally and set an alias (for instance in your `~/.bash.rc` file):
+
+```
+cd docker
+docker build -f Dockerfile_greedy . # Check that command. Add tag!
+```
+
+Setting the alias:
+
+```
+alias greedy='docker run greedy'
+```
+
