@@ -198,7 +198,7 @@ def affine_registration(path_to_greedy: str,
     # aff_rgs['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
     aff_rgs['-n'] = pyramid_iterations
     aff_rgs['-threads'] = options.n_threads
-    aff_rgs['-dof'] = '12'
+    aff_rgs['-dof'] = str(options.dof)
     aff_rgs['-search'] = f'{options.rigid_iterations} 180 {offset}'.split()  # Replaced 360 with any for rotation parameter
     aff_rgs['-gm-trim'] = f'{options.kernel_size}x{options.kernel_size}'
     aff_rgs['-a'] = ''  # Doesnt get param how to parse?

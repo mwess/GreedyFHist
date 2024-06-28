@@ -38,12 +38,11 @@ class OMETIFFImage:
         that Nearest Neighbor interpolation is used during 
         transformation.
         
-    switch_axis: bool
-        If set to True, first and third channel are switched when data 
-        is loaded and switched back when writing data to file. 
-        Normally, images are provided in W x H x C format, but some 
-        tools generate images in format C x H x W, e.g. multi class 
-        annotations from QuPath. 
+    keep_axis: bool
+        If set to True, first and third channel are not switched if 
+        is_annotation is also true. Normally, images are provided 
+        in W x H x C format, but some tools generate annotations in 
+        format C x H x W, e.g. multi class annotations from QuPath. 
     """
     
     data: numpy.array
@@ -51,7 +50,7 @@ class OMETIFFImage:
     is_ome: bool
     tif: tifffile.tifffile.TiffFile
     is_annotation: bool = False
-    switch_axis: bool = False
+    keep_axis: bool = False
     
 
     def to_file(self, path: str):
@@ -66,7 +65,7 @@ class OMETIFFImage:
         self.to_file(output_path)
 
     def to_tiff_file(self, path: str):
-        if self.switch_axis and len(self.data.shape) > 2:
+        if self.is_annotation and not self.keep_axis and len(self.data.shape) > 2:
             data = np.moveaxis(self.data, 2, 0)
         else:
             data = self.data
@@ -79,7 +78,7 @@ class OMETIFFImage:
         else:
             options = dict(photometric='rgb')
         
-        if self.switch_axis and len(self.data.shape) > 2:
+        if not self.keep_axis and len(self.data.shape) > 2:
             data = np.moveaxis(self.data, 2, 0)
         else:
             data = self.data
@@ -121,33 +120,33 @@ class OMETIFFImage:
             is_ome=self.is_ome,
             tif=self.tif,
             is_annotation=self.is_annotation,
-            switch_axis=self.switch_axis
+            keep_axis=self.keep_axis
         )
     
     @staticmethod
     def load_and_transform_data(path: str, 
                                 registerer: GreedyFHist,
                                 transformation: RegistrationResult,
-                                switch_axis: bool = False,
+                                keep_axis: bool = False,
                                 is_annotation: bool = False):
-        ome_tiff_image = OMETIFFImage.load_from_path(path, switch_axis=switch_axis, is_annotation=is_annotation)
+        ome_tiff_image = OMETIFFImage.load_from_path(path, keep_axis=keep_axis, is_annotation=is_annotation)
         warped_ome_tiff_image = ome_tiff_image.transform_data(registerer, transformation)
         return warped_ome_tiff_image
     
     @classmethod
     def load_data(cls, dct):
         path = dct['path']
-        switch_axis = dct.get('switch_axis', False)
+        keep_axis = dct.get('keep_axis', False)
         is_annotation = dct.get('is_annotation', False)
         tif = tifffile.TiffFile(path)
         img = tif.asarray()
-        if switch_axis and len(img.shape) > 2:
+        if is_annotation and not keep_axis and len(img.shape) > 2:
             img = np.moveaxis(img, 0, 2)
         if path.endswith('ome.tif') or path.endswith('ome.tiff'):
             is_ome = True
         else:
             is_ome = False            
-        return cls(img, path, is_ome, tif, is_annotation, switch_axis)
+        return cls(img, path, is_ome, tif, is_annotation, keep_axis)
         
     @classmethod
     def load_from_path(cls, path, keep_axis=False, is_annotation=False):

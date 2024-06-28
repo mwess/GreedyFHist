@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Any, List
 
 import numpy
@@ -27,7 +27,7 @@ class HistologySection:
     
     ref_image: Optional[Any]
     ref_mask: Optional[Any]
-    additional_data: List[Any]
+    additional_data: List[Any] = field(default_factory=list)
     
     def register_to_image(self, 
                           fixed_image: numpy.array, 

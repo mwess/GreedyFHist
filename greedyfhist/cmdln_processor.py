@@ -1,18 +1,11 @@
 import logging
-import os
 from os.path import join
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import geojson
-import numpy as np
-import pandas as pd
-import SimpleITK as sitk
 import toml
 
-from greedyfhist.utils.image import read_image
-from greedyfhist.utils.io import create_if_not_exists, derive_output_path
-from greedyfhist.utils.geojson_utils import read_geojson
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, InternalRegParams, RegistrationResult
+from greedyfhist.utils.io import create_if_not_exists
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
 from greedyfhist.data_types import OMETIFFImage, DefaultImage, Pointset, GeoJsonData, HistologySection
 
@@ -257,7 +250,8 @@ def load_histology_section_from_config(config: Dict) -> HistologySection:
         reference_image = None
     ref_mask_config = config.get('reference_mask', None)
     if ref_mask_config is not None:
-        reference_mask = load_image_from_config(ref_img_config)
+        config['is_annotation'] = True
+        reference_mask = load_image_from_config(ref_mask_config)
     else:
         reference_mask = None
     additional_data_config = config.get('additional_data', [])
@@ -399,7 +393,7 @@ def register(moving_image_path: Optional[str] = None,
         tif_image = OMETIFFImage.load_from_path(tif_image_path)
         moving_histology_section.additional_data.append(tif_image)
     for tif_annotation_path in tif_annotations:
-        tif_annotation = OMETIFFImage.load_and_transform_data(tif_annotation_path, is_annotation=True)
+        tif_annotation = OMETIFFImage.load_from_path(tif_annotation_path, is_annotation=True)
         moving_histology_section.additional_data.append(tif_annotation)
     for pointset_path in pointsets:
         pointset = Pointset.load_from_path(pointset_path)
@@ -560,19 +554,23 @@ def groupwise_registration(config_path: str):
         img_mask_list.append((img, mask))
     group_reg, _ = registerer.groupwise_registration(img_mask_list, 
                                                      affine_options=registration_options)
-    transforms = []
-    for idx in range(len(img_mask_list)-1):
-        transform = group_reg.get_transforms(idx)
-        transforms.append(transform)
 
     for idx, section in enumerate(sections[:-1]):
-        section_output_directory = join(output_directory, f'{idx}')
+        # Replace this with section id.
+        section_output_directory = join(output_directory, f'section{idx}')
         create_if_not_exists(section_output_directory)
         section_output_directory_transform = join(section_output_directory, 'registration')
         create_if_not_exists(section_output_directory_transform)
-        transform = transforms[idx]
+        transform = group_reg.get_transforms(idx)
         transform.to_file(section_output_directory_transform)
         warped_section = section.apply_transformation(transform, registerer)
         section_output_directory_data = join(section_output_directory, 'transformed_data')
         create_if_not_exists(section_output_directory_data)
         warped_section.to_directory(section_output_directory_data)
+
+    section_output_directory = join(output_directory, f'section{len(sections)-1}')
+    create_if_not_exists(section_output_directory)
+    section_output_directory_data = join(section_output_directory, 'transformed_data')
+    create_if_not_exists(section_output_directory_data)
+    sections[-1].to_directory(section_output_directory_data)
+    

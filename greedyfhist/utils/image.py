@@ -164,6 +164,8 @@ def resample_image_sitk(image: numpy.array,
                         scaling_factor: float, 
                         ref_image_shape: Optional[Tuple[int, int]] = None,
                         interpolator: int = sitk.sitkLinear):
+    if scaling_factor == 1:
+        return image
     if ref_image_shape is None:
         shape = image.shape[:2]
         ref_image_shape = (int(shape[0]*scaling_factor), int(shape[1]*scaling_factor))

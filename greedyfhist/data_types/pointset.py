@@ -95,14 +95,14 @@ class Pointset:
         path = dct['path']
         x_axis = dct.get('x', 'x')
         y_axis = dct.get('y', 'y')
-        header = dct.get('header', None)
+        header = dct.get('header', 0)
         data = pd.read_csv(path, index_col=index_col, header=header)
         if header is None:
             data.rename(columns={0: x_axis, 1: y_axis}, inplace=True)
         return cls(data, path, x_axis, y_axis, index_col, header)
 
     @classmethod
-    def load_from_path(cls, path, x_axis='x', y_axis='y', index_col=None, header=None):
+    def load_from_path(cls, path, x_axis='x', y_axis='y', index_col=None, header=0):
         data = pd.read_csv(path, index_col=index_col, header=header)
         if header is None:
             data.rename(columns={0: x_axis, 1: y_axis}, inplace=True)

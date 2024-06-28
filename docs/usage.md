@@ -130,11 +130,52 @@ At the moment, there are only two fields set in `output`: `output_directory` def
 
 In this section, the spatial topolgy is defined. The configuration depends on the registration mode, i.e. `pairwise` and `groupwise` registrations require slightly different setups. However, defining a spatial object is the same throughout both modes.
 
+### Image data
 
 ```
-[input.image]
+...
+[input.reference_image]
 
 path = 'image.ome.tiff'
 type = 'ome'
 is_annotation = false
+keep_axis = false
+...
 ```
+
+`path` leads to the file to be loaded. `type` defines which file type is to be loaded. If `type` is not supplied GreedyFHist guesses the filetype based on the file ending: `tiff` and `tif` are loaded as `tif` images, `csv` as `pointsets`, and `geojson` as geojson data. Otherwise paths are treated as image data and loaded as default images.
+
+`is_annotation` is set to `false` by default. If set to `true`, `Nearest Neighbor` interpolation is used instead of `Linear` interpolation. Also `tif` images are read in form of C x W x H instead of W x H x C that is used for other images. Otherwise `is_annotation` has no effect. This effect can be suppressed by setting `keep_axis = true`. 
+
+### Pointset data
+
+Below see a full example for configuring pointset data.
+
+```
+...
+[input.additional_data]
+
+path = 'pointset.csv'
+x_axis = 'x'
+y_axis = 'y'
+index_col = None
+header = None
+...
+```
+
+Pointsets are internally parsed as pandas DataFrames. `x_axis` is the column used to index x-coordinates. `y_axis` indexes y-coordinates. `index_col` denotes the column used as the row index and `header` denotes the row used as the header. `index_col` and `header` are passed directly to pandas.
+
+
+### Geojson Data
+
+Full example.
+
+```
+...
+[input.additional_data]
+
+path = 'annotation.geojson'
+...
+```
+
+Geojson data is defined using `path`.
