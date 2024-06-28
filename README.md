@@ -2,10 +2,15 @@
 
 GreedyFHist - Registration of stained histology images.
 
+### Documentation
+
+Documentation can be found at:
+
+https://greedyfhist.readthedocs.io/en/latest/
 
 
-
-If you use any of this code, please cite: 
+If you use any of this code, please cite:
+ 
 ```
 @article{wess2024spatial,
   title={Spatial Integration of Multi-Omics Data using the novel Multi-Omics Imaging Integration Toolset},
