@@ -11,15 +11,6 @@ version = "0.0.1"
 description = "Registration for stained histology"
 authors = ["Maximilian Wess <maximilian.wess@ntnu.no>"]
 
-#packages = [
-#    { include = "my_package", from = "src/python" }
-#]
-#
-## This does not work! It puts the `data` folder into site-packages/data instead of site-packages/my_package/data
-#include = [
-#    { path = "data", format = ["sdist", "wheel"] }
-#]
-
 include = [
     { path = "greedyfhist/model_data/segmentation/default_yolo.onnx", format = ["sdist", "wheel"] }
 ]
@@ -42,7 +33,9 @@ stack-data = "^0.6.2"
 tifffile = "^2023.7.10"
 tqdm = "^4.66.1"
 # Remove ultralytics dependency, since we only need opencv for reading the segmentation model
-ultralytics = "^8.0.199"
+onnxruntime = "1.17.0"
+toml = "0.10.2"
+# ultralytics = "^8.0.199"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.812"

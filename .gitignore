@@ -30,3 +30,6 @@ scripts/
 .vscode
 
 secret_scripts/
+
+examples/scripts/out
+examples/scripts/group_out
