@@ -1,7 +1,3 @@
-# GreedyFHist
+# Welcome to GreedyFHist's documentation.
 
-GreedyFHist is a python based tool for registration of stained images.
-
-
-## Usage - Command line
-
+GreedyFHist is a Python based tool for registration of stained images.

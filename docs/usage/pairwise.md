@@ -5,7 +5,9 @@ In this section we show examples of pairwise registration using the command line
 
 ## Using commandline arguments
 
-Using the commandline option variant requires a moving and fixed image. Registration options can be configured in the `example_registration.toml` file. Additional options can be passed as `tif-images`, `tif-annotations`, `default-images`, `default-annotations`, `pointsets`, `geojsons`.  
+Using the commandline option requires a moving and fixed image. Registration options can be configured in the `example_registration.toml` file. Additional data for transformations can be passed as `tif-images`, `tif-annotations`, `default-images`, `default-annotations`, `pointsets`, `geojsons`.  
+
+An example call could look like this:
 
 ```
 greedyfhist register \
@@ -19,7 +21,7 @@ greedyfhist register \
 
 ## Registration using commandline example
 
-Another option for using the commandline is using the `configuration.toml` without any additional arguments. If moving and fixed image are supplied as command line arguments, spatial input data in the `configuration.toml` is ignored. Sections `gfh_options` and `options` are explained in config_example. The `input` section can be formulated as follows:
+Another option for using the commandline is using the `configuration.toml` without any additional arguments. If moving and fixed image are supplied as command line arguments, any input data in `[input]` in the `configuration.toml` is ignored. Sections `gfh_options` and `options` are explained in config_example. The `input` section can be formulated as follows:
 
 ```
 ...
@@ -33,10 +35,15 @@ type = 'tif'
 
 [[input.moving_image.additional_data]]
 
-path = ''
-type = ''
+path = '../pairwise_examples/annotations/some_annotation.ome.tif'
+type = 'tif'
 is_annotation = true
 keep_axis = false
+
+[[input.moving_image.additional_data]]
+
+path = '../pairwise_examples/annotation/more_annotation.geojson'
+
 
 [input.fixed_image.reference_image]
 
@@ -62,16 +69,13 @@ out/
 │       ├── attributes.json
 │       └── transform.txt
 └── transformed_data
-    ├── moving_annotation.geojson
-    ├── moving_annotationmco.ome.tiff
+    ├── more_annotations.geojson
     ├── moving_image.ome.tif
-    └── moving_pointset.csv
+    └── some_annotations.ome.tiff
 ```
 
 
 `registrations` contains the transformation from moving to fixed_image space. `transformed_data` contains the transformed moving image and additionally transformed data.
-
-
 
 Full example configuration.
 
@@ -149,13 +153,22 @@ type = 'tif'
 
 [[input.moving_image.additional_data]]
 
-path = ''
-type = ''
+path = '../pairwise_examples/annotations/some_annotation.ome.tif'
+type = 'tif'
 is_annotation = true
 keep_axis = false
+
+[[input.moving_image.additional_data]]
+
+path = '../pairwise_examples/annotation/more_annotation.geojson'
+
 
 [input.fixed_image.reference_image]
 
 path = '../pairwise_examples/images/fixed_image.ome.tif'
 type = 'tif'
 ```
+
+## Pairwise registration using interactive Python session
+
+An example using the interactive Python session can be found in `examples/notebooks/pairwise.ipynb`.

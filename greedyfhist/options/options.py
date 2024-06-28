@@ -10,10 +10,6 @@ def get_4_step_pyramid_iterations():
     return [100, 100, 50, 10]
 
 
-# def load_greedyoptions():
-#     return GreedyOptions()
-
-
 def load_default_resolution():
     return (1024, 1024)
 
@@ -367,9 +363,6 @@ class RegistrationOptions:
     remove_temporary_directory: bool = True
    # TODO: Parse this option correctly.
     yolo_segmentation_min_size: int = 5000
-    
-    # def __post_init__(self):
-    #     self.greedy_opts = ()
     
     def __assign_if_present(self, key, args_dict):
         """Assigns value of given key in args_dict if key in class's __annotations__.
