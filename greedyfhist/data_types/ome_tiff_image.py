@@ -5,7 +5,6 @@ import os
 
 import numpy
 import numpy as np
-# from pyometiff import OMETIFFReader, OMETIFFWriter
 import tifffile
 
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
