@@ -22,3 +22,27 @@ For examples for interactive Python sessions, see the provided examples: `exampl
   publisher={Cold Spring Harbor Laboratory}
 }
 ```
+
+
+
+------------------------------------------------------------------------
+
+## Contents
+
+```{toctree}
+---
+maxdepth: 2
+caption: Tutorials
+---
+installation
+```
+
+```{toctree} 
+---
+maxdepth: 2
+caption: Usage & Examples
+---
+config
+pairwise
+groupwise
+```
