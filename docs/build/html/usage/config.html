@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>Configuration structure &#8212; GreedyFHist 28/06/2024 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=12dfc556" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=aa37896b"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="configuration-structure">
+<h1>Configuration structure<a class="headerlink" href="#configuration-structure" title="Permalink to this heading">¶</a></h1>
+<section id="config-toml">
+<h2>config.toml<a class="headerlink" href="#config-toml" title="Permalink to this heading">¶</a></h2>
+<p>Here we explain how configuration files are defined.</p>
+<p>Each configuration consits of up to 3 sections: <code class="docutils literal notranslate"><span class="pre">gfh_options</span></code>, <code class="docutils literal notranslate"><span class="pre">options</span></code>, and <code class="docutils literal notranslate"><span class="pre">input</span></code>.</p>
+<section id="gfhoptions">
+<h3>GFHOptions<a class="headerlink" href="#gfhoptions" title="Permalink to this heading">¶</a></h3>
+<p>This section is used to declare any parameters used during registration. Below is a full configuration example. Absent field in the configuration are replaced by default parameters. For a full explanation of each parameter, see <a class="reference external" href="https://github.com/mwess/GreedyFHist/blob/master/greedyfhist/options/options.py">options.py</a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">gfh_options</span><span class="p">]</span>
+
+<span class="n">pre_sampling_factor</span> <span class="o">=</span> <span class="mf">0.25</span>
+<span class="n">pre_sampling_auto_factor</span> <span class="o">=</span> <span class="mi">3500</span>
+<span class="n">do_affine_registration</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">do_nonrigid_registration</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">temporary_directory</span> <span class="o">=</span> <span class="s1">&#39;tmp&#39;</span>
+<span class="n">remove_temporary_directory</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">yolo_segmentation_min_size</span> <span class="o">=</span> <span class="mi">5000</span>
+
+<span class="p">[</span><span class="n">gfh_options</span><span class="o">.</span><span class="n">affine_registration_options</span><span class="p">]</span>
+
+<span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">resolution</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">]</span>
+<span class="n">kernel_size</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">cost_function</span> <span class="o">=</span> <span class="s1">&#39;ncc&#39;</span>
+<span class="n">rigid_iterations</span> <span class="o">=</span> <span class="mi">10000</span>
+<span class="n">ia</span> <span class="o">=</span> <span class="s1">&#39;ia-com-init&#39;</span>
+<span class="n">iteration_pyramid</span> <span class="o">=</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">10</span><span class="p">]</span>
+<span class="n">n_threads</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">keep_affine_transform_unbounded</span> <span class="o">=</span> <span class="n">true</span>
+
+<span class="p">[</span><span class="n">gfh_options</span><span class="o">.</span><span class="n">affine_registration_options</span><span class="o">.</span><span class="n">preprocessing_options</span><span class="p">]</span>
+<span class="n">moving_sr</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">moving_sp</span> <span class="o">=</span> <span class="mi">25</span>
+<span class="n">fixed_sr</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">fixed_sp</span> <span class="o">=</span> <span class="mi">25</span>
+<span class="n">temporary_directory</span> <span class="o">=</span> <span class="s1">&#39;tmp&#39;</span>
+<span class="n">remove_temporary_directory</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">yolo_segmentation_min_size</span> <span class="o">=</span> <span class="mi">5000</span>
+<span class="n">enable_denoising</span> <span class="o">=</span> <span class="n">true</span>
+
+
+<span class="p">[</span><span class="n">gfh_options</span><span class="o">.</span><span class="n">nonrigid_registration_options</span><span class="p">]</span>
+<span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">resolution</span> <span class="o">=</span> <span class="s1">&#39;1024x1024&#39;</span>
+<span class="n">s1</span> <span class="o">=</span> <span class="mf">5.0</span>
+<span class="n">s2</span> <span class="o">=</span> <span class="mf">5.0</span>
+<span class="n">kernel_size</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">cost_function</span> <span class="o">=</span> <span class="s1">&#39;ncc&#39;</span>
+<span class="n">ia</span> <span class="o">=</span> <span class="s1">&#39;ia-com-init&#39;</span>
+<span class="n">iteration_pyramid</span> <span class="o">=</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">10</span><span class="p">]</span>
+<span class="n">n_threads</span> <span class="o">=</span> <span class="mi">8</span>
+<span class="n">use_sv</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">use_svlb</span> <span class="o">=</span> <span class="n">false</span>
+
+<span class="p">[</span><span class="n">gfh_options</span><span class="o">.</span><span class="n">nonrigid_registration_options</span><span class="o">.</span><span class="n">preprocessing_options</span><span class="p">]</span>
+<span class="n">moving_sr</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">moving_sp</span> <span class="o">=</span> <span class="mi">25</span>
+<span class="n">fixed_sr</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">fixed_sp</span> <span class="o">=</span> <span class="mi">25</span>
+<span class="n">temporary_directory</span> <span class="o">=</span> <span class="s1">&#39;tmp&#39;</span>
+<span class="n">remove_temporary_directory</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">yolo_segmentation_min_size</span> <span class="o">=</span> <span class="mi">5000</span>
+<span class="n">enable_denoising</span> <span class="o">=</span> <span class="n">false</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Permalink to this heading">¶</a></h2>
+<p>At the moment, there are only two fields set in <code class="docutils literal notranslate"><span class="pre">output</span></code>: <code class="docutils literal notranslate"><span class="pre">output_directory</span></code> defines where registration data is stored (defaults to <code class="docutils literal notranslate"><span class="pre">out</span></code>) and <code class="docutils literal notranslate"><span class="pre">path_to_greedy</span></code> sets the path to the directory of the <code class="docutils literal notranslate"><span class="pre">greedy</span></code> executable. If <code class="docutils literal notranslate"><span class="pre">greedy</span></code> is on the <code class="docutils literal notranslate"><span class="pre">PATH</span></code> environment variable, this option can be skipped.</p>
+</section>
+<section id="input">
+<h2>Input<a class="headerlink" href="#input" title="Permalink to this heading">¶</a></h2>
+<p>In this section, the spatial topolgy is defined. The configuration depends on the registration mode, i.e. <code class="docutils literal notranslate"><span class="pre">pairwise</span></code> and <code class="docutils literal notranslate"><span class="pre">groupwise</span></code> registrations require slightly different setups. However, defining a spatial object is the same throughout both modes.</p>
+<section id="image-data">
+<h3>Image data<a class="headerlink" href="#image-data" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="p">[</span><span class="nb">input</span><span class="o">.</span><span class="n">reference_image</span><span class="p">]</span>
+
+<span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;image.ome.tiff&#39;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;tif&#39;</span>
+<span class="n">is_annotation</span> <span class="o">=</span> <span class="n">false</span>
+<span class="n">keep_axis</span> <span class="o">=</span> <span class="n">false</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">path</span></code> leads to the file to be loaded. <code class="docutils literal notranslate"><span class="pre">type</span></code> defines which file type is to be loaded. If <code class="docutils literal notranslate"><span class="pre">type</span></code> is not supplied GreedyFHist guesses the filetype based on the file ending: <code class="docutils literal notranslate"><span class="pre">tiff</span></code> and <code class="docutils literal notranslate"><span class="pre">tif</span></code> are loaded as <code class="docutils literal notranslate"><span class="pre">tif</span></code> images, <code class="docutils literal notranslate"><span class="pre">csv</span></code> as <code class="docutils literal notranslate"><span class="pre">pointsets</span></code>, and <code class="docutils literal notranslate"><span class="pre">geojson</span></code> as geojson data. Otherwise paths are treated as image data and loaded as default images.</p>
+<p><code class="docutils literal notranslate"><span class="pre">is_annotation</span></code> is set to <code class="docutils literal notranslate"><span class="pre">false</span></code> by default. If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, <code class="docutils literal notranslate"><span class="pre">Nearest</span> <span class="pre">Neighbor</span></code> interpolation is used instead of <code class="docutils literal notranslate"><span class="pre">Linear</span></code> interpolation. Also <code class="docutils literal notranslate"><span class="pre">tif</span></code> images are read in form of C x W x H instead of W x H x C that is used for other images. Otherwise <code class="docutils literal notranslate"><span class="pre">is_annotation</span></code> has no effect. This effect can be suppressed by setting <code class="docutils literal notranslate"><span class="pre">keep_axis</span> <span class="pre">=</span> <span class="pre">true</span></code>.</p>
+</section>
+<section id="pointset-data">
+<h3>Pointset data<a class="headerlink" href="#pointset-data" title="Permalink to this heading">¶</a></h3>
+<p>Below see a full example for configuring pointset data.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="p">[</span><span class="nb">input</span><span class="o">.</span><span class="n">additional_data</span><span class="p">]</span>
+
+<span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;pointset.csv&#39;</span>
+<span class="n">x_axis</span> <span class="o">=</span> <span class="s1">&#39;x&#39;</span>
+<span class="n">y_axis</span> <span class="o">=</span> <span class="s1">&#39;y&#39;</span>
+<span class="n">index_col</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">header</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>Pointsets are internally parsed as pandas DataFrames. <code class="docutils literal notranslate"><span class="pre">x_axis</span></code> is the column used to index x-coordinates. <code class="docutils literal notranslate"><span class="pre">y_axis</span></code> indexes y-coordinates. <code class="docutils literal notranslate"><span class="pre">index_col</span></code> denotes the column used as the row index and <code class="docutils literal notranslate"><span class="pre">header</span></code> denotes the row used as the header. <code class="docutils literal notranslate"><span class="pre">index_col</span></code> and <code class="docutils literal notranslate"><span class="pre">header</span></code> are passed directly to pandas’s <code class="docutils literal notranslate"><span class="pre">pd.read_csv</span></code> function.</p>
+</section>
+<section id="geojson-data">
+<h3>Geojson Data<a class="headerlink" href="#geojson-data" title="Permalink to this heading">¶</a></h3>
+<p>Full example.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="p">[</span><span class="nb">input</span><span class="o">.</span><span class="n">additional_data</span><span class="p">]</span>
+
+<span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;annotation.geojson&#39;</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>Geojson data is defined using <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
+<p>Spatial objects can be combined to composite spatial objects (see pairwise and groupwise examples).</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">GreedyFHist</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2024, Maximilian Wess.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.1.2</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+      |
+      <a href="../_sources/usage/config.md.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
