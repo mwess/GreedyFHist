@@ -21,4 +21,4 @@ ENV PATH="$PATH:/greedy/build"
 
 # CMD greedy
 
-ENTRYPOINT ['greedy']
+ENTRYPOINT ["greedy"]
