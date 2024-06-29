@@ -69,9 +69,9 @@ html_theme = "sphinx_rtd_theme"
 #     ],
 # }
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-# html_style = os.path.join("css", "custom.css")
+html_style = os.path.join("css", "custom.css")
 # # html_favicon = os.path.join("_static", "favicon.ico")
-# html_static_path = ["_static"]
+html_static_path = ["_static"]
 # html_js_files = ["language_data.js"]
 
 # html_sidebars = {
@@ -105,3 +105,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 #     ],
 #     'using/windows': ['windowssidebar.html', 'searchbox.html']
 # }
+
+exclude_patterns = ['build']
+exclude_trees = ['.build']
+pygments_style = "sphinx"
