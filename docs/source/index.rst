@@ -1,33 +1,14 @@
 .. _topics-index:
 
-.. toctree::
-   :caption: Installation
-   :hidden:
-
-   installation
-
-
 =======================================
 Welcome to GreedyFHist's documentation.
 =======================================
 
 GreedyFHist is a Python based tool for registration of stained images.
 
-
-
 For examples in using GreedyFHist's commandline interface, see ``examples``.
 
 For examples for interactive Python sessions, see the provided examples: ``examples/notebooks/groupwise.ipynb`` and ``examples/notebooks/pairwise.ipynb``
-
-
-.. toctree::
-  :caption: Usage
-  :hidden:
-
-   usage/pairwise
-   usage/groupwise
-   usage/config
-
 
 
 Citing
@@ -44,3 +25,17 @@ Citing
       publisher={Cold Spring Harbor Laboratory}
     }
 
+.. toctree::
+   :caption: Installation
+   :hidden:
+
+   installation
+
+
+.. toctree::
+  :caption: Usage
+  :hidden:
+
+   usage/pairwise
+   usage/groupwise
+   usage/config
