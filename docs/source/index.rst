@@ -27,15 +27,9 @@ Citing
 
 
 .. toctree::
-   :caption: Installation
+   :caption: Menu
    :hidden:
-
-
-.. _section-usage:
-
-.. toctree::
-   :caption: Usage
-   :hidden:
+   installation
    pairwise
    groupwise
    config
