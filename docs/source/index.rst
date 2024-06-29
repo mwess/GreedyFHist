@@ -30,4 +30,9 @@ Citing
    :caption: Installation
    :hidden:
 
-   installation
+.. toctree::
+   :caption: Usage
+   :hidden:
+   pairwise
+   groupwise
+   config
