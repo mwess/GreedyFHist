@@ -22,8 +22,9 @@ pip install --user git+https://github.com/mwess/greedyfhist@master
 Installing GreedyFHist locally
 ==============================
 
-To build GreedyFHist locally, we use ``poetry``::
+To build GreedyFHist locally, we use ``poetry``
 
+.. code-block::
 poetry build
 pip install dist/greedyfhist-*.tar.gz
 
