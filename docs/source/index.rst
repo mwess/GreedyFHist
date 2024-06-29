@@ -36,6 +36,6 @@ Citing
   :caption: Usage
   :hidden:
 
-   usage/pairwise
-   usage/groupwise
-   usage/config
+   pairwise
+   groupwise
+   config

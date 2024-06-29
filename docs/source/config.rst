@@ -11,7 +11,8 @@ Here we explain how configuration files are defined.
 
 Each configuration consits of up to 3 sections: ``gfh_options``, ``options``, and ``input``.
 
-### GFHOptions
+GFHOptions
+----------
 
 This section is used to declare any parameters used during registration. Below is a full configuration example. Absent field in the configuration are replaced by default parameters. For a full explanation of each parameter, see [options.py](https://github.com/mwess/GreedyFHist/blob/master/greedyfhist/options/options.py).
 
