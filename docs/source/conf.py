@@ -19,7 +19,7 @@ release = '28/06/2024'
 
 extensions = ["myst_parser"]
 
-source_suffix = ['.md']
+source_suffix = ['.rst', '.md']
 
 templates_path = ['_templates']
 exclude_patterns = []
