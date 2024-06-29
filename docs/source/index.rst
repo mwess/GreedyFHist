@@ -27,6 +27,7 @@ Citing
 
 
 .. toctree::
+   :caption: Menu
    :hidden:
 
    installation
