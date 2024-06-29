@@ -25,7 +25,7 @@ Citing
 
 ::
 
-    @article{wess2024spatial
+    @article{wess2024spatial,
       title={Spatial Integration of Multi-Omics Data using the novel Multi-Omics Imaging Integration Toolset},
       author={Wess, Maximilian and Andersen, Maria K and Midtbust, Elise and Guillem, Juan Carlos Cabellos and Viset, Trond and St{\o}rkersen, {\O}ystein and Krossa, Sebastian and Rye, Morten Beck and Tessem, May-Britt},
       journal={bioRxiv},
