@@ -5,6 +5,9 @@
    :hidden:
 
    installation
+   usage/pairwise
+   usage/groupwise
+   usage/config
 
 
 =======================================
