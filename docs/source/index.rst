@@ -25,3 +25,12 @@ Citing
       publisher={Cold Spring Harbor Laboratory}
     }
 
+
+.. toctree::
+   :hidden:
+
+   installation
+   pairwise
+   groupwise
+   config
+
