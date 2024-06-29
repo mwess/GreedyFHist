@@ -9,6 +9,7 @@
 .. toctree::
   :caption: Usage
   :hidden:
+  
    usage/pairwise
    usage/groupwise
    usage/config
