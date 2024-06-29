@@ -1,3 +1,5 @@
+.. _topics-index:
+
 =======================================
 Welcome to GreedyFHist's documentation.
 =======================================
