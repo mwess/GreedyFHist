@@ -33,7 +33,7 @@ For examples for interactive Python sessions, see the provided examples: ``examp
 Citing
 ======
 
-::
+.. note::
 
     @article{wess2024spatial,
       title={Spatial Integration of Multi-Omics Data using the novel Multi-Omics Imaging Integration Toolset},
