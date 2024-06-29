@@ -89,10 +89,10 @@ html_static_path = ["_static"]
 #     ]
 # }
 
-# html_sidebars = {
-#    '**': ['localtoc.html', 'sourcelink.html', 'searchbox.html'],
-#    'using/windows': ['windowssidebar.html', 'searchbox.html'],
-# }
+html_sidebars = {
+   '**': ['globaltoc.html', 'sourcelink.html', 'searchbox.html'],
+   'using/windows': ['windowssidebar.html', 'searchbox.html'],
+}
 
 # html_sidebars = {
 #     '**': [
