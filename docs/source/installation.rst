@@ -25,8 +25,8 @@ Installing GreedyFHist locally
 To build GreedyFHist locally, we use ``poetry``
 
 .. code-block::
-poetry build
-pip install dist/greedyfhist-*.tar.gz
+    poetry build
+    pip install dist/greedyfhist-*.tar.gz
 
 Docker
 ======
@@ -46,15 +46,18 @@ GreedyFHist has one external dependency, which is ``greedy`` (https://sites.goog
 
 If ``greedy`` cannot be installed using the official documentation, we have also provided a Dockerfile. 
 
-Either build the Dockerfile locally and set an alias (for instance in your ``~/.bash.rc`` file)::
+Either build the Dockerfile locally and set an alias (for instance in your ``~/.bash.rc`` file)
 
-cd docker
-docker build -f Dockerfile_greedy -t greedy .
+.. code-block::
+    cd docker
+    docker build -f Dockerfile_greedy -t greedy .
 
-Setting the alias::
+Setting the alias
 
-alias greedy='docker run greedy'
+.. code-block::
+    alias greedy='docker run greedy'
 
-Alternatively, a docker-image for ``greedy`` can be downloaded::
+Alternatively, a docker-image for ``greedy`` can be downloaded
 
-docker ...
+.. code-block::
+    docker ...
