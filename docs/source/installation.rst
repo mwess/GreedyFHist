@@ -42,7 +42,8 @@ GreedyFHist has one external dependency, which is ``greedy`` (https://sites.goog
 
 ``greedy`` can be installed using the official instructions. It also comes with ITK-SNAP (http://www.itksnap.org). 
 
-## Installing Greedy via Docker
+Installing Greedy via Docker
+----------------------------
 
 If ``greedy`` cannot be installed using the official documentation, we have also provided a Dockerfile. 
 
