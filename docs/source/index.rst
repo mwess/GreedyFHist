@@ -30,6 +30,9 @@ Citing
    :caption: Installation
    :hidden:
 
+
+.. _section-usage:
+
 .. toctree::
    :caption: Usage
    :hidden:
