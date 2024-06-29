@@ -1,5 +1,12 @@
 .. _topics-index:
 
+.. toctree::
+   :caption: Installation
+   :hidden:
+
+   installation
+
+
 =======================================
 Welcome to GreedyFHist's documentation.
 =======================================
