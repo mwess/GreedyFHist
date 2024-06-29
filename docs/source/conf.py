@@ -89,7 +89,19 @@ html_js_files = ["language_data.js"]
 #     ]
 # }
 
+# html_sidebars = {
+#    '**': ['localtoc.html', 'sourcelink.html', 'searchbox.html'],
+#    'using/windows': ['windowssidebar.html', 'searchbox.html'],
+# }
+
 html_sidebars = {
-   '**': ['localtoc.html', 'sourcelink.html', 'searchbox.html'],
-   'using/windows': ['windowssidebar.html', 'searchbox.html'],
+    '**': [
+        'installation.html',
+        'usage/pairwise.html',
+        'usage/groupwise.html',
+        'usage/config.html'
+        'sourcelink.html',
+        'searchbox.html'
+    ],
+    'using/windows': ['windowssidebar.html', 'searchbox.html']
 }
