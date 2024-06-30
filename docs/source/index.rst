@@ -5,12 +5,9 @@ Welcome to GreedyFHist's documentation.
 =======================================
 
 .. toctree::
-   :caption: Menu
-   :hidden:
-   installation
-  ..  pairwise
-  ..  groupwise
-  ..  config
+  :caption: Menu
+  :hidden:
+  installation
 
 GreedyFHist is a Python based tool for registration of stained images.
 
