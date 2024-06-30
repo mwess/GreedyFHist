@@ -4,13 +4,14 @@ Groupwise Registration Example
 
 In this section, we show an example for groupwise registration for the commandline interface.
 
+------------------------------
 Commandline interface example.
-==============================
+------------------------------
 
 When using the command line, a ``config.toml`` has to be defined containing registration options and image topology.
 
 Input
------
+=====
 
 In this part of the configuration the image topology to be registered is defined. Each section consists of a ``reference_image`` which is used for registration. Optionally, a ``reference_mask`` can be supplied as well (,e.g. for focusing on a specific region of interest). If not used, the mask will be computed by GreedyFHist. Additional data that should be transformed to the fixed image space is defined in ``input.sectionX.additional_data`` as a list. By convention, the last section defined is treated as the fixed section towards which all other moving section registered.
 
@@ -19,6 +20,7 @@ A full example configuration might look like this:
 
 
 .. code-block::
+
     [options]
 
     output_directory = 'group_out'
@@ -117,6 +119,7 @@ A full example configuration might look like this:
 GreedyFHist's groupwise registration can be executed the following way:
 
 .. code-block::
+
     greedyfhist groupwise-registration -c groupwise_config.toml
 
 
@@ -124,6 +127,7 @@ GreedyFHist's groupwise registration can be executed the following way:
 This will result in the following output structure:
 
 .. code-block::
+
     group_out/
     ├── section0
     │   ├── registration
@@ -157,7 +161,8 @@ This will result in the following output structure:
 Subfolders named ``registration`` contain the transformation parameters to the fixed image space. E.g. ``group_out/section0/registration`` defines the transformation from the image space of section0 to the image space of section1. All registered data is stored in ``transformed_data`` subfolders.
 
 
+-------------------------------------------------------
 Groupwise registration using interactive Python session
-=======================================================
+-------------------------------------------------------
 
 An example using the interactive Python session can be found in ``examples/notebooks/groupwise.ipynb``.

@@ -4,9 +4,9 @@ Pairwise registration example
 
 In this section we show examples of pairwise registration using the command line interface. With give one example using arguments and one example using a configuration file.
 
-
+---------------------------
 Using commandline arguments
-===========================
+---------------------------
 
 
 Using the commandline option requires a moving and fixed image. Registration options can be configured in the ``example_registration.toml`` file. Additional data for transformations can be passed as ``tif-images``, ``tif-annotations``, ``default-images``, ``default-annotations``, ``pointsets``, ``geojsons``.  
@@ -14,6 +14,7 @@ Using the commandline option requires a moving and fixed image. Registration opt
 An example call could look like this:
 
 .. code-block:: bash
+
    greedyfhist register \
       --moving-image ../pairwise_examples/images/moving_image.ome.tif \
       --fixed-image ../pairwise_examples/images/fixed_image.ome.tif \
@@ -22,13 +23,16 @@ An example call could look like this:
       --pointsets ../pairwise_examples/annotations/moving_pointset.csv \
       --geojsons ../pairwise_examples/annotations/moving_annotation.geojson                            
 
-Registration using commandline example
-======================================
+
+-----------------
+Using config.toml
+-----------------
 
 Another option for using the commandline is using the ``configuration.toml`` without any additional arguments. If moving and fixed image are supplied as command line arguments, any input data in ``[input]`` in the ``configuration.toml`` is ignored. Sections ``gfh_options`` and ``options`` are explained in config_example. The ``input`` section can be formulated as follows:
 
 
 .. code-block::
+
     ...
     [input]
 
@@ -54,7 +58,7 @@ Another option for using the commandline is using the ``configuration.toml`` wit
     path = '../pairwise_examples/images/fixed_image.ome.tif'
     type = 'tif'
     ...
-    
+
 
 ``input.moving_image.reference_image`` and ``input.fixed_image.reference_image`` sections need to be defined. Additional data for transforming can be supplied as ``[[input.moving_image.additional_data]]``. Defining sections and additional data elements is document here: LINK
 
@@ -64,6 +68,7 @@ Using this example we can run ``greedyfhist register -c configuration.toml`` and
 
 
 .. code-block::
+
     out/
     ├── registrations
     │   ├── fixed_transform
@@ -82,6 +87,7 @@ Using this example we can run ``greedyfhist register -c configuration.toml`` and
 Full example configuration.
 
 .. code-block::
+
     [options]
 
     output_directory = 'out'
@@ -170,7 +176,9 @@ Full example configuration.
     path = '../pairwise_examples/images/fixed_image.ome.tif'
     type = 'tif'
 
-Pairwise registration using interactive Python session
-======================================================
+
+--------------------------------
+Using interactive Python session
+--------------------------------
 
 An example using the interactive Python session can be found in `examples/notebooks/pairwise.ipynb`.

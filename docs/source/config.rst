@@ -4,13 +4,11 @@
 Configuration structure
 =======================
 
-config.toml
-===========
-
 Here we explain how configuration files are defined.
 
 Each configuration consits of up to 3 sections: ``gfh_options``, ``options``, and ``input``.
 
+----------
 GFHOptions
 ----------
 
@@ -76,19 +74,21 @@ This section is used to declare any parameters used during registration. Below i
     enable_denoising = false
 
 
+-------
 Options
-=======
+-------
 
 At the moment, there are only two fields set in ``output``: ``output_directory`` defines where registration data is stored (defaults to `out`) and `path_to_greedy` sets the path to the directory of the ``greedy`` executable. If ``greedy`` is on the ``PATH`` environment variable, this option can be skipped.
 
 
+-----
 Input
-=====
+-----
 
 In this section, the spatial topolgy is defined. The configuration depends on the registration mode, i.e. ``pairwise`` and ``groupwise`` registrations require slightly different setups. However, defining a spatial object is the same throughout both modes.
 
 Image data
-----------
+==========
 
 
 .. code-block::
@@ -107,7 +107,7 @@ Image data
 ``is_annotation`` is set to ``false`` by default. If set to ``true``, ``Nearest Neighbor`` interpolation is used instead of ``Linear`` interpolation. Also ``tif`` images are read in form of C x W x H instead of W x H x C that is used for other images. Otherwise ``is_annotation`` has no effect. This effect can be suppressed by setting ``keep_axis = true``. 
 
 Pointset data
--------------
+=============
 
 Below see a full example for configuring pointset data.
 
@@ -127,8 +127,8 @@ Below see a full example for configuring pointset data.
 Pointsets are internally parsed as pandas DataFrames. ``x_axis`` is the column used to index x-coordinates. ``y_axis`` indexes y-coordinates. ``index_col`` denotes the column used as the row index and ``header`` denotes the row used as the header. ``index_col`` and ``header`` are passed directly to pandas's ``pd.read_csv`` function.
 
 
-Geojson Data
-------------
+Geojson data
+============
 
 Full example.
 
