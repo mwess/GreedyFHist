@@ -92,7 +92,7 @@ Image data
 
 .. code-block::
     ...
-    [input.reference_image]\
+    [input.reference_image] \
 
     path = 'image.ome.tiff'
     type = 'tif'
@@ -112,7 +112,7 @@ Below see a full example for configuring pointset data.
 
 .. code-block::
     ...
-    [input.additional_data]\
+    [input.additional_data] \
 
     path = 'pointset.csv'
     x_axis = 'x'
@@ -131,7 +131,7 @@ Full example.
 
 .. code-block::
     ...
-    [input.additional_data]\
+    [input.additional_data] \
 
     path = 'annotation.geojson'
     ...

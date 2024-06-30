@@ -13,7 +13,7 @@ Using the commandline option requires a moving and fixed image. Registration opt
 
 An example call could look like this:
 
-.. code-block::
+.. code-block:: bash
     greedyfhist register \
         --moving-image ../pairwise_examples/images/moving_image.ome.tif \
         --fixed-image ../pairwise_examples/images/fixed_image.ome.tif \
