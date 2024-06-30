@@ -14,13 +14,13 @@ Using the commandline option requires a moving and fixed image. Registration opt
 An example call could look like this:
 
 .. code-block:: bash
-    greedyfhist register \
-        --moving-image ../pairwise_examples/images/moving_image.ome.tif \
-        --fixed-image ../pairwise_examples/images/fixed_image.ome.tif \
-        --config example_registration.toml \
-        --tif-annotations ../pairwise_examples/annotations/moving_annotationmco.ome.tiff \
-        --pointsets ../pairwise_examples/annotations/moving_pointset.csv \
-        --geojsons ../pairwise_examples/annotations/moving_annotation.geojson                            
+   greedyfhist register \
+      --moving-image ../pairwise_examples/images/moving_image.ome.tif \
+      --fixed-image ../pairwise_examples/images/fixed_image.ome.tif \
+      --config example_registration.toml \
+      --tif-annotations ../pairwise_examples/annotations/moving_annotationmco.ome.tiff \
+      --pointsets ../pairwise_examples/annotations/moving_pointset.csv \
+      --geojsons ../pairwise_examples/annotations/moving_annotation.geojson                            
 
 Registration using commandline example
 ======================================
