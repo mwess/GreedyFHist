@@ -130,10 +130,10 @@ Geojson Data
 Full example.
 
 .. code-block:: 
-    ...
+    \.\.\.
     [input.additional_data]
     path = 'annotation.geojson'
-    ...
+    \.\.\.
 
 Geojson data is defined using ``path``.
 
