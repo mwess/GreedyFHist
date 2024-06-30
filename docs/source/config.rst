@@ -18,6 +18,7 @@ This section is used to declare any parameters used during registration. Below i
 
 
 .. code-block::
+
     [gfh_options]
 
     pre_sampling_factor = 0.25
@@ -91,6 +92,7 @@ Image data
 
 
 .. code-block::
+
     ...
     [input.reference_image]
     path = 'image.ome.tiff'
@@ -110,8 +112,9 @@ Pointset data
 Below see a full example for configuring pointset data.
 
 .. code-block::
+
     ...
-    [input.additional_data] \
+    [input.additional_data]
 
     path = 'pointset.csv'
     x_axis = 'x'
@@ -119,6 +122,7 @@ Below see a full example for configuring pointset data.
     index_col = None
     header = None
     ...
+
 
 Pointsets are internally parsed as pandas DataFrames. ``x_axis`` is the column used to index x-coordinates. ``y_axis`` indexes y-coordinates. ``index_col`` denotes the column used as the row index and ``header`` denotes the row used as the header. ``index_col`` and ``header`` are passed directly to pandas's ``pd.read_csv`` function.
 
@@ -129,6 +133,7 @@ Geojson Data
 Full example.
 
 .. code-block::
+
     [input.additional_data]
     path = 'annotation.geojson'
 
