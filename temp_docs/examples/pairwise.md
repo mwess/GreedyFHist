@@ -5,7 +5,7 @@ In this section we show examples of pairwise registration using the command line
 
 ## Using commandline arguments
 
-Using the commandline option variant requires a moving and fixed image. Registration options can be configured in the `example_registration.toml` file. Additional options can be passed as `tif-images`, `tif-annotations`, `default-images`, `default-annotations`, `pointsets`, `geojsons`.  
+Using the commandline option variant requires a moving and fixed image. Registration options can be configured in the `example_registration.toml` file. Additional data for transformations can be passed as `tif-images`, `tif-annotations`, `default-images`, `default-annotations`, `pointsets`, `geojsons`.  
 
 ```
 greedyfhist register \
@@ -33,10 +33,15 @@ type = 'tif'
 
 [[input.moving_image.additional_data]]
 
-path = ''
-type = ''
+path = '../pairwise_examples/annotations/some_annotation.ome.tif'
+type = 'tif'
 is_annotation = true
 keep_axis = false
+
+[[input.moving_image.additional_data]]
+
+path = '../pairwise_examples/annotation/more_annotation.geojson'
+
 
 [input.fixed_image.reference_image]
 
@@ -62,10 +67,9 @@ out/
 │       ├── attributes.json
 │       └── transform.txt
 └── transformed_data
-    ├── moving_annotation.geojson
-    ├── moving_annotationmco.ome.tiff
+    ├── more_annotations.geojson
     ├── moving_image.ome.tif
-    └── moving_pointset.csv
+    └── some_annotations.ome.tiff
 ```
 
 

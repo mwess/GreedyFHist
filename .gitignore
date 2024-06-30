@@ -33,3 +33,5 @@ secret_scripts/
 
 examples/scripts/out
 examples/scripts/group_out
+
+docs/build/

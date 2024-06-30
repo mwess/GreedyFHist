@@ -390,7 +390,6 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
         SimpleITK.SimpleITK.Transform: Composited end-to-end registration.
     """
 
-    # TODO: Implement transformation from fixed to moving space in case we want to go in a different direction?
     moving_padding = internal_reg_params.reg_params['moving_padding']
     moving_cropping = internal_reg_params.reg_params['cropping_params_mov']
     fixed_padding = internal_reg_params.reg_params['fixed_padding']
@@ -398,10 +397,6 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     fixed_image_shape = internal_reg_params.reg_params['original_fixed_image_size']
 
     all_transforms = sitk.CompositeTransform(2)
-    # Try adding downsampling factor
-    # ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
-    # pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
-    # post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
 
     mov_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
     fix_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
@@ -454,10 +449,6 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     
     all_transforms = sitk.CompositeTransform(2)
 
-    # ds_factor = internal_reg_params.reg_params['pre_downsampling_factor']
-    # pre_downscale_transform = sitk.ScaleTransform(2, (1/ds_factor, 1/ds_factor))
-    # post_upscale_transform = sitk.ScaleTransform(2, (ds_factor, ds_factor))
-    
     mov_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
     fix_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
     pre_downscale_transform = sitk.ScaleTransform(2, (1/fix_ds_factor, 1/fix_ds_factor))
@@ -482,7 +473,6 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     all_transforms.AddTransform(pre_downscale_transform)
     all_transforms.AddTransform(aff_trans4)
     all_transforms.AddTransform(aff_trans3)
-    # all_transforms.AddTransform(displ_transform)
     all_transforms.AddTransform(transform)
     all_transforms.AddTransform(aff_trans2)
     all_transforms.AddTransform(aff_trans1)
@@ -490,10 +480,6 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     return all_transforms
 
 
-# def compute_transforms(transformation: InternalRegResult) -> Tuple[SimpleITK.SimpleITK.Transform, SimpleITK.SimpleITK.Transform]:
-#     forward_displacement_field = compose_reg_transforms(transformation)
-#     backward_displacement_field = compose_inv_reg_transforms(transformation)
-#     return forward_displacement_field, backward_displacement_field
 def preprocessing(image: numpy.array,
                   preprocessing_options: PreprocessingOptions,
                   resolution: Tuple[int, int],
@@ -897,8 +883,6 @@ class GreedyFHist:
         path_to_small_ref_image = join(path_output, 'small_ref_image.nii.gz')
         sitk.WriteImage(empty_fixed_img, path_to_small_ref_image)
 
-        # reg_params['factor'] = factor
-
         # If no non-rigid registration is performed we keep the affine transform unbounded.
         # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
         if options.do_nonrigid_registration:
@@ -1030,13 +1014,6 @@ class GreedyFHist:
             # affine transformation.) Check!!
             forward_transform = rescale_affine(path_small_affine, aff_2_orig_factor)
             backward_transform = forward_transform.GetInverse()
-            # backward_transform = invert_affine_transform(forward_transform)
-
-        # Check those 2
-
-        # reg_param_outpath = os.path.join(path_output, 'reg_params.json')
-        # with open(reg_param_outpath, 'w') as f:
-        #     json.dump(reg_params, f)
 
 
         displacement_field = None
@@ -1056,8 +1033,6 @@ class GreedyFHist:
             inv_displacement_field=inv_displacement_field
         )
 
-        # TODO: For affine transforms: Write function to convert all 5 transforms into a single transform.
-        # TODO: Add option to compress all 5 transforms into a single displacement field.
         composited_forward_transform = compose_reg_transforms(forward_transform, reg_result)
         composited_backward_transform = compose_inv_reg_transforms(backward_transform, reg_result)
         fixed_transform = GFHTransform(original_fixed_image_size, composited_forward_transform)
@@ -1117,7 +1092,6 @@ class GreedyFHist:
             sub_options.do_nonrigid_registration = False
             reg_result = self.register2_(moving_image, fixed_image, moving_mask, fixed_mask, sub_options)
             affine_transform_lists.append(reg_result)
-            # map_to_transforms[rev_idx] = (forward, backward)
             moving_image = fixed_image
             moving_mask = fixed_mask
         # Stage 2: Take the matched images and do a nonrigid registration
@@ -1141,12 +1115,10 @@ class GreedyFHist:
             if moving_mask is None:
                 moving_mask = self.segmentation_function(moving_image)
             composited_fixed_transform = compose_transforms([x.forward_transform for x in affine_transform_lists][idx:])
-            # composited_moving_transform = compose_transforms([x.moving_transform for x in transform_lists][idx:][::-1])
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
             nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_option)
             deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.forward_transform, 'LINEAR')
-            # Do deformable mask?
             nonrigid_warped_images.append(deformable_warped_image)
             nonrigid_transformations.append(nonrigid_reg_result)
         groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, nonrigid_transformations)

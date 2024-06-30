@@ -32,7 +32,7 @@ Either build the Dockerfile locally and set an alias (for instance in your `~/.b
 
 ```
 cd docker
-docker build -f Dockerfile_greedy . # Check that command. Add tag!
+docker build -f Dockerfile_greedy -t greedy . # Check that command. Add tag!
 ```
 
 Setting the alias:

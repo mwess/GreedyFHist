@@ -8,7 +8,6 @@ import numpy as np
 from skimage.measure import regionprops, label
 from skimage.restoration import denoise_tv_chambolle
 from skimage.morphology import reconstruction
-# from ultralytics import YOLO
 import onnxruntime as ort
 
 from greedyfhist.segmentation.yolo8_parsing import postprocess
