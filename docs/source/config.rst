@@ -92,8 +92,7 @@ Image data
 
 .. code-block::
     ...
-    [input.reference_image] \
-
+    [input.reference_image]
     path = 'image.ome.tiff'
     type = 'tif'
     is_annotation = false
