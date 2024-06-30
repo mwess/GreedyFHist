@@ -30,27 +30,26 @@ Another option for using the commandline is using the ``configuration.toml`` wit
 
 .. code-block::
     ...
-    [input]
+    [input]\
 
     [input.moving_image]
-    [input.moving_image.reference_image]
+    [input.moving_image.reference_image]\
 
     path = '../pairwise_examples/images/moving_image.ome.tif'
-    type = 'tif'
+    type = 'tif'\
 
-    [[input.moving_image.additional_data]]
+    [[input.moving_image.additional_data]]\
 
     path = '../pairwise_examples/annotations/some_annotation.ome.tif'
     type = 'tif'
     is_annotation = true
-    keep_axis = false
+    keep_axis = false\
 
-    [[input.moving_image.additional_data]]
+    [[input.moving_image.additional_data]]\
 
-    path = '../pairwise_examples/annotation/more_annotation.geojson'
+    path = '../pairwise_examples/annotation/more_annotation.geojson'\
 
-
-    [input.fixed_image.reference_image]
+    [input.fixed_image.reference_image]\
 
     path = '../pairwise_examples/images/fixed_image.ome.tif'
     type = 'tif'
