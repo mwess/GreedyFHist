@@ -74,7 +74,7 @@ html_static_path = ["_static"]
 #    'using/windows': ['windowssidebar.html', 'searchbox.html'],
 # }
 
-# html_sidebars = { '**': ['globaltoc.html', 'relations.html', 'sourcelink.html', 'searchbox.html'] }
+html_sidebars = { '**': ['globaltoc.html', 'relations.html', 'sourcelink.html', 'searchbox.html'] }
 
 exclude_patterns = ['build']
 exclude_trees = ['.build']
