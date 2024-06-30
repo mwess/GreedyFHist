@@ -8,9 +8,9 @@ Welcome to GreedyFHist's documentation.
    :caption: Menu
    :hidden:
    installation
-   pairwise
-   groupwise
-   config
+  ..  pairwise
+  ..  groupwise
+  ..  config
 
 GreedyFHist is a Python based tool for registration of stained images.
 
