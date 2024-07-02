@@ -4,4 +4,5 @@ FROM mwess/greedy:1.3.0-alpha
 
 RUN pip install --user git+https://github.com/mwess/greedyfhist@master
 
+
 ENTRYPOINT ['greedyfhist']

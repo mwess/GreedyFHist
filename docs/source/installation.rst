@@ -12,9 +12,9 @@ Requirements
 
 GreedyFHist is dependent on several Python packages which are all listed in ``pyproject.toml``. Otherwise, the only external dependency is the greedy software ``greedy``. 
 
-----------
-Installing 
-----------
+--------------------
+Installing using pip
+--------------------
 
 GreedyFHist can be installed by running the following command:
 
@@ -41,6 +41,7 @@ Using Docker
 We also provided a Dockerfile for installing ``GreedyFHist``.
 
 
+-----------------
 Installing Greedy
 -----------------
 
@@ -49,7 +50,7 @@ GreedyFHist has one external dependency, which is ``greedy`` (https://sites.goog
 ``greedy`` can be installed using the official instructions. It also comes with ITK-SNAP (http://www.itksnap.org). 
 
 Installing Greedy via Docker
-----------------------------
+============================
 
 If ``greedy`` cannot be installed using the official documentation, we have also provided a Dockerfile. 
 
