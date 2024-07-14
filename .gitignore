@@ -19,7 +19,6 @@ secret_notebooks/
 
 data/
 examples_old/
-notebooks/
 out/
 save_directories/
 tmp/
