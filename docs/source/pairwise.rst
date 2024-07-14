@@ -190,4 +190,4 @@ Full example configuration.
 Using interactive Python session
 --------------------------------
 
-An example using the interactive Python session can be found in `examples/notebooks/pairwise.ipynb`.
+An example using the interactive Python session can be found in `examples/notebooks/pairwise.ipynb <https://github.com/mwess/GreedyFHist/blob/master/examples/notebooks/pairwise.ipynb>`_.
