@@ -644,14 +644,14 @@ class GreedyFHist:
         Returns:
             RegistrationResult: Contains computed registration result.
         """
-        reg_result = self.register2_(moving_img,
+        reg_result = self.register_(moving_img,
                                     fixed_img,
                                     moving_img_mask,
                                     fixed_img_mask,
                                     options)
         return reg_result 
 
-    def register2_(self,
+    def register_(self,
                  moving_img: numpy.array,
                  fixed_img: numpy.array,
                  moving_img_mask: Optional[numpy.array] = None,
@@ -1087,10 +1087,7 @@ class GreedyFHist:
                 fixed_image = fixed_tuple
                 fixed_mask = None
             # This kind of makes transformations that are all registered to the original fixed image. Consider having them only be pairwise.
-            sub_options = RegistrationOptions()
-            sub_options.keep_affine_transform_unbounded = True
-            sub_options.do_nonrigid_registration = False
-            reg_result = self.register2_(moving_image, fixed_image, moving_mask, fixed_mask, sub_options)
+            reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, affine_options)
             affine_transform_lists.append(reg_result)
             moving_image = fixed_image
             moving_mask = fixed_mask

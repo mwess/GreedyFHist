@@ -67,6 +67,16 @@ Setting the alias:
 
     alias greedy='docker run greedy'
 
-Alternatively, a docker-image for ``greedy`` can be downloaded::
+Alternatively, a docker-image for ``greedyfhist`` can be downloaded::
 
-    docker ...
+.. code-block:: bash
+
+    docker pull mwess89/greedyfhist:0.0.1
+
+
+Or built:
+
+.. code-block:: bash
+
+    cd docker
+    docker build -t greedyfhist -f Dockerfile_greedyfhist .
