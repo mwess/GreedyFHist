@@ -9,3 +9,4 @@ RUN pip --version
 RUN pip install git+https://github.com/mwess/greedyfhist@master
 
 ENTRYPOINT ["greedyfhist"]
+
