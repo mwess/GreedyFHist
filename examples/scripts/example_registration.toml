@@ -1,0 +1,88 @@
+[options]
+
+output_directory = 'out'
+path_to_greedy = ''
+
+
+[gfh_options]
+
+pre_sampling_factor = 0.25
+pre_sampling_auto_factor = 3500
+do_affine_registration = true
+do_nonrigid_registration = true
+temporary_directory = 'tmp'
+remove_temporary_directory = true
+yolo_segmentation_min_size = 5000
+
+[gfh_options.affine_registration_options]
+
+dim = 2
+resolution = [1024, 1024]
+kernel_size = 10
+cost_function = 'ncc'
+rigid_iterations = 10000
+ia = 'ia-com-init'
+iteration_pyramid = [100, 50, 10]
+n_threads = 8
+keep_affine_transform_unbounded = true
+
+[gfh_options.affine_registration_options.preprocessing_options]
+moving_sr = 30
+moving_sp = 25
+fixed_sr = 30
+fixed_sp = 25
+temporary_directory = 'tmp'
+remove_temporary_directory = true
+yolo_segmentation_min_size = 5000
+enable_denoising = true
+
+
+[gfh_options.nonrigid_registration_options]
+dim = 2
+resolution = [1024, 1024]
+s1 = 5.0
+s2 = 5.0
+kernel_size = 10
+cost_function = 'ncc'
+ia = 'ia-com-init'
+iteration_pyramid = [100, 100, 50, 10]
+n_threads = 8
+use_sv = false
+use_svlb = false
+
+[gfh_options.nonrigid_registration_options.preprocessing_options]
+moving_sr = 30
+moving_sp = 25
+fixed_sr = 30
+fixed_sp = 25
+temporary_directory = 'tmp'
+remove_temporary_directory = true
+yolo_segmentation_min_size = 5000
+enable_denoising = false
+
+
+[input]
+
+[input.moving_image]
+[input.moving_image.reference_image]
+
+path = '../pairwise_examples/images/moving_image.ome.tif'
+type = 'tif'
+
+[[input.moving_image.additional_data]]
+
+path = '../pairwise_examples/annotations/moving_annotationmco.ome.tiff'
+is_annotation = true
+
+[[input.moving_image.additional_data]]
+
+path = '../pairwise_examples/annotations/moving_pointset.csv'
+
+[[input.moving_image.additional_data]]
+
+path = '../pairwise_examples/annotations/moving_annotation.geojson'
+
+[input.fixed_image.reference_image]
+
+path = '../pairwise_examples/images/fixed_image.ome.tif'
+type = 'tif'

@@ -1,0 +1,1 @@
+greedyfhist groupwise-registration --config example_groupwise_registration.toml

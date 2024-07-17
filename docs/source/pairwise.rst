@@ -2,14 +2,18 @@
 Pairwise registration example
 ============================= 
 
-In this section we show examples of pairwise registration using the command line interface. With give one example using arguments and one example using a configuration file.
+In this section we show examples of pairwise registration using the command line interface. We give one example using arguments and one example using a 
+configuration file.
 
 ---------------------------
 Using commandline arguments
 ---------------------------
 
 
-Using the commandline option requires a moving and fixed image. Registration options can be configured in the ``example_registration.toml`` file. Additional data for transformations can be passed as ``tif-images``, ``tif-annotations``, ``default-images``, ``default-annotations``, ``pointsets``, ``geojsons``.  
+Using the commandline option requires a moving and fixed image. Registration options can be configured in the ``example_registration.toml`` file. Additional 
+data for transformations can be passed as ``tif-images``, ``tif-annotations``, ``default-images``, ``default-annotations``, ``pointsets``, ``geojsons``.  
+`default-images` refers to any image that is not in `tif` format. GreedyFHist supports most common image formats, but if any are missing, feel free to post 
+an issue. `default-annotations` are annotation masks with the last image channel used to denote classes, e.g., W x H x C.
 
 An example call could look like this:
 
@@ -28,7 +32,9 @@ An example call could look like this:
 Using config.toml
 -----------------
 
-Another option for using the commandline is using the ``configuration.toml`` without any additional arguments. If moving and fixed image are supplied as command line arguments, any input data in ``[input]`` in the ``configuration.toml`` is ignored. Sections ``gfh_options`` and ``options`` are explained in config_example. The ``input`` section can be formulated as follows:
+Another option for using the commandline is using the ``configuration.toml`` without any additional arguments. If moving and fixed image are supplied as 
+command line arguments, any input data in ``[input]`` in the ``configuration.toml`` is ignored. Sections ``gfh_options`` and ``options`` are 
+explained in config_example. The ``input`` section can be formulated as follows:
 
 
 .. code-block::
@@ -60,7 +66,9 @@ Another option for using the commandline is using the ``configuration.toml`` wit
     ...
 
 
-``input.moving_image.reference_image`` and ``input.fixed_image.reference_image`` sections need to be defined. Additional data for transforming can be supplied as ``[[input.moving_image.additional_data]]``. Defining sections and additional data elements is document here: LINK
+``input.moving_image.reference_image`` and ``input.fixed_image.reference_image`` sections need to be defined. Additional data for 
+transforming can be supplied as ``[[input.moving_image.additional_data]]``. 
+Examples for defining sections and additional data types in the configuration file can be found here in the `config` section.
 
 A full example can be found further below. 
 
@@ -82,7 +90,8 @@ Using this example we can run ``greedyfhist register -c configuration.toml`` and
         ├── moving_image.ome.tif
         └── some_annotations.ome.tiff
 
-``registrations`` contains the transformation from moving to fixed_image space. ``transformed_data`` contains the transformed moving image and additionally transformed data.
+``registrations`` contains the transformation from moving to fixed_image space. ``transformed_data`` contains the transformed moving image and 
+additionally transformed data.
 
 Full example configuration.
 
@@ -181,4 +190,4 @@ Full example configuration.
 Using interactive Python session
 --------------------------------
 
-An example using the interactive Python session can be found in `examples/notebooks/pairwise.ipynb`.
+An example using the interactive Python session can be found in `examples/notebooks/pairwise.ipynb <https://github.com/mwess/GreedyFHist/blob/master/examples/notebooks/pairwise.ipynb>`_.

@@ -20,7 +20,7 @@ GreedyFHist can be installed by running the following command:
 
 .. code-block:: bash
 
-    pip install --user git+https://github.com/mwess/greedyfhist@master
+    pip install --user git+https://github.com/mwess/greedyfhist@v0.0.1
 
 
 ----------------------------
@@ -67,6 +67,15 @@ Setting the alias:
 
     alias greedy='docker run greedy'
 
-Alternatively, a docker-image for ``greedy`` can be downloaded::
+Alternatively, a docker-image for ``greedyfhist`` can be downloaded:
 
-    docker ...
+.. code-block:: bash
+
+    docker pull mwess89/greedyfhist:0.0.1
+
+Or the docker image can be built as well:
+
+.. code-block:: bash
+
+    cd docker
+    docker build -t greedyfhist -f Dockerfile_greedyfhist .

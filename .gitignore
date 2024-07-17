@@ -13,19 +13,17 @@ impl3/
 configs/
 trained_models/
 
-notebooks/
+secret_notebooks/
 .Rproj.user
 
 
 data/
 examples_old/
-notebooks/
 out/
 save_directories/
 tmp/
 
 dist/
-scripts/
 
 .vscode
 
