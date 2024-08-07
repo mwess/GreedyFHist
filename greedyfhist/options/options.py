@@ -335,7 +335,12 @@ class RegistrationOptions:
         Whether an affine registration is performed or not.
         
     do_nonrigid_registration: bool = True
-        Whether a deformable registration is performed or not.        
+        Whether a deformable registration is performed or not.     
+
+    compute_reverse_nonrigid_registration: bool = True
+        Compute the reverse nonrigid registration. If do_affine_registration
+        is True, uses the inverse of affine transformation as an
+        initialization.    
         
     keep_affine_transform_unbounded: bool = True
         If true, keeps affine transform unbounded. Otherwise, affine
@@ -359,6 +364,7 @@ class RegistrationOptions:
     pre_sampling_auto_factor: Optional[int] = 3500    
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
+    compute_reverse_nonrigid_registration: bool = True
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
    # TODO: Parse this option correctly.
