@@ -988,7 +988,11 @@ class GreedyFHist:
                         paths_rev,
                         True)
         else:
-            rev_registration_transform = None
+            # Overwise just invert the transform.
+            rev_registration_transform = RegistrationTransforms(
+                forward_transform=registration_transform.backward_transform,
+                backward_transform=registration_transform.forward_transform,
+            )
 
         if options.remove_temporary_directory:
             self.__cleanup_temporary_directory(options.temporary_directory)  
@@ -1300,6 +1304,7 @@ class GreedyFHist:
         if nonrigid_option is None:
             nonrigid_option = RegistrationOptions()
         nonrigid_option.do_affine_registration = False
+        affine_options.do_nonrigid_registration = False
         # Stage1: Affine register along the the sequence.
         moving_tuple = image_mask_list[0]
         if isinstance(moving_tuple, tuple):
@@ -1316,11 +1321,9 @@ class GreedyFHist:
             else:
                 fixed_image = fixed_tuple
                 fixed_mask = None
-            # This kind of makes transformations that are all registered to the original fixed image. Consider having them only be pairwise.
             reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, affine_options)
-            affine_transform_lists.append(reg_result.registration_transform)
-            if nonrigid_option.compute_reverse_nonrigid_registration:
-                reverse_affine_transform_list.append(reg_result.reverse_registration_transform)
+            affine_transform_lists.append(reg_result.registration_transforms)
+            reverse_affine_transform_list.append(reg_result.reverse_registration_transforms)
             moving_image = fixed_image
             moving_mask = fixed_mask
         # Stage 2: Take the matched images and do a nonrigid registration
@@ -1348,10 +1351,10 @@ class GreedyFHist:
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
             nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_option)
-            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration_transform.forward_transform, 'LINEAR')
+            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration_transforms.forward_transform, 'LINEAR')
             nonrigid_warped_images.append(deformable_warped_image)
-            nonrigid_transformations.append(nonrigid_reg_result.registration_transform)
-            reverse_nonrigid_transformations.append(nonrigid_reg_result.reverse_registration_transform)
+            nonrigid_transformations.append(nonrigid_reg_result.registration_transforms)
+            reverse_nonrigid_transformations.append(nonrigid_reg_result.reverse_registration_transforms)
         groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, 
                                                             reverse_affine_transform_list,
                                                             nonrigid_transformations,
