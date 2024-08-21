@@ -4,7 +4,7 @@ from typing import Optional, Any, List
 import numpy
 
 from greedyfhist.options import RegistrationOptions
-from greedyfhist.registration import GreedyFHist, RegistrationResult
+from greedyfhist.registration import GreedyFHist, RegistrationTransforms
 from greedyfhist.utils.io import create_if_not_exists
 
 
@@ -33,7 +33,7 @@ class HistologySection:
                           fixed_image: numpy.array, 
                           fixed_mask: Optional[numpy.array] = None, 
                           options: Optional[RegistrationOptions] = None,
-                          registerer: Optional[GreedyFHist] = None) -> RegistrationResult:
+                          registerer: Optional[GreedyFHist] = None) -> RegistrationTransforms:
         if registerer is None:
             registerer = GreedyFHist.load_from_config({})
 
@@ -47,7 +47,7 @@ class HistologySection:
         return registration_result
 
     def apply_transformation(self,
-                             registration_result: RegistrationResult,
+                             registration_result: RegistrationTransforms,
                              registerer: Optional[GreedyFHist] = None) -> 'HistologySection':
         if registerer is None:
             registerer = GreedyFHist.load_from_config({})

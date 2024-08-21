@@ -41,6 +41,9 @@ class PreprocessingOptions:
     fixed_sp: int = 25
     yolo_segmentation_min_size: int = 5000
     enable_denoising: bool = True
+    disable_denoising_moving: bool = False
+    disable_denoising_fixed: bool = False
+    
     
     def __assign_if_present(self, key, args_dict):
         """Assigns value of given key in args_dict if key in class's __annotations__.
@@ -337,10 +340,11 @@ class RegistrationOptions:
     do_nonrigid_registration: bool = True
         Whether a deformable registration is performed or not.     
 
-    compute_reverse_nonrigid_registration: bool = True
+    compute_reverse_nonrigid_registration: bool = False
         Compute the reverse nonrigid registration. If do_affine_registration
         is True, uses the inverse of affine transformation as an
-        initialization.    
+        initialization, if affine registration is used. This options is typically
+        used for groupwise registration if the reverse transform is needed as well.    
         
     keep_affine_transform_unbounded: bool = True
         If true, keeps affine transform unbounded. Otherwise, affine
@@ -364,10 +368,9 @@ class RegistrationOptions:
     pre_sampling_auto_factor: Optional[int] = 3500    
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
-    compute_reverse_nonrigid_registration: bool = True
+    compute_reverse_nonrigid_registration: bool = False
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
-   # TODO: Parse this option correctly.
     yolo_segmentation_min_size: int = 5000
     
     def __assign_if_present(self, key, args_dict):

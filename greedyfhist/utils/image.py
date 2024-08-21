@@ -47,6 +47,18 @@ def get_com_offset(mat: numpy.array) -> float:
     return np.sqrt(np.square(translation[0]) + np.square(translation[1]))
 
 
+def read_affine_transform(small_affine_path: str) -> SimpleITK.SimpleITK.Transform:
+    with open(small_affine_path) as f:
+        my_var = list(map(float, f.read().split()))
+    # Modify translation vector
+
+    affine_transform = sitk.AffineTransform(2)
+    affine_transform.SetTranslation((my_var[2], my_var[5]))
+    affine_transform.SetMatrix((my_var[0], my_var[1], my_var[3], my_var[4]))
+    return affine_transform
+    
+
+
 def rescale_affine(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK.Transform:
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
@@ -79,6 +91,8 @@ def rescale_warp(small_warp_path: str,
 
 
 def apply_mask(image: numpy.array, mask: numpy.array) -> numpy.array:
+    if len(image.shape) == 2:
+        return image * mask
     return image * np.expand_dims(mask, -1).astype(np.uint8)
 
 
@@ -117,7 +131,9 @@ def denoise_image(image: numpy.array, resolution: int =512, sp: int =20, sr: int
 def resample_image_with_gaussian(image: numpy.array, resolution: image_shape, sigma: float):
     image = gaussian(image, sigma, channel_axis=-1)
     image = resize(image, resolution)
-    image = rgb2gray(image) * 255
+    if len(image.shape) == 3:
+        image = rgb2gray(image)
+    image = image * 255
     image = image.astype(np.float32)
     return image
 

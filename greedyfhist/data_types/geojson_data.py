@@ -4,7 +4,7 @@ from typing import Dict, List, Union
 
 import geojson
 
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms
 from greedyfhist.utils.io import derive_output_path
 
 @dataclass
@@ -34,7 +34,7 @@ class GeoJsonData:
         output_path = derive_output_path(directory, fname)
         self.to_file(output_path)
 
-    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult) -> 'GeoJsonData':
+    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms) -> 'GeoJsonData':
         data = self.data.copy()
         warped_data = registerer.transform_geojson(data, transformation.backward_transform)
         return GeoJsonData(warped_data, self.path)
@@ -42,7 +42,7 @@ class GeoJsonData:
     @staticmethod
     def load_and_transform_data(path: str, 
                                 registerer: GreedyFHist,
-                                transformation: RegistrationResult,
+                                transformation: RegistrationTransforms,
                                 switch_axis: bool = False,
                                 is_annotation: bool = False):
         geojson_data = GeoJsonData.load_from_path(path)

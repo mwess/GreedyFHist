@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import toml
 
 from greedyfhist.utils.io import create_if_not_exists
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms
 from greedyfhist.options.options import RegistrationOptions
-from greedyfhist.data_types import OMETIFFImage, DefaultImage, Pointset, GeoJsonData, HistologySection
+from greedyfhist.data_types import Pointset, GeoJsonData, HistologySection, Image
 
 
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.WARN)
@@ -45,7 +45,7 @@ def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str],
 
 def guess_load_transform_data(path: str,
                               registerer: GreedyFHist,
-                              transformation: RegistrationResult) -> Union[OMETIFFImage, DefaultImage, Pointset, GeoJsonData]:
+                              transformation: RegistrationTransforms) -> Union[Image, Pointset, GeoJsonData]:
     """Utility function that determines filetype from path, then applies
     the transformation and returns the warped data.
 
@@ -58,14 +58,14 @@ def guess_load_transform_data(path: str,
         _type_: Warped data.
     """
     if path.endswith('tiff') or path.endswith('tif'):
-        warped_ome_data = OMETIFFImage.load_and_transform_data(path, registerer, transformation)
+        warped_ome_data = Image.load_and_transform_data(path, registerer, transformation)
         return warped_ome_data
     if path.endswith('csv'):
         return Pointset.load_and_transform_data(path, registerer, transformation)
     if path.endswith('geojson'):
         return GeoJsonData.load_and_transform_data(path, registerer, transformation)
     else:
-        image_data = DefaultImage.load_and_transform_data(path, registerer, transformation)
+        image_data = Image.load_and_transform_data(path, registerer, transformation)
         return image_data
     
 
@@ -94,11 +94,11 @@ def resolve_variable(selector: str,
     return choice2
 
 
-def guess_load_transform_image_data(path: str, 
+def load_transform_image_data(path: str, 
                               registerer: GreedyFHist,
-                              transformation: RegistrationResult,
+                              transformation: RegistrationTransforms,
                               is_annotation: bool = False, 
-                              switch_axis: bool = False) -> Union[OMETIFFImage, DefaultImage]:
+                              switch_axis: bool = False) -> Image:
     """Utility function that loads images based on file ending. Image
     data can be interpreted as either image or annotation and axis can
     be switched (might be necessary for multilabel outputs from QuPath).
@@ -112,22 +112,9 @@ def guess_load_transform_image_data(path: str,
         switch_axis (bool, optional): If True, switches axis 0 and 2. Defaults to False.
 
     Returns:
-        Union[OMETIFFImage, DefaultImage]: Warped imge data.
+        Image: Warped imge data.
     """
-    if path.endswith('tiff') or path.endswith('tif'):
-        ome_data = OMETIFFImage.load_and_transform_data(path, 
-                                                        registerer,
-                                                        transformation,
-                                                        is_annotation=is_annotation, 
-                                                        switch_axis=switch_axis)
-        return ome_data
-    else:
-        image_data = DefaultImage.load_and_transform_data(path, 
-                                                   registerer,
-                                                   transformation,
-                                                   is_annotation=is_annotation, 
-                                                   keep_axis=False)
-        return image_data
+    return Image.load_and_transform_data(path, registerer, transformation, is_annotation)
 
 
 def get_image_type_from_config(config: Dict) -> str:
@@ -155,7 +142,7 @@ def get_image_type_from_config(config: Dict) -> str:
 
 def guess_and_load_image(path: str, 
                          is_annotation: Optional[bool] = False,
-                         keep_axis: Optional[bool] = False) -> Union[OMETIFFImage, DefaultImage]:
+                         keep_axis: Optional[bool] = False) -> Image:
     """Guess image type and return guessed image types.
 
     Args:
@@ -166,14 +153,12 @@ def guess_and_load_image(path: str,
     Returns:
         Union[OMETIFFImage, DefaultImage]: Loaded image.
     """
-    if path.endswith('tiff') or path.endswith('tif'):
-        return OMETIFFImage.load_from_path(path, is_annotation=is_annotation, keep_axis=False)
-    return DefaultImage.load_from_path(path, is_annotation=is_annotation, keep_axis=True)
+    return Image.load_from_path(path, is_annotation)
 
 
 def guess_load_transform_image_from_config(config: Dict, 
                               registerer: GreedyFHist,
-                              transformation: RegistrationResult) -> Union[OMETIFFImage, DefaultImage]:
+                              transformation: RegistrationTransforms) -> Image:
     """Utility function that loads images based on config object. Image
     data can be interpreted as either image or annotation and axis can
     be switched (might be necessary for multilabel outputs from QuPath).
@@ -192,7 +177,7 @@ def guess_load_transform_image_from_config(config: Dict,
     return warped_image
 
     
-def load_image_from_config(config: Dict) -> Union[DefaultImage, OMETIFFImage]:
+def load_image_from_config(config: Dict) -> Image:
     """Load image based on config.
 
     Args:
@@ -201,10 +186,7 @@ def load_image_from_config(config: Dict) -> Union[DefaultImage, OMETIFFImage]:
     Returns:
         Union[DefaultImage, OMETIFFIMage]: 
     """
-    type_ = get_image_type_from_config(config)
-    if type_ in ['tiff', 'tif']:
-        return OMETIFFImage.load_data(config)
-    return DefaultImage.load_data(config)
+    return Image.load_data_from_config(config)
 
 
 def guess_type(path: str) -> str:
@@ -217,18 +199,16 @@ def guess_type(path: str) -> str:
     return 'default'
 
 
-def load_data_from_config(config: Dict) -> Union[DefaultImage, OMETIFFImage, Pointset, GeoJsonData]:
+def load_data_from_config(config: Dict) -> Union[Image, Pointset, GeoJsonData]:
     type_ = config.get('type', None)
     if type_ is None:
         type_ = guess_type(config['path'])
-    if type_ == 'geojson':
+    elif type_ == 'geojson':
         return GeoJsonData.load_data(config)
-    if type_ == 'pointset':
+    elif type_ == 'pointset':
         return Pointset.load_data(config)
-    if type_ in ['tif', 'tiff']:
-        return OMETIFFImage.load_data(config)
-    if type_ == 'default':
-        return DefaultImage.load_data(config)
+    else:
+        return Image.load_data_from_config(config)
     # Throw an error message otherwise.
 
 
@@ -321,10 +301,8 @@ def register(moving_image_path: Optional[str] = None,
              fixed_mask_path: Optional[str] = None,
              path_to_greedy: Optional[str] = None,
              config_path: Optional[str] = None,
-             default_images: Optional[List[str]] = None,
-             default_annotations: Optional[List[str]] = None,
-             tif_images: Optional[List[str]] = None,
-             tif_annotations: Optional[List[str]] = None,
+             images: Optional[List[str]] = None,
+             annotations: Optional[List[str]] = None,
              pointsets: Optional[List[str]] = None,
              geojsons: Optional[List[str]] = None):
     """Performs GreedyFHist registration between moving and fixed image followed by
@@ -346,14 +324,10 @@ def register(moving_image_path: Optional[str] = None,
         additional_pointsets (Optional[List[str]], optional): Defaults to None.
         additional_geojsons (Optional[List[str]], optional): Defaults to None.
     """
-    if default_images is None:
-        default_images = []
-    if default_annotations is None:
-        default_annotations = []
-    if tif_images is None:
-        tif_images = []
-    if tif_annotations is None:
-        tif_annotations = []
+    if images is None:
+        images = []
+    if annotations is None:
+        annotations = []
     if pointsets is None:
         pointsets = []
     if geojsons is None:
@@ -383,18 +357,12 @@ def register(moving_image_path: Optional[str] = None,
         mask_path=moving_mask_path
     )
     
-    for default_image_path in default_images:
-        default_image = DefaultImage.load_from_path(default_image_path)
-        moving_histology_section.additional_data.append(default_image)
-    for default_annotation_path in default_annotations:
-        default_annotation = DefaultImage.load_from_path(default_annotation_path, is_annotation=True)
-        moving_histology_section.additional_data.append(default_annotation)
-    for tif_image_path in tif_images:
-        tif_image = OMETIFFImage.load_from_path(tif_image_path)
-        moving_histology_section.additional_data.append(tif_image)
-    for tif_annotation_path in tif_annotations:
-        tif_annotation = OMETIFFImage.load_from_path(tif_annotation_path, is_annotation=True)
-        moving_histology_section.additional_data.append(tif_annotation)
+    for image_path in images:
+        image = Image.load_from_path(image_path)
+        moving_histology_section.additional_data.append(image)
+    for annotation_path in annotations:
+        annotation = Image.load_from_path(annotation_path, True)
+        moving_histology_section.additional_data.append(annotation)
     for pointset_path in pointsets:
         pointset = Pointset.load_from_path(pointset_path)
         moving_histology_section.additional_data.append(pointset)
@@ -441,10 +409,8 @@ def apply_transformation(
              output_directory: Optional[str] = None,
              config_path: Optional[str] = None,
              path_to_transform: Optional[str] = None,
-             default_images: Optional[List[str]] = None,
-             default_annotations: Optional[List[str]] = None,
-             tif_images: Optional[List[str]] = None,
-             tif_annotations: Optional[List[str]] = None,
+             images: Optional[List[str]] = None,
+             annotations: Optional[List[str]] = None,
              pointsets: Optional[List[str]] = None,
              geojsons: Optional[List[str]] = None):
     """Transforms provided data from moving to fixed image space by
@@ -468,14 +434,10 @@ def apply_transformation(
         additional_pointsets (Optional[List[str]], optional): Defaults to None.
         additional_geojsons (Optional[List[str]], optional): Defaults to None.
     """
-    if default_images is None:
-        default_images = []
-    if default_annotations is None:
-        default_annotations = []
-    if tif_images is None:
-        tif_images = []
-    if tif_annotations is None:
-        tif_annotations = []
+    if images is None:
+        images = []
+    if annotations is None:
+        annotations = []
     if pointsets is None:
         pointsets = []
     if geojsons is None:
@@ -497,18 +459,12 @@ def apply_transformation(
     registration_result = None
 
     moving_histology_section = HistologySection(ref_image=None, ref_mask=None)
-    for default_image_path in default_images:
-        default_image = DefaultImage.load_from_path(default_image_path)
-        moving_histology_section.additional_data.append(default_image)
-    for default_annotation_path in default_annotations:
-        default_annotation = DefaultImage.load_from_path(default_annotation_path, is_annotation=True)
-        moving_histology_section.additional_data.append(default_annotation)
-    for tif_image_path in tif_images:
-        tif_image = OMETIFFImage.load_from_path(tif_image_path)
-        moving_histology_section.additional_data.append(tif_image)
-    for tif_annotation_path in tif_annotations:
-        tif_annotation = OMETIFFImage.load_and_transform_data(tif_annotation_path, is_annotation=True)
-        moving_histology_section.additional_data.append(tif_annotation)
+    for image_path in images:
+        image = Image.load_from_path(image_path)
+        moving_histology_section.additional_data.append(image)
+    for annotation_path in annotations:
+        annotation = Image.load_from_path(annotation_path, is_annotation=True)
+        moving_histology_section.additional_data.append(annotation)
     for pointset_path in pointsets:
         pointset = Pointset.load_from_path(pointset_path)
         moving_histology_section.additional_data.append(pointset)

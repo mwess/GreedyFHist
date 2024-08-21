@@ -2,13 +2,10 @@ from dataclasses import dataclass
 import os
 from typing import Any, Dict, Optional
 
-import numpy
-import numpy as np
+import numpy, numpy as np
+import pandas, pandas as pd
 
-import pandas
-import pandas as pd
-
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationResult
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms
 from greedyfhist.utils.io import derive_output_path
 
 @dataclass
@@ -64,7 +61,7 @@ class Pointset:
         output_path = derive_output_path(directory, fname)
         self.to_file(output_path)
 
-    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationResult):
+    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms):
         pointset_data = self.to_numpy()
         warped_pointset_data = registerer.transform_pointset(pointset_data, transformation.backward_transform)
         warped_data = self.data.copy()
@@ -82,9 +79,7 @@ class Pointset:
     @staticmethod
     def load_and_transform_data(path: str, 
                                 registerer: GreedyFHist,
-                                transformation: RegistrationResult,
-                                switch_axis: bool = False,
-                                is_annotation: bool = False):
+                                transformation: RegistrationTransforms):
         pointset = Pointset.load_from_path(path)
         warped_pointset = pointset.transform_data(registerer, transformation)
         return warped_pointset

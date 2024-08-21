@@ -2,7 +2,7 @@
 
 This module handles the core registration functionality via the 
 GreedyFHist class. Results are exported as GroupwiseRegResult or 
-RegistrationResult. 
+RegistrationTransforms. 
 """
 
 from dataclasses import dataclass, field
@@ -35,7 +35,8 @@ from greedyfhist.utils.image import (
     derive_resampling_factor,
     realign_displacement_field,
     translation_length,
-    get_com_offset
+    get_com_offset,
+    read_affine_transform
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps, affine_registration, deformable_registration
 from greedyfhist.segmentation.segmenation import load_yolo_segmentation
@@ -64,18 +65,20 @@ class GroupwiseRegResult:
 
     """
 
-    affine_transform: List['GFHTransform']
-    deformable_transform: List['GFHTransform']
+    affine_transform: List['RegistrationTransforms']
+    reverse_affine_transform: List['RegistrationTransforms']
+    deformable_transform: List['RegistrationTransforms']
+    reverse_deformable_transform: List['RegistrationTransforms']
 
-    def get_transforms(self,
-                       source: int) -> 'RegistrationResult':
+    def __get_transform_to_fixed_image(self,
+                                       source:int) -> 'RegistrationTransforms':
         """Retrieves registration from one moving image indexed by 'source'.
 
         Args:
             source (int): Index of moving image.
 
         Returns:
-            RegistrationResult: transformation from source to reference image.
+            RegistrationTransforms: transformation from source to reference image.
         """
         # TODO: At the moment only one direction works.
         transforms = self.affine_transform[source:]
@@ -84,7 +87,50 @@ class GroupwiseRegResult:
         # Composite transforms
         composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
         composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
-        reg_result = RegistrationResult(composited_forward_transform, composited_backward_transform)
+        reg_result = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
+        return reg_result
+
+    def get_transforms(self,
+                       source: int,
+                       target: Optional[int] = None) -> 'RegistrationTransforms':
+        """Retrieves registration from one moving image indexed by 'source'.
+
+        Args:
+            source (int): Index of moving image.
+
+        Returns:
+            RegistrationTransforms: transformation from source to reference image.
+        """
+        if target is None:
+            return self.__get_transform_to_fixed_image(source)
+        if source < target:
+            strt_idx = source
+            stp_idx = target - 1
+            reverse = False
+        else:
+            strt_idx = target - 1
+            stp_idx = source
+            reverse = True
+
+        if not reverse:
+            # transforms = self.affine_transform[strt_idx:stp_idx]
+            # transforms = self.affine_transform[source:target]
+            transforms = [self.affine_transform[x] for x in range(source, target)]
+        else:
+            transforms = [self.reverse_affine_transform[x] for x in range(source - 1, target - 1, -1)]
+
+        # TODO: At the moment only one direction works.
+        # transforms = self.affine_transform[source:]
+        if self.deformable_transform is not None and len(self.deformable_transform) > 0:
+            if not reverse:
+                transforms.append(self.deformable_transform[target-1])
+            else:
+                transforms.append(self.reverse_deformable_transform[target])
+            
+        # Composite transforms
+        composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
+        composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
+        reg_result = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
         return reg_result
     
 
@@ -156,6 +202,36 @@ class GFHTransform:
 
 @dataclass
 class RegistrationResult:
+
+    registration_transforms: 'RegistrationTransforms'
+
+    reverse_registration_transforms: Optional['RegistrationTransforms']
+
+    def to_file(self, path: str):
+        """
+        Save 'RegistrationResult' to file.
+        """
+        create_if_not_exists(path)
+        reg_path = join(path, 'registration_transform')
+        self.registration_transforms.to_file(reg_path)
+        if self.reverse_registration_transforms is not None:
+            rev_reg_path = join(path, 'reverse_registration_transform')
+            self.reverse_registration_transforms.to_file(rev_reg_path)
+
+    @staticmethod
+    def load(path: str) -> 'RegistrationResult':
+        reg_path = join(path, 'registration_transform')
+        registration_transforms = RegistrationTransforms.load(reg_path)
+        rev_reg_path = join(path, 'reverse_registration_transform')
+        if exists(rev_reg_path):
+            reverse_registration_transforms = RegistrationTransforms.load(rev_reg_path)
+        else:
+            reverse_registration_transforms = None
+        return RegistrationResult(registration_transforms, reverse_registration_transforms)
+        
+
+@dataclass
+class RegistrationTransforms:
     """
     Result of one pairwise registrations.
 
@@ -178,10 +254,10 @@ class RegistrationResult:
     -------
 
     to_file(path): str
-        Saves RegistrationResult to file.
+        Saves RegistrationTransforms to file.
 
-    load(path): str -> RegistrationResult
-        Load RegistrationResult from file.
+    load(path): str -> RegistrationTransforms
+        Load RegistrationTransforms from file.
     """
     
     forward_transform: 'GFHTransform'
@@ -191,7 +267,7 @@ class RegistrationResult:
     
     # TODO: Can I add cmdln_returns and reg_params somehow
     def to_file(self, path: str):
-        """Saves 'RegistrationResult' to file.
+        """Saves 'RegistrationTransforms' to file.
 
         Args:
             path (str): Directory location.
@@ -203,20 +279,20 @@ class RegistrationResult:
         self.backward_transform.to_file(backward_transform_path)
 
     @staticmethod
-    def load(path: str) -> 'RegistrationResult':
-        """Load RegistrationResult from location.
+    def load(path: str) -> 'RegistrationTransforms':
+        """Load RegistrationTransforms from location.
 
         Args:
             path (str): Directory.
 
         Returns:
-            RegistrationResult: 
+            RegistrationTransforms: 
         """
         fixed_transform_path = join(path, 'fixed_transform')
         fixed_transform = GFHTransform.load_transform(fixed_transform_path)
         moving_transform_path = join(path, 'moving_transform')
         moving_transform = GFHTransform.load_transform(moving_transform_path)
-        return RegistrationResult(fixed_transform, moving_transform)
+        return RegistrationTransforms(fixed_transform, moving_transform)
 
 
 @dataclass
@@ -267,6 +343,8 @@ class InternalRegParams:
     path_to_big_inv_composite: str
     cmdl_log: Optional[List[subprocess.CompletedProcess]]
     reg_params: Optional[Any]
+    moving_preprocessing_params: Dict
+    fixed_preprocessing_params: Dict
     path_to_small_ref_image: str
     sub_dir_key: int
     displacement_field: SimpleITK.SimpleITK.Image
@@ -379,8 +457,8 @@ def compose_transforms(gfh_transforms: List['GFHTransform']) -> 'GFHTransform':
     return gfh_comp_trans
 
 def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-                           internal_reg_params: InternalRegParams,
-                           reverse: bool = False) -> SimpleITK.SimpleITK.Transform:
+                           moving_preprocessing_params: Dict,
+                           fixed_preprocessing_params: Dict) -> SimpleITK.SimpleITK.Transform:
     """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward affine/nonrigid registration.  
 
     Args:
@@ -391,25 +469,13 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     Returns:
         SimpleITK.SimpleITK.Transform: Composited end-to-end registration.
     """
-
-    if not reverse:
-        moving_padding = internal_reg_params.reg_params['moving_padding']
-        moving_cropping = internal_reg_params.reg_params['cropping_params_mov']
-        fixed_padding = internal_reg_params.reg_params['fixed_padding']
-        fixed_cropping = internal_reg_params.reg_params['cropping_params_fix']
-        fixed_image_shape = internal_reg_params.reg_params['original_fixed_image_size']
-        mov_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
-        fix_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
-    else:
-        fixed_padding = internal_reg_params.reg_params['moving_padding']
-        fixed_cropping = internal_reg_params.reg_params['cropping_params_mov']
-        moving_padding = internal_reg_params.reg_params['fixed_padding']
-        moving_cropping = internal_reg_params.reg_params['cropping_params_fix']
-        fixed_image_shape = internal_reg_params.reg_params['original_moving_image_size']
-        fix_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
-        mov_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
-
-
+    moving_padding = moving_preprocessing_params['padding']
+    moving_cropping = moving_preprocessing_params['cropping_params']
+    fixed_padding = fixed_preprocessing_params['padding']
+    fixed_cropping = fixed_preprocessing_params['cropping_params']
+    mov_ds_factor = moving_preprocessing_params['resampling_factor']
+    fix_ds_factor = fixed_preprocessing_params['resampling_factor']
+    
     all_transforms = sitk.CompositeTransform(2)
 
     pre_downscale_transform = sitk.ScaleTransform(2, (1/mov_ds_factor, 1/mov_ds_factor))
@@ -442,8 +508,8 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
 
 
 def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-                               internal_reg_params: InternalRegParams,
-                               reverse: bool = False) -> SimpleITK.SimpleITK.Transform:
+                               moving_preprocessing_params: Dict,
+                               fixed_preprocessing_params: Dict) -> SimpleITK.SimpleITK.Transform:
     """Pre- and appends preprocessing steps from moving and fixed image as transforms to backward affine/nonrigid registration.  
 
     Args:
@@ -453,24 +519,12 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     Returns:
         SimpleITK.SimpleITK.Transform: Composited end-to-end transform.
     """
-
-    if not reverse:
-        moving_padding = internal_reg_params.reg_params['moving_padding']
-        moving_cropping = internal_reg_params.reg_params['cropping_params_mov']
-        fixed_padding = internal_reg_params.reg_params['fixed_padding']
-        fixed_cropping = internal_reg_params.reg_params['cropping_params_fix']
-        moving_image_shape = internal_reg_params.reg_params['original_moving_image_size']
-        mov_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
-        fix_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
-    else:
-        fixed_padding = internal_reg_params.reg_params['moving_padding']
-        fixed_cropping = internal_reg_params.reg_params['cropping_params_mov']
-        moving_padding = internal_reg_params.reg_params['fixed_padding']
-        moving_cropping = internal_reg_params.reg_params['cropping_params_fix']
-        fixed_image_shape = internal_reg_params.reg_params['original_moving_image_size']
-        fix_ds_factor = internal_reg_params.reg_params['moving_resampling_factor']
-        mov_ds_factor = internal_reg_params.reg_params['fixed_resampling_factor']
-        
+    moving_padding = moving_preprocessing_params['padding']
+    moving_cropping = moving_preprocessing_params['cropping_params']
+    fixed_padding = fixed_preprocessing_params['padding']
+    fixed_cropping = fixed_preprocessing_params['cropping_params']
+    mov_ds_factor = moving_preprocessing_params['resampling_factor']
+    fix_ds_factor = fixed_preprocessing_params['resampling_factor']
     
     all_transforms = sitk.CompositeTransform(2)
 
@@ -507,10 +561,11 @@ def preprocessing(image: numpy.array,
                   preprocessing_options: PreprocessingOptions,
                   resolution: Tuple[int, int],
                   kernel_size: int,
-                  tmp_path: str
-                  ):
+                  tmp_path: str,
+                  skip_denoising: bool = False
+                  ) -> 'PreprocessedData':
     create_if_not_exists(tmp_path)
-    if preprocessing_options.enable_denoising:
+    if preprocessing_options.enable_denoising and not skip_denoising:
         image = denoise_image(image,
                               sp=preprocessing_options.moving_sr,
                               sr=preprocessing_options.moving_sp)
@@ -524,6 +579,7 @@ def preprocessing(image: numpy.array,
                                                      smoothing,
                                                      tmp_dir)
     return image_preprocessed
+
 
 def affine_transform_to_file(transform, fpath):
     mat = transform.GetMatrix()
@@ -604,6 +660,7 @@ def derive_subdir(directory, limit=1000) -> Tuple[str, int]:
     # TODO: Do better error handling here, but who has 1000 sections to register, really?!
     return subdir, subdir_num
 
+
 # TODO: There is probably a better way to ensure the dtype of the image.
 def correct_img_dtype(img: numpy.array) -> numpy.array:
     """Changes the image type from float to np.uint8 if necessary.
@@ -619,6 +676,7 @@ def correct_img_dtype(img: numpy.array) -> numpy.array:
     else:
         img = img.astype(np.uint8)
     return img
+
 
 @dataclass
 class GreedyFHist:
@@ -681,7 +739,7 @@ class GreedyFHist:
                  moving_img_mask: Optional[numpy.array] = None,
                  fixed_img_mask: Optional[numpy.array] = None,
                  options: Optional[RegistrationOptions] = None,                  
-                 **kwargs: Dict) -> 'RegistrationResult':
+                 **kwargs: Dict) -> Tuple['RegistrationTransforms', Optional['RegistrationTransforms']]:
         """Computes registration from moving image to fixed image.
 
         Args:
@@ -692,7 +750,7 @@ class GreedyFHist:
             options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
 
         Returns:
-            RegistrationResult: _description_
+            RegistrationTransforms: _description_
         """
         if options is None:
             options = RegistrationOptions()
@@ -700,15 +758,12 @@ class GreedyFHist:
         clean_if_exists(path_temp)
         path_temp, _ = derive_subdir(path_temp)
         create_if_not_exists(path_temp)
-        path_output = join(path_temp, 'output')
-        create_if_not_exists(path_output)
-        path_output = join(path_output, 'registrations')
+        path_output = join(path_temp, 'output', 'registrations')
         path_output, subdir_num = derive_subdir(path_output)
         create_if_not_exists(path_output)
         # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
         pre_sampling_factor = options.pre_sampling_factor
         if pre_sampling_factor == 'auto':
-            # TODO: Separate between moving and fixed resampling factor
             moving_resampling_factor = derive_resampling_factor(moving_img)
             fixed_resampling_factor = derive_resampling_factor(fixed_img)
         else:
@@ -720,12 +775,16 @@ class GreedyFHist:
         self.cmdln_returns = []
 
         reg_params = {
-                        'moving_resampling_factor': moving_resampling_factor,
-                        'fixed_resampling_factor': fixed_resampling_factor,
-                        'original_moving_image_size': original_moving_image_size,
-                        'original_fixed_image_size': original_fixed_image_size,
                         'subdir_num': subdir_num
-                        }
+                    }
+        moving_preprocessing_params = {
+            'resampling_factor': moving_resampling_factor,
+            'original_image_size': original_moving_image_size
+        }
+        fixed_preprocessing_params = {
+            'resampling_factor': fixed_resampling_factor,
+            'original_image_size': original_fixed_image_size
+        }
         paths = {
             'path_temp': path_temp,
             'path_output': path_output,
@@ -736,20 +795,25 @@ class GreedyFHist:
         fixed_img = correct_img_dtype(fixed_img)
         moving_img = resample_image_sitk(moving_img, moving_resampling_factor)
         fixed_img = resample_image_sitk(fixed_img, fixed_resampling_factor)
+        yolo_segmentation_min_size = options.affine_registration_options.preprocessing_options.yolo_segmentation_min_size if options.do_affine_registration else options.nonrigid_registration_options.preprocessing_options.yolo_segmentation_min_size
         if moving_img_mask is None:
-            moving_img_mask = self.segmentation_function(moving_img)
+            moving_img_mask = self.segmentation_function(moving_img, yolo_segmentation_min_size)
         else:
             moving_img_mask = resample_image_sitk(moving_img_mask, moving_resampling_factor)
         if fixed_img_mask is None:
-            fixed_img_mask = self.segmentation_function(fixed_img)
+            fixed_img_mask = self.segmentation_function(fixed_img, yolo_segmentation_min_size)
         else:
             fixed_img_mask = resample_image_sitk(fixed_img_mask, fixed_resampling_factor)
+        moving_preprocessing_params['moving_img_mask'] = moving_img_mask
+        fixed_preprocessing_params['fixed_img_mask'] = fixed_img_mask
         # Cropping and Padding
         cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
         cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
-        reg_params['cropping_params_mov'] = crop_params_mov
-        reg_params['cropping_params_fix'] = crop_params_fix
-        reg_params['original_shape_fixed_image'] = fixed_img.shape
+        moving_preprocessing_params['cropping_params'] = crop_params_mov
+        moving_preprocessing_params['original_shape_image'] = moving_img.shape
+        fixed_preprocessing_params['cropping_params'] = crop_params_fix
+        fixed_preprocessing_params['original_shape_image'] = fixed_img.shape
+        
         cropped_moving_img = moving_img[crop_params_mov[0]:crop_params_mov[1], crop_params_mov[2]:crop_params_mov[3]]
         cropped_fixed_img = fixed_img[crop_params_fix[0]:crop_params_fix[1], crop_params_fix[2]:crop_params_fix[3]]
         moving_pad, fixed_pad = get_symmetric_padding(cropped_moving_img, cropped_fixed_img)
@@ -757,14 +821,14 @@ class GreedyFHist:
         fixed_img = pad_asym(cropped_fixed_img, fixed_pad)
         moving_img_mask = pad_asym(cropped_moving_mask, moving_pad)
         fixed_img_mask = pad_asym(cropped_fixed_mask, fixed_pad)
-        reg_params['moving_padding'] = moving_pad
-        reg_params['fixed_padding'] = fixed_pad
+        moving_preprocessing_params['padding'] = moving_pad
+        fixed_preprocessing_params['padding'] = fixed_pad
         moving_img = apply_mask(moving_img, moving_img_mask)
         fixed_img = apply_mask(fixed_img, fixed_img_mask)
         _, cropping_padded_mov_mask = cropping(moving_img_mask)
         _, cropping_padded_fix_mask = cropping(fixed_img_mask)
-        reg_params['cropped_padded_mov_mask'] = cropping_padded_mov_mask
-        reg_params['cropped_padded_fix_mask'] = cropping_padded_fix_mask
+        moving_preprocessing_params['cropped_padded_mask'] = cropping_padded_mov_mask
+        fixed_preprocessing_params['cropped_padded_mask'] = cropping_padded_fix_mask
 
         path_metrics = os.path.join(path_output, 'metrics')
         path_metrics_small_resolution = os.path.join(path_metrics, 'small_resolution')
@@ -785,12 +849,14 @@ class GreedyFHist:
                                                     options.affine_registration_options.preprocessing_options,
                                                     options.affine_registration_options.resolution,
                                                     options.affine_registration_options.kernel_size,
-                                                    moving_affine_path)
+                                                    moving_affine_path,
+                                                    options.affine_registration_options.preprocessing_options.disable_denoising_moving)
             fixed_img_preprocessed = preprocessing(fixed_img,
-                                                options.affine_registration_options.preprocessing_options,
-                                                options.affine_registration_options.resolution,
-                                                options.affine_registration_options.kernel_size,
-                                                fixed_affine_path)
+                                                   options.affine_registration_options.preprocessing_options,
+                                                   options.affine_registration_options.resolution,
+                                                   options.affine_registration_options.kernel_size,
+                                                   fixed_affine_path,
+                                                   options.affine_registration_options.preprocessing_options.disable_denoising_fixed)
             height = fixed_img_preprocessed.height
             
             ia_init = ''
@@ -852,22 +918,26 @@ class GreedyFHist:
             paths['path_small_warp'] = None
             paths['path_small_warp_inv'] = None      
 
-        registration_result = self.reg_postprocess(moving_img_preprocessed,
+        registration_transform = self.reg_postprocess(moving_img_preprocessed,
                              fixed_img_preprocessed,
+                             moving_preprocessing_params,
+                             fixed_preprocessing_params,
                              options,
                              moving_img,
                              reg_params,
                              paths)
         
-        if options.compute_reverse_nonrigid_registration and options.do_nonrigid_registration:
+        if options.compute_reverse_nonrigid_registration:
+            path_output = join(path_temp, 'output', 'registrations_rev')
+            path_output, subdir_num = derive_subdir(path_output)
+            create_if_not_exists(path_output)
             paths_rev = paths.copy()
-            del paths_rev['nonrigid_affine_trans_path']
+            if 'nonrigid_affine_trans_path' in paths_rev:
+                del paths_rev['nonrigid_affine_trans_path']
             del paths_rev['path_small_warp']
             del paths_rev['path_small_warp_inv']
-
-            create_if_not_exists(paths_rev['path_temp'])
-            create_if_not_exists(paths_rev['path_output'])
-
+            del paths_rev['path_small_affine']
+            paths_rev['path_output'] = path_output
             path_metrics = os.path.join(path_output, 'metrics_rev')
             path_metrics_small_resolution = os.path.join(path_metrics, 'small_resolution')
             path_metrics_full_resolution = os.path.join(path_metrics, 'full_resolution')
@@ -880,34 +950,50 @@ class GreedyFHist:
             paths_rev['path_metrics_small_resolution'] = path_metrics_small_resolution
             paths_rev['path_metrics_full_resolution'] = path_metrics_full_resolution
 
-            (def_reg_ret, 
-             new_paths,
-             moving_img_preprocessed,
-             fixed_img_preprocessed) = self.do_deformable_registration(moving_img,
-                                            fixed_img,
-                                            moving_img_mask,
-                                            fixed_img_mask,
-                                            options,
-                                            paths_rev,
-                                            reg_params,
-                                            compute_reverse_nonrigid_registration=True)
-            self.cmdln_returns.append(def_reg_ret)      
-            for key in new_paths:
-                paths_rev[key] = new_paths[key]                  
-                # print(f'{key}: {paths_rev[key]}')
-            rev_registration_result = self.reg_postprocess(moving_img_preprocessed,
+            moving_img, fixed_img = fixed_img, moving_img
+            moving_img_mask, fixed_img_mask = fixed_img_mask, moving_img_mask
+            moving_preprocessing_params, fixed_preprocessing_params = fixed_preprocessing_params, moving_preprocessing_params
+
+
+            if options.do_affine_registration:
+                affine_transform = read_affine_transform(paths['path_small_affine'])
+                rev_affine_transform = affine_transform.GetInverse()
+                paths_rev['path_small_affine'] = os.path.join(paths_rev['path_metrics_small_resolution'], 'small_affine.mat')
+                affine_transform_to_file(rev_affine_transform, paths_rev['path_small_affine'])
+            else:
+                paths_rev['path_small_affine'] = None
+                
+            if options.do_nonrigid_registration:
+                (def_reg_ret, 
+                 new_paths,
+                 moving_img_preprocessed,
+                 fixed_img_preprocessed) = self.do_deformable_registration(moving_img,
+                                                fixed_img,
+                                                moving_img_mask,
+                                                fixed_img_mask,
+                                                options,
+                                                paths_rev,
+                                                reg_params,
+                                                compute_reverse_nonrigid_registration=True)
+                self.cmdln_returns.append(def_reg_ret)      
+                for key in new_paths:
+                    paths_rev[key] = new_paths[key]                  
+            rev_registration_transform = self.reg_postprocess(moving_img_preprocessed,
                         fixed_img_preprocessed,
+                        moving_preprocessing_params,
+                        fixed_preprocessing_params,
                         options,
                         moving_img,
                         reg_params,
                         paths_rev,
                         True)
         else:
-            rev_registration_result = None
+            rev_registration_transform = None
 
         if options.remove_temporary_directory:
-            self.__cleanup_temporary_directory(options.temporary_directory)        
-        return registration_result, rev_registration_result
+            self.__cleanup_temporary_directory(options.temporary_directory)  
+        registration_result = RegistrationResult(registration_transform, rev_registration_transform)      
+        return registration_result
 
     def do_deformable_registration(self,
                                    moving_img,
@@ -919,9 +1005,6 @@ class GreedyFHist:
                                    reg_params,
                                    compute_reverse_nonrigid_registration=False):
         path_metrics_small_resolution = paths['path_metrics_small_resolution']
-        if compute_reverse_nonrigid_registration:
-            moving_img, fixed_img = fixed_img, moving_img
-            moving_img_mask, fixed_img_mask = fixed_img_mask, moving_img_mask
         if options.do_affine_registration:
             src_resolution = options.affine_registration_options.resolution[0]
             dst_resolution = options.nonrigid_registration_options.resolution[0]
@@ -933,15 +1016,7 @@ class GreedyFHist:
                 resample = src_resolution / dst_resolution * 100
                 tmp_factor = 100 / resample    
                 affine_transform = rescale_affine(path_small_affine, tmp_factor)
-                if compute_reverse_nonrigid_registration:
-                    affine_transform = affine_transform.GetInverse()
-                # print('Rotation:')
-                # print(affine_transform.GetTranslation())
-                # print(affine_transform.GetMatrix())
-                if compute_reverse_nonrigid_registration:
-                    nonrigid_affine_trans_path = join(path_metrics_small_resolution, 'nr_aff_trans_rev.mat')
-                else:
-                    nonrigid_affine_trans_path = join(path_metrics_small_resolution, 'nr_aff_trans.mat')
+                nonrigid_affine_trans_path = join(path_metrics_small_resolution, 'nr_aff_trans.mat')
                 affine_transform_to_file(affine_transform, nonrigid_affine_trans_path)
         else:
             nonrigid_affine_trans_path = None
@@ -971,12 +1046,14 @@ class GreedyFHist:
                                                 options.nonrigid_registration_options.preprocessing_options,
                                                 options.nonrigid_registration_options.resolution,
                                                 options.nonrigid_registration_options.kernel_size,
-                                                moving_nr_path)
+                                                moving_nr_path,
+                                                options.nonrigid_registration_options.preprocessing_options.disable_denoising_moving)
         fixed_img_preprocessed = preprocessing(fixed_img,
                                             options.nonrigid_registration_options.preprocessing_options,
                                             options.nonrigid_registration_options.resolution,
                                             options.nonrigid_registration_options.kernel_size,
-                                            fixed_nr_path)
+                                            fixed_nr_path,
+                                            options.nonrigid_registration_options.preprocessing_options.disable_denoising_fixed)
         height = fixed_img_preprocessed.height
 
         ia_init = ''
@@ -1004,25 +1081,21 @@ class GreedyFHist:
                                                         ia=ia_init)
         return deformable_reg_ret, new_paths, moving_img_preprocessed, fixed_img_preprocessed
            
-
-
     def reg_postprocess(self,
                         moving_img_preprocessed,
                         fixed_img_preprocessed,
+                        moving_preprocessing_params,
+                        fixed_preprocessing_params,
                         options,
                         moving_img,
                         reg_params,
                         paths,
                         reverse=False):
         path_output = paths['path_output']
-        path_small_warp = paths['path_small_warp']
-        path_small_warp_inv = paths['path_small_warp_inv']
         path_small_affine = paths['path_small_affine']
-        path_metrics_small_resolution = paths['path_metrics_small_resolution']
-        path_metrics_full_resolution = paths['path_metrics_full_resolution']
 
-        original_moving_image_size = reg_params['original_moving_image_size']
-        original_fixed_image_size = reg_params['original_fixed_image_size']
+        original_moving_image_size = moving_preprocessing_params['original_image_size']
+        original_fixed_image_size = fixed_preprocessing_params['original_image_size']
         # Write small ref image to file for warping of coordinates
         small_fixed = sitk.ReadImage(fixed_img_preprocessed.image_path)
         empty_fixed_img = small_fixed[:,:]
@@ -1034,6 +1107,10 @@ class GreedyFHist:
         # If no non-rigid registration is performed we keep the affine transform unbounded.
         # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
         if options.do_nonrigid_registration:
+            path_metrics_small_resolution = paths['path_metrics_small_resolution']
+            path_metrics_full_resolution = paths['path_metrics_full_resolution']
+            path_small_warp = paths['path_small_warp']
+            path_small_warp_inv = paths['path_small_warp_inv']
             no_2_orig_resample = (options.nonrigid_registration_options.resolution[0] / moving_img.shape[0]) * 100
             no_2_orig_factor = 100 / no_2_orig_resample            
             if options.do_affine_registration and not options.affine_registration_options.keep_affine_transform_unbounded:
@@ -1078,15 +1155,8 @@ class GreedyFHist:
                 # First rescale affine transforms
                 aff_2_orig_resample = options.affine_registration_options.resolution[0] / moving_img.shape[0] * 100
                 aff_2_orig_factor = 100 / aff_2_orig_resample
-                # print('postprocess') 
-                # print(f'path_small_affine: {path_small_affine}')
                 forward_affine_transform = rescale_affine(path_small_affine, aff_2_orig_factor)
                 backward_affine_transform = forward_affine_transform.GetInverse()
-                if reverse:
-                    forward_affine_transform, backward_affine_transform = backward_affine_transform, forward_affine_transform
-                # print(f'path_metrics_full_resolution: {path_metrics_full_resolution}')
-                # print(f'path_small_warp: {path_small_warp}')
-                # print(f'path_small_warp_inv: {path_small_warp_inv}')
                 path_big_warp = os.path.join(path_metrics_full_resolution, 'big_warp.nii.gz')
                 rescale_warp(
                     path_small_warp,
@@ -1181,17 +1251,23 @@ class GreedyFHist:
             path_to_big_inv_composite=path_big_composite_warp_inv,
             cmdl_log=self.cmdln_returns,
             reg_params=reg_params,
+            moving_preprocessing_params=moving_preprocessing_params,
+            fixed_preprocessing_params=fixed_preprocessing_params,
             path_to_small_ref_image=path_to_small_ref_image,
             sub_dir_key=reg_params['subdir_num'],
             displacement_field=displacement_field,
             inv_displacement_field=inv_displacement_field
         )
 
-        composited_forward_transform = compose_reg_transforms(forward_transform, reg_result, reverse)
-        composited_backward_transform = compose_inv_reg_transforms(backward_transform, reg_result, reverse)
+        composited_forward_transform = compose_reg_transforms(forward_transform, 
+                                                              moving_preprocessing_params,
+                                                              fixed_preprocessing_params)
+        composited_backward_transform = compose_inv_reg_transforms(backward_transform, 
+                                                                   moving_preprocessing_params,
+                                                                   fixed_preprocessing_params)
         fixed_transform = GFHTransform(original_fixed_image_size, composited_forward_transform)
         moving_transform = GFHTransform(original_moving_image_size, composited_backward_transform)
-        registration_result = RegistrationResult(forward_transform=fixed_transform, backward_transform=moving_transform, cmdln_returns=self.cmdln_returns, reg_params=reg_params)
+        registration_result = RegistrationTransforms(forward_transform=fixed_transform, backward_transform=moving_transform, cmdln_returns=self.cmdln_returns, reg_params=reg_result)
         # Return this!
         return registration_result
 
@@ -1233,6 +1309,7 @@ class GreedyFHist:
             moving_mask = None
         registered_images = []
         affine_transform_lists = []
+        reverse_affine_transform_list = []
         for fixed_tuple in image_mask_list[1:]:
             if isinstance(fixed_tuple, tuple):
                 fixed_image, fixed_mask = fixed_tuple
@@ -1241,14 +1318,17 @@ class GreedyFHist:
                 fixed_mask = None
             # This kind of makes transformations that are all registered to the original fixed image. Consider having them only be pairwise.
             reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, affine_options)
-            affine_transform_lists.append(reg_result)
+            affine_transform_lists.append(reg_result.registration_transform)
+            if nonrigid_option.compute_reverse_nonrigid_registration:
+                reverse_affine_transform_list.append(reg_result.reverse_registration_transform)
             moving_image = fixed_image
             moving_mask = fixed_mask
         # Stage 2: Take the matched images and do a nonrigid registration
         if skip_deformable_registration:
-            g_res = GroupwiseRegResult(affine_transform_lists, [])
+            g_res = GroupwiseRegResult(affine_transform_lists, reverse_affine_transform_list, [], [])
             return g_res, registered_images
         nonrigid_transformations = []
+        reverse_nonrigid_transformations = []
         nonrigid_warped_images = []
         fixed_tuple = image_mask_list[-1]
         if isinstance(fixed_tuple, tuple):
@@ -1268,10 +1348,14 @@ class GreedyFHist:
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
             nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_option)
-            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.forward_transform, 'LINEAR')
+            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration_transform.forward_transform, 'LINEAR')
             nonrigid_warped_images.append(deformable_warped_image)
-            nonrigid_transformations.append(nonrigid_reg_result)
-        groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, nonrigid_transformations)
+            nonrigid_transformations.append(nonrigid_reg_result.registration_transform)
+            reverse_nonrigid_transformations.append(nonrigid_reg_result.reverse_registration_transform)
+        groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, 
+                                                            reverse_affine_transform_list,
+                                                            nonrigid_transformations,
+                                                            reverse_nonrigid_transformations)
         return groupwise_registration_results, nonrigid_warped_images
 
     def transform_image(self,
