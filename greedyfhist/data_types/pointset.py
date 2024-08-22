@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+from os.path import join
 from typing import Any, Dict, Optional
 
 import numpy, numpy as np
@@ -58,7 +59,7 @@ class Pointset:
 
     def to_directory(self, directory: str):
         fname = os.path.basename(self.path)
-        output_path = derive_output_path(directory, fname)
+        output_path = join(directory, fname)
         self.to_file(output_path)
 
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms):
@@ -75,14 +76,6 @@ class Pointset:
             index_col=self.index_col,
             header=self.header
         )
-
-    @staticmethod
-    def load_and_transform_data(path: str, 
-                                registerer: GreedyFHist,
-                                transformation: RegistrationTransforms):
-        pointset = Pointset.load_from_path(path)
-        warped_pointset = pointset.transform_data(registerer, transformation)
-        return warped_pointset
 
     @classmethod
     def load_data(cls, dct: Dict) -> 'Pointset':

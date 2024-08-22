@@ -6,6 +6,7 @@ import numpy
 from greedyfhist.options import RegistrationOptions
 from greedyfhist.registration import GreedyFHist, RegistrationTransforms
 from greedyfhist.utils.io import create_if_not_exists
+from greedyfhist.data_types.image import Image
 
 
 @dataclass
@@ -25,8 +26,8 @@ class HistologySection:
         Contains additional imaging data.
     """
     
-    ref_image: Optional[Any]
-    ref_mask: Optional[Any]
+    ref_image: Optional[Image]
+    ref_mask: Optional[Image]
     additional_data: List[Any] = field(default_factory=list)
     
     def register_to_image(self, 

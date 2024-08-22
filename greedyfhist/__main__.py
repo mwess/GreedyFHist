@@ -17,6 +17,26 @@ def groupwise_registration(config):
     cmdln_processor.groupwise_registration(config)
 
 
+# @click.command()
+# @click.option('--moving-image', '-m', type=click.Path())
+# @click.option('--fixed-images', '-f', type=click.Path(), multiple=True)
+# @click.option('--output-directory', '-o', type=click.Path())
+# @click.option('--path-to-greedy', '-g', type=click.Path())
+# @click.option('--config', '-c', type=click.Path())
+# def groupwise_registration_simple(moving_images=None,
+#                                   fixed_image=None,
+#                                   output_directory=None,
+#                                   path_to_greedy=None,
+#                                   config=None):
+#     cmdln_processor.groupwise_registration_from_cmdln(
+#         moving_image_paths=moving_images,
+#         fixed_image_path=fixed_image,
+#         output_directory=output_directory,
+#         path_to_greedy=path_to_greedy,
+#         config_path=config
+#     )
+
+
 
 @click.command()
 @click.option('--moving-image', '-m', type=click.Path())
@@ -26,10 +46,8 @@ def groupwise_registration(config):
 @click.option('--fixed-mask', '-fmask', type=click.Path())  # Make this optional
 @click.option('--path-to-greedy', '-g', type=click.Path())
 @click.option('--config', '-c', type=click.Path())
-@click.option('--default-images', type=click.Path(), multiple=True)
-@click.option('--default-annotations', type=click.Path(), multiple=True)
-@click.option('--tif-images', type=click.Path(), multiple=True)
-@click.option('--tif-annotations', type=click.Path(), multiple=True)
+@click.option('--images', type=click.Path(), multiple=True)
+@click.option('--annotations', type=click.Path(), multiple=True)
 @click.option('--pointsets', type=click.Path(), multiple=True)
 @click.option('--geojsons', type=click.Path(), multiple=True)
 def register(moving_image=None,
@@ -39,10 +57,8 @@ def register(moving_image=None,
              fixed_mask=None,
              path_to_greedy=None,
              config=None,
-             default_images=None,
-             default_annotations=None,
-             tif_images=None,
-             tif_annotations=None,
+             images=None,
+             annotations=None,
              pointsets=None,
              geojsons=None):
     cmdln_processor.register(
@@ -53,10 +69,8 @@ def register(moving_image=None,
         fixed_mask_path=fixed_mask,
         path_to_greedy=path_to_greedy,
         config_path=config,
-        default_images=default_images,
-        default_annotations=default_annotations,
-        tif_images=tif_images,
-        tif_annotations=tif_annotations,
+        images=images,
+        annotations=annotations,
         pointsets=pointsets,
         geojsons=geojsons
     )
@@ -66,27 +80,21 @@ def register(moving_image=None,
 @click.option('--transformation', '-t', type=click.Path(), required=True)
 @click.option('--output-directory', '-o', type=click.Path(), default='out')
 @click.option('--config', '-c', type=click.Path(), required=False)
-@click.option('--default-images', type=click.Path(), multiple=True)
-@click.option('--default-annotations', type=click.Path(), multiple=True)
-@click.option('--tif-images', type=click.Path(), multiple=True)
-@click.option('--tif-annotations', type=click.Path(), multiple=True)
+@click.option('--images', type=click.Path(), multiple=True)
+@click.option('--annotations', type=click.Path(), multiple=True)
 @click.option('--pointsets', type=click.Path(), multiple=True)
 @click.option('--geojsons', type=click.Path(), multiple=True)
 def transform(transformation=None,
          output_directory=None,
          config=None,
-         default_images=None,
-         default_annotations=None,
-         tif_images=None,
-         tif_annotations=None,
+         images=None,
+         annotations=None,
          pointsets=None,
          geojsons=None):
     cmdln_processor.apply_transformation(output_directory=output_directory,
                                          config=config,
-                                         default_images=default_images,
-                                         default_annotations=default_annotations,
-                                         tif_images=tif_images,
-                                         tif_annotations=tif_annotations,
+                                         images=images,
+                                         annotations=annotations,
                                          pointsets=pointsets,
                                          geojsons=geojsons,                                         
                                          registerer=None,

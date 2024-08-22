@@ -41,32 +41,6 @@ def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str],
     moving_mask_path = config.get('moving_mask', None)
     fixed_mask_path = config.get('fixed_mask', None)
     return moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path
-        
-
-def guess_load_transform_data(path: str,
-                              registerer: GreedyFHist,
-                              transformation: RegistrationTransforms) -> Union[Image, Pointset, GeoJsonData]:
-    """Utility function that determines filetype from path, then applies
-    the transformation and returns the warped data.
-
-    Args:
-        path (str): Filename
-        registerer (GreedyFHist): Initialized GreedyFHist registerer.
-        transformation (RegistrationResult): Computed transformation from moving to fixed image.
-
-    Returns:
-        _type_: Warped data.
-    """
-    if path.endswith('tiff') or path.endswith('tif'):
-        warped_ome_data = Image.load_and_transform_data(path, registerer, transformation)
-        return warped_ome_data
-    if path.endswith('csv'):
-        return Pointset.load_and_transform_data(path, registerer, transformation)
-    if path.endswith('geojson'):
-        return GeoJsonData.load_and_transform_data(path, registerer, transformation)
-    else:
-        image_data = Image.load_and_transform_data(path, registerer, transformation)
-        return image_data
     
 
 def resolve_variable(selector: str, 
@@ -92,89 +66,6 @@ def resolve_variable(selector: str,
     if choice2 is None:
         return fallback_value
     return choice2
-
-
-def load_transform_image_data(path: str, 
-                              registerer: GreedyFHist,
-                              transformation: RegistrationTransforms,
-                              is_annotation: bool = False, 
-                              switch_axis: bool = False) -> Image:
-    """Utility function that loads images based on file ending. Image
-    data can be interpreted as either image or annotation and axis can
-    be switched (might be necessary for multilabel outputs from QuPath).
-    Then applies transformation on image data. 
-
-    Args:
-        path (str): Filepath
-        registerer (GreedyFHist): Initialized GreedyFHist registerer.
-        transformation (RegistrationResult): Computed transformation from moving to fixed image space.
-        is_annotation (bool, optional): If True, sets image data to annotation. Defaults to False.
-        switch_axis (bool, optional): If True, switches axis 0 and 2. Defaults to False.
-
-    Returns:
-        Image: Warped imge data.
-    """
-    return Image.load_and_transform_data(path, registerer, transformation, is_annotation)
-
-
-def get_image_type_from_config(config: Dict) -> str:
-    """Derive image type from given config.
-    First, tries to use the type key in config.
-    If that isnt found, uses the filenames to 
-    guess the correct filepath.
-
-    Args:
-        config (Dict): 
-
-    Returns:
-        str: 
-    """
-    type_ = config.get('type', None)
-    if type_ in ['tif', 'tiff', 'default']:
-        return type_
-    else:
-        path = config['path']
-        if path.endswith('tif') or path.endswith('tiff'):
-            return 'tif'
-        else:
-            return 'default'
-        
-
-def guess_and_load_image(path: str, 
-                         is_annotation: Optional[bool] = False,
-                         keep_axis: Optional[bool] = False) -> Image:
-    """Guess image type and return guessed image types.
-
-    Args:
-        path (str): Path to image file.
-        is_annotation: Passed on to loading image.
-        keep_axis: Passed on to loading image.
-
-    Returns:
-        Union[OMETIFFImage, DefaultImage]: Loaded image.
-    """
-    return Image.load_from_path(path, is_annotation)
-
-
-def guess_load_transform_image_from_config(config: Dict, 
-                              registerer: GreedyFHist,
-                              transformation: RegistrationTransforms) -> Image:
-    """Utility function that loads images based on config object. Image
-    data can be interpreted as either image or annotation and axis can
-    be switched (might be necessary for multilabel outputs from QuPath).
-    Then applies transformation on image data. 
-
-    Args:
-        config (Dict): Config of containing image relevant information.
-        registerer (GreedyFHist): Initialized GreedyFHist instance.
-        transformation (RegistrationResult): Transformation for warping from moving to fixed image space.
-
-    Returns:
-        Union[OMETIFFImage, DefaultImage]: Warped data.
-    """
-    image = load_image_from_config(config)
-    warped_image = image.transform_data(registerer, transformation)
-    return warped_image
 
     
 def load_image_from_config(config: Dict) -> Image:
@@ -249,50 +140,17 @@ def load_histology_section_from_config(config: Dict) -> HistologySection:
 def load_base_histology_section(image_path: Optional[str] = None,
                                 mask_path: Optional[str] = None):
     if image_path is not None:
-        image = guess_and_load_image(image_path)
+        image = Image.load_from_path(image_path)
     else:
         image = None
     if mask_path is not None:
-        mask = guess_and_load_image(mask_path)
+        mask = Image.load_from_path(mask_path, True)
     else:
         mask = None
     histology_section = HistologySection(ref_image=image,
                                          ref_mask=mask)
     return histology_section
 
-
-def load_histology_section(image_path: Optional[str] = None,
-                           additional_images: List[str] = None,
-                           additional_annotations: List[str] = None,
-                           additional_pointsets: List[str] = None,
-                           additional_geojsons: List[str] = None,
-                           mask_path: Optional[str] = None):
-    if image_path is not None:
-        image = guess_and_load_image(image_path)
-    else:
-        image = None
-    if mask_path is not None:
-        mask = guess_and_load_image(mask_path)
-    else:
-        mask = None
-    additional_data = []
-    for path in additional_images:
-        ad_image = guess_and_load_image(path)
-        additional_data.append(ad_image)
-    for path in additional_annotations:
-        ad_image = guess_and_load_image(path, is_annotation=True)
-        additional_data.append(ad_image)
-    for path in additional_pointsets:
-        ps = Pointset.load_from_path(path)
-        additional_data.append(ps)
-    for path in additional_geojsons:
-        gs = GeoJsonData.load_from_path(path)
-        additional_data.append(gs)
-    histology_section = HistologySection(ref_image=image,
-                                         ref_mask=mask,
-                                         additional_data=additional_data)
-    return histology_section
-        
 
 def register(moving_image_path: Optional[str] = None,
              fixed_image_path: Optional[str] = None,
@@ -375,8 +233,8 @@ def register(moving_image_path: Optional[str] = None,
     output_directory_registrations = join(output_directory, 'registrations')
     create_if_not_exists(output_directory_registrations)
 
-    fixed_image = guess_and_load_image(fixed_image_path)
-    fixed_mask = guess_and_load_image(fixed_mask_path, is_annotation=True) if fixed_mask_path is not None else None
+    fixed_image = Image.load_from_path(fixed_image_path)
+    fixed_mask = Image.load_from_path(fixed_mask_path, is_annotation=True) if fixed_mask_path is not None else None
 
     logging.info('Loaded images. Starting registration.')
     logging.info(f'Registration options: {registration_options}')
@@ -393,14 +251,14 @@ def register(moving_image_path: Optional[str] = None,
     )
     logging.info('Registration finished.')
     if save_transform_to_file:
-        registration_result.to_file(output_directory_registrations)
+        registration_result.to_directory(output_directory_registrations)
         logging.info('Registration saved.')
 
     
     output_directory_transformation_data = join(output_directory, 'transformed_data')
     create_if_not_exists(output_directory_transformation_data)
 
-    warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result,
+    warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result.registration_transforms,
                                                                              registerer=registerer)
     warped_histology_section.to_directory(output_directory_transformation_data)
 
@@ -484,21 +342,30 @@ def apply_transformation(
 
 
 def groupwise_registration(config_path: str):
-    with open(config_path) as f:
-        config = toml.load(f)
+    if config_path is not None:
+        with open(config_path) as f:
+            config = toml.load(f)
+    else:
+        config = {}
     if 'gfh_options' in config:
-        registration_options = RegistrationOptions.parse_cmdln_dict(config['gfh_options'])
+        reg_opts = config.get('gfh_options', {})
+        skip_affine_registration = reg_opts.get('skip_affine_registration', False)
+        skip_nr_registration = reg_opts.get('skip_nonrigid_registration', False)
+        if not skip_affine_registration:
+            aff_opts = RegistrationOptions.parse_cmdln_dict(reg_opts.get('affine_registration_options', {}))
+        else:
+            aff_opts = None
+        if not skip_nr_registration:
+            nr_opts = RegistrationOptions.parse_cmdln_dict(reg_opts.get('nonrigid_registratino_options', {}))
+        else:
+            nr_opts = None
     else:
-        registration_options = RegistrationOptions.default_options()
-    if 'options' in config:
-        # TODO: Should I add collision avoidance?
-        output_directory = config['options'].get('output_directory', 'out')
-        path_to_greedy = config['options'].get('path_to_greedy', '')
-    else:
-        output_directory = 'out'
-        path_to_greedy = ''
+        aff_opts = RegistrationOptions.default_options()    
+        nr_opts = RegistrationOptions.default_options()
 
     path_to_greedy = resolve_variable('path_to_greedy', path_to_greedy, config.get('options', None), '')
+    save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)        
+    output_directory = resolve_variable('output_directory', output_directory, config.get('options', None), 'out')
     registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
 
     sections = load_sections(config['input'])
@@ -509,16 +376,19 @@ def groupwise_registration(config_path: str):
         mask = section.ref_mask.data if section.ref_mask is not None else None
         img_mask_list.append((img, mask))
     group_reg, _ = registerer.groupwise_registration(img_mask_list, 
-                                                     affine_options=registration_options)
+                                                     affine_options=aff_opts,
+                                                     nonrigid_options=nr_opts,
+                                                     skip_nonrigid_registration=skip_nr_registration)
 
     for idx, section in enumerate(sections[:-1]):
         # Replace this with section id.
         section_output_directory = join(output_directory, f'section{idx}')
         create_if_not_exists(section_output_directory)
-        section_output_directory_transform = join(section_output_directory, 'registration')
-        create_if_not_exists(section_output_directory_transform)
         transform = group_reg.get_transforms(idx)
-        transform.to_file(section_output_directory_transform)
+        if save_transform_to_file:
+            section_output_directory_transform = join(section_output_directory, 'transformations')
+            create_if_not_exists(section_output_directory_transform)
+            transform.to_directory(section_output_directory_transform)
         warped_section = section.apply_transformation(transform, registerer)
         section_output_directory_data = join(section_output_directory, 'transformed_data')
         create_if_not_exists(section_output_directory_data)
@@ -528,5 +398,8 @@ def groupwise_registration(config_path: str):
     create_if_not_exists(section_output_directory)
     section_output_directory_data = join(section_output_directory, 'transformed_data')
     create_if_not_exists(section_output_directory_data)
-    sections[-1].to_directory(section_output_directory_data)
-    
+    sections[-1].to_directory(section_output_directory_data)        
+    if save_transform_to_file:
+        output_directory_group_transforms = join(output_directory, 'group_transforms')
+        create_if_not_exists(output_directory_group_transforms)
+        group_reg.to_file(output_directory_group_transforms)    

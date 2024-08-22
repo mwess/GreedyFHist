@@ -14,10 +14,8 @@ import subprocess
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import geojson
-import numpy
-import numpy as np
-import SimpleITK
-import SimpleITK as sitk
+import numpy, numpy as np
+import SimpleITK, SimpleITK as sitk
 
 from greedyfhist.utils.io import create_if_not_exists, write_mat_to_file, clean_if_exists
 from greedyfhist.utils.image import (
@@ -34,8 +32,6 @@ from greedyfhist.utils.image import (
     resample_image_sitk,
     derive_resampling_factor,
     realign_displacement_field,
-    translation_length,
-    get_com_offset,
     read_affine_transform
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps, affine_registration, deformable_registration
@@ -67,8 +63,8 @@ class GroupwiseRegResult:
 
     affine_transform: List['RegistrationTransforms']
     reverse_affine_transform: List['RegistrationTransforms']
-    deformable_transform: List['RegistrationTransforms']
-    reverse_deformable_transform: List['RegistrationTransforms']
+    nonrigid_transform: List['RegistrationTransforms']
+    reverse_nonrigid_transform: List['RegistrationTransforms']
 
     def __get_transform_to_fixed_image(self,
                                        source:int) -> 'RegistrationTransforms':
@@ -82,8 +78,8 @@ class GroupwiseRegResult:
         """
         # TODO: At the moment only one direction works.
         transforms = self.affine_transform[source:]
-        if self.deformable_transform is not None and len(self.deformable_transform) > 0:
-            transforms.append(self.deformable_transform[source])
+        if self.nonrigid_transform is not None and len(self.nonrigid_transform) > 0:
+            transforms.append(self.nonrigid_transform[source])
         # Composite transforms
         composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
         composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
@@ -92,7 +88,8 @@ class GroupwiseRegResult:
 
     def get_transforms(self,
                        source: int,
-                       target: Optional[int] = None) -> 'RegistrationTransforms':
+                       target: Optional[int] = None,
+                       skip_nonrigid: bool = False) -> 'RegistrationTransforms':
         """Retrieves registration from one moving image indexed by 'source'.
 
         Args:
@@ -104,28 +101,20 @@ class GroupwiseRegResult:
         if target is None:
             return self.__get_transform_to_fixed_image(source)
         if source < target:
-            strt_idx = source
-            stp_idx = target - 1
             reverse = False
         else:
-            strt_idx = target - 1
-            stp_idx = source
             reverse = True
 
         if not reverse:
-            # transforms = self.affine_transform[strt_idx:stp_idx]
-            # transforms = self.affine_transform[source:target]
             transforms = [self.affine_transform[x] for x in range(source, target)]
         else:
             transforms = [self.reverse_affine_transform[x] for x in range(source - 1, target - 1, -1)]
 
-        # TODO: At the moment only one direction works.
-        # transforms = self.affine_transform[source:]
-        if self.deformable_transform is not None and len(self.deformable_transform) > 0:
+        if not skip_nonrigid and self.nonrigid_transform is not None and len(self.nonrigid_transform) > 0:
             if not reverse:
-                transforms.append(self.deformable_transform[target-1])
+                transforms.append(self.nonrigid_transform[target-1])
             else:
-                transforms.append(self.reverse_deformable_transform[target])
+                transforms.append(self.reverse_nonrigid_transform[target])
             
         # Composite transforms
         composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
@@ -133,6 +122,52 @@ class GroupwiseRegResult:
         reg_result = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
         return reg_result
     
+    def to_file(self, path: str):
+        aff_dir = join(path, 'affine_transforms')
+        GroupwiseRegResult.__save_transforms_to_file(self.affine_transform, aff_dir)
+        aff_rev_dir = join(path, 'reverse_affine_transforms')
+        GroupwiseRegResult.__save_transforms_to_file(self.reverse_affine_transform, aff_rev_dir)
+        nr_dir = join(path, 'nonrigid_transforms')
+        GroupwiseRegResult.__save_transforms_to_file(self.nonrigid_transform, nr_dir)
+        nr_rev_dir = join(path, 'reverse_nonrigid_transforms')
+        GroupwiseRegResult.__save_transforms_to_file(self.reverse_nonrigid_transform, nr_rev_dir)
+    
+    @staticmethod
+    def __save_transforms_to_file(transform_list: List['RegistrationTransforms'], path: str):
+        create_if_not_exists(path)
+        for idx, transform in enumerate(transform_list):
+            dir_i = join(path, f'{idx}')
+            create_if_not_exists(dir_i)
+            transform.to_directory(dir_i)
+
+    @staticmethod
+    def __load_transforms_from_dir(path: str) -> List['GroupwiseRegResult']:
+        sub_dirs = os.listdir(path)
+        sub_dirs = sorted(sub_dirs, lambda x: int(sub_dirs))
+        transforms = []
+        for sub_dir in sub_dirs:
+            path = join(path, sub_dir)
+            transform = RegistrationTransforms.load(path)
+            transforms.append(transform)
+        return transforms
+
+    @staticmethod
+    def load(path: str) -> 'GroupwiseRegResult':
+        aff_dir = join(path, 'affine_transforms')
+        aff_transforms  = GroupwiseRegResult.__load_transforms_from_dir(aff_dir)
+        rev_aff_dir = join(path, 'reverse_affine_transforms')
+        rev_aff_transforms = GroupwiseRegResult.__load_transforms_from_dir(rev_aff_dir)
+        nr_dir = join(path, 'nonrigid_transforms')
+        nr_transforms = GroupwiseRegResult.__load_transforms_from_dir(nr_dir)
+        nr_rev_dir = join(path, 'reverse_nonrigid_transforms')
+        rev_nr_transforms = GroupwiseRegResult.__load_transforms_from_dir(nr_rev_dir)
+        return GroupwiseRegResult(
+            affine_transform=aff_transforms,
+            reverse_affine_transform=rev_aff_transforms,
+            nonrigid_transform=nr_transforms,
+            reverse_nonrigid_transform=rev_nr_transforms
+        )
+
 
 @dataclass
 class GFHTransform:
@@ -207,16 +242,16 @@ class RegistrationResult:
 
     reverse_registration_transforms: Optional['RegistrationTransforms']
 
-    def to_file(self, path: str):
+    def to_directory(self, path: str):
         """
         Save 'RegistrationResult' to file.
         """
         create_if_not_exists(path)
         reg_path = join(path, 'registration_transform')
-        self.registration_transforms.to_file(reg_path)
+        self.registration_transforms.to_directory(reg_path)
         if self.reverse_registration_transforms is not None:
             rev_reg_path = join(path, 'reverse_registration_transform')
-            self.reverse_registration_transforms.to_file(rev_reg_path)
+            self.reverse_registration_transforms.to_directory(rev_reg_path)
 
     @staticmethod
     def load(path: str) -> 'RegistrationResult':
@@ -266,7 +301,7 @@ class RegistrationTransforms:
     reg_params: Optional[Dict] = None
     
     # TODO: Can I add cmdln_returns and reg_params somehow
-    def to_file(self, path: str):
+    def to_directory(self, path: str):
         """Saves 'RegistrationTransforms' to file.
 
         Args:
@@ -927,7 +962,7 @@ class GreedyFHist:
                              reg_params,
                              paths)
         
-        if options.compute_reverse_nonrigid_registration:
+        if options.do_nonrigid_registration and options.compute_reverse_nonrigid_registration:
             path_output = join(path_temp, 'output', 'registrations_rev')
             path_output, subdir_num = derive_subdir(path_output)
             create_if_not_exists(path_output)
@@ -1104,7 +1139,6 @@ class GreedyFHist:
         small_fixed = sitk.ReadImage(fixed_img_preprocessed.image_path)
         empty_fixed_img = small_fixed[:,:]
         empty_fixed_img[:,:] = 0
-        # print(f'Small fixed size in postprocessing: {small_fixed.GetSize()}')
         path_to_small_ref_image = join(path_output, 'small_ref_image.nii.gz')
         sitk.WriteImage(empty_fixed_img, path_to_small_ref_image)
 
@@ -1155,7 +1189,7 @@ class GreedyFHist:
 
                 forward_deformable_transform = realign_displacement_field(path_big_warp)
                 backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
-            elif options.affine_registration_options.keep_affine_transform_unbounded and options.do_affine_registration:
+            elif options.do_affine_registration and options.affine_registration_options.keep_affine_transform_unbounded:
                 # First rescale affine transforms
                 aff_2_orig_resample = options.affine_registration_options.resolution[0] / moving_img.shape[0] * 100
                 aff_2_orig_factor = 100 / aff_2_orig_resample
@@ -1279,8 +1313,8 @@ class GreedyFHist:
     def groupwise_registration(self,
                                image_mask_list: List[Union[Tuple[numpy.array, Optional[numpy.array]]]],
                                affine_options: Optional[RegistrationOptions] = None,
-                               nonrigid_option: Optional[RegistrationOptions] = None,
-                               skip_deformable_registration: bool = False,
+                               nonrigid_options: Optional[RegistrationOptions] = None,
+                               skip_nonrigid_registration: bool = False,
                                ) -> Tuple[GroupwiseRegResult, List[numpy.array]]:
         """Performs groupwise registration on a provided image list. For each image, an optional mask can be provided. Fixed image is last image in image_mask_list.
         Every other image is a moving image. Groupwise registration is performed in 2 steps:
@@ -1300,10 +1334,9 @@ class GreedyFHist:
         """
         if affine_options is None:
             affine_options = RegistrationOptions()
-            affine_options.do_nonrigid_registration = False
-        if nonrigid_option is None:
-            nonrigid_option = RegistrationOptions()
-        nonrigid_option.do_affine_registration = False
+        if nonrigid_options is None:
+            nonrigid_options = RegistrationOptions()
+        nonrigid_options.do_affine_registration = False
         affine_options.do_nonrigid_registration = False
         # Stage1: Affine register along the the sequence.
         moving_tuple = image_mask_list[0]
@@ -1327,7 +1360,7 @@ class GreedyFHist:
             moving_image = fixed_image
             moving_mask = fixed_mask
         # Stage 2: Take the matched images and do a nonrigid registration
-        if skip_deformable_registration:
+        if skip_nonrigid_registration:
             g_res = GroupwiseRegResult(affine_transform_lists, reverse_affine_transform_list, [], [])
             return g_res, registered_images
         nonrigid_transformations = []
@@ -1350,11 +1383,12 @@ class GreedyFHist:
             composited_fixed_transform = compose_transforms([x.forward_transform for x in affine_transform_lists][idx:])
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
-            nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_option)
+            nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_options)
             deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration_transforms.forward_transform, 'LINEAR')
             nonrigid_warped_images.append(deformable_warped_image)
             nonrigid_transformations.append(nonrigid_reg_result.registration_transforms)
             reverse_nonrigid_transformations.append(nonrigid_reg_result.reverse_registration_transforms)
+        reverse_nonrigid_transformations = reverse_nonrigid_transformations[::-1]
         groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, 
                                                             reverse_affine_transform_list,
                                                             nonrigid_transformations,
