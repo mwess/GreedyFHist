@@ -2,9 +2,10 @@ import logging
 from os.path import join
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import cv2
 import toml
 
-from greedyfhist.utils.io import create_if_not_exists
+from greedyfhist.utils.io import create_if_not_exists, write_to_ometiffile
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms
 from greedyfhist.options.options import RegistrationOptions
 from greedyfhist.data_types import Pointset, GeoJsonData, HistologySection, Image
@@ -94,7 +95,7 @@ def load_data_from_config(config: Dict) -> Union[Image, Pointset, GeoJsonData]:
     type_ = config.get('type', None)
     if type_ is None:
         type_ = guess_type(config['path'])
-    elif type_ == 'geojson':
+    if type_ == 'geojson':
         return GeoJsonData.load_data(config)
     elif type_ == 'pointset':
         return Pointset.load_data(config)
@@ -261,6 +262,19 @@ def register(moving_image_path: Optional[str] = None,
     warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result.registration_transforms,
                                                                              registerer=registerer)
     warped_histology_section.to_directory(output_directory_transformation_data)
+    output_directory_transformation_data_prep = join(output_directory_transformation_data, 'preprocessing_data')
+    create_if_not_exists(output_directory_transformation_data_prep)
+    # Try writing masks to file.
+    try:
+        moving_preprocessing_mask = registration_result.registration_transforms.reg_params.moving_preprocessing_params['moving_img_mask']
+        path = join(output_directory_transformation_data_prep, 'moving_mask.png')
+        cv2.imwrite(path, moving_preprocessing_mask)
+        fixed_preprocessing_mask = registration_result.registration_transforms.reg_params.fixed_preprocessing_params['fixed_img_mask']
+        path = join(output_directory_transformation_data_prep, 'fixed_mask.png')
+        cv2.imwrite(path, fixed_preprocessing_mask)
+    except Exception:
+        print('Masks could not be stored due to error.')
+
 
   
 def apply_transformation(
@@ -347,25 +361,12 @@ def groupwise_registration(config_path: str):
             config = toml.load(f)
     else:
         config = {}
-    if 'gfh_options' in config:
-        reg_opts = config.get('gfh_options', {})
-        skip_affine_registration = reg_opts.get('skip_affine_registration', False)
-        skip_nr_registration = reg_opts.get('skip_nonrigid_registration', False)
-        if not skip_affine_registration:
-            aff_opts = RegistrationOptions.parse_cmdln_dict(reg_opts.get('affine_registration_options', {}))
-        else:
-            aff_opts = None
-        if not skip_nr_registration:
-            nr_opts = RegistrationOptions.parse_cmdln_dict(reg_opts.get('nonrigid_registratino_options', {}))
-        else:
-            nr_opts = None
-    else:
-        aff_opts = RegistrationOptions.default_options()    
-        nr_opts = RegistrationOptions.default_options()
+    reg_opts = config.get('gfh_options', {})
+    options = RegistrationOptions.parse_cmdln_dict(reg_opts)
 
-    path_to_greedy = resolve_variable('path_to_greedy', path_to_greedy, config.get('options', None), '')
+    path_to_greedy = resolve_variable('path_to_greedy', None, config.get('options', None), '')
     save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)        
-    output_directory = resolve_variable('output_directory', output_directory, config.get('options', None), 'out')
+    output_directory = resolve_variable('output_directory', None, config.get('options', None), 'out')
     registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
 
     sections = load_sections(config['input'])
@@ -375,11 +376,8 @@ def groupwise_registration(config_path: str):
         img = section.ref_image.data
         mask = section.ref_mask.data if section.ref_mask is not None else None
         img_mask_list.append((img, mask))
-    group_reg, _ = registerer.groupwise_registration(img_mask_list, 
-                                                     affine_options=aff_opts,
-                                                     nonrigid_options=nr_opts,
-                                                     skip_nonrigid_registration=skip_nr_registration)
-
+    group_reg, _ = registerer.groupwise_registration(img_mask_list,
+                                                     options=options)
     for idx, section in enumerate(sections[:-1]):
         # Replace this with section id.
         section_output_directory = join(output_directory, f'section{idx}')

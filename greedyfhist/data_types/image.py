@@ -47,6 +47,6 @@ class Image:
     @classmethod
     def load_from_path(cls, path: str, is_annotation: bool = False) -> 'Image':
         data, metadata = read_image(path, is_annotation)
-        if is_annotation:
+        if is_annotation and len(data.shape) == 3:
             data = np.moveaxis(data, 0, 2)
         return cls(data, path, is_annotation, metadata)

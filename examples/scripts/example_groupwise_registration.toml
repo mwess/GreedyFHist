@@ -12,7 +12,6 @@ do_affine_registration = true
 do_nonrigid_registration = true
 temporary_directory = 'tmp'
 remove_temporary_directory = true
-yolo_segmentation_min_size = 5000
 
 [gfh_options.affine_registration_options]
 

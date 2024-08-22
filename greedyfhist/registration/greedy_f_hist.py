@@ -1312,19 +1312,27 @@ class GreedyFHist:
 
     def groupwise_registration(self,
                                image_mask_list: List[Union[Tuple[numpy.array, Optional[numpy.array]]]],
-                               affine_options: Optional[RegistrationOptions] = None,
-                               nonrigid_options: Optional[RegistrationOptions] = None,
-                               skip_nonrigid_registration: bool = False,
+                               options: Optional[RegistrationOptions] = None,
                                ) -> Tuple[GroupwiseRegResult, List[numpy.array]]:
-        """Performs groupwise registration on a provided image list. For each image, an optional mask can be provided. Fixed image is last image in image_mask_list.
-        Every other image is a moving image. Groupwise registration is performed in 2 steps:
-            1. Pairwise affine registration between all adjacent images is computed and applied such that each moving image is affinely registered onto the fixed image.
-            2. Nonrigid registration between each moving image and the fixed image.
+        """Performs groupwise registration on a provided image list. 
+        For each image, an optional mask can be provided. Fixed 
+        image is last image in image_mask_list.
+
+        Every other image is a moving image. Groupwise registration 
+        is performed in 2 steps:
+            1. Pairwise affine registration between all adjacent images
+               is computed and applied such that each moving image is 
+               affinely registered onto the fixed image.
+            2. Nonrigid registration between each moving image and 
+               the fixed image.
 
 
         Args:
             image_mask_list (List[Tuple[numpy.array, Optional[numpy.array]]]): List of images. Last image is fixed image. Every other image is a moving image. For each image, 
             an optional mask can be supplied.
+            options (Optional[RegistrationOptions], optional): Registration options. At this moment, the affine registration is
+            always executed. `options.do_affine_registration` is ignored, but the nonrigid registration can be disabled.
+            Defaults to None.
             affine_options (Optional[RegistrationOptions], optional): Affine registration options. Defaults to None.
             nonrigid_option (Optional[RegistrationOptions], optional): Nonrigid registration options. Defaults to None.
             skip_deformable_registration (bool, optional): Defaults to False.
@@ -1332,12 +1340,9 @@ class GreedyFHist:
         Returns:
             Tuple[GroupwiseRegResult, List[numpy.array]]: GroupwiseRegResult contains all computed transformations. List of images are either affine or nonrigid warped images.
         """
-        if affine_options is None:
-            affine_options = RegistrationOptions()
-        if nonrigid_options is None:
-            nonrigid_options = RegistrationOptions()
-        nonrigid_options.do_affine_registration = False
-        affine_options.do_nonrigid_registration = False
+        if options is None:
+            options = RegistrationOptions()
+        do_nr_registration = options.do_nonrigid_registration
         # Stage1: Affine register along the the sequence.
         moving_tuple = image_mask_list[0]
         if isinstance(moving_tuple, tuple):
@@ -1345,8 +1350,10 @@ class GreedyFHist:
         else:
             moving_image = moving_tuple
             moving_mask = None
-        registered_images = []
         affine_transform_lists = []
+        # We set this to false for the affine part and set it back to the original value afterwards.
+        options.do_nonrigid_registration = False
+        options.do_affine_registration = True
         reverse_affine_transform_list = []
         for fixed_tuple in image_mask_list[1:]:
             if isinstance(fixed_tuple, tuple):
@@ -1354,15 +1361,17 @@ class GreedyFHist:
             else:
                 fixed_image = fixed_tuple
                 fixed_mask = None
-            reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, affine_options)
+            reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, options)
             affine_transform_lists.append(reg_result.registration_transforms)
             reverse_affine_transform_list.append(reg_result.reverse_registration_transforms)
             moving_image = fixed_image
             moving_mask = fixed_mask
         # Stage 2: Take the matched images and do a nonrigid registration
-        if skip_nonrigid_registration:
+        if not do_nr_registration:
             g_res = GroupwiseRegResult(affine_transform_lists, reverse_affine_transform_list, [], [])
-            return g_res, registered_images
+            return g_res, None
+        options.do_affine_registration = False
+        options.do_nonrigid_registration = True
         nonrigid_transformations = []
         reverse_nonrigid_transformations = []
         nonrigid_warped_images = []
@@ -1383,7 +1392,7 @@ class GreedyFHist:
             composited_fixed_transform = compose_transforms([x.forward_transform for x in affine_transform_lists][idx:])
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
-            nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=nonrigid_options)
+            nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=options)
             deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration_transforms.forward_transform, 'LINEAR')
             nonrigid_warped_images.append(deformable_warped_image)
             nonrigid_transformations.append(nonrigid_reg_result.registration_transforms)

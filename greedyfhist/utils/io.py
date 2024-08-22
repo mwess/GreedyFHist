@@ -99,10 +99,18 @@ def write_to_ometiffile(img: numpy.array,
             'PhysicalSizeXUnit': 'px',
             'PhysicalSizeY': 1,
             'PhysicalSizeYUnit': 'px',
-            'Interleaved': 'true'
+            'Interleaved': 'true',
+            'channels': [],
+            'tiff_data': []
         }
         if is_annotation:
             metadata['Interleaved'] = 'false'
+    ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
+    if path.endswith('.ome.tif') or path.endswith('.ome.tiff'):
+        target_fname = os.path.basename(path)
+        for tiff_data in metadata['tiff_data']:
+            for uuid_node in tiff_data.findall('ns0:UUID', ns):
+                uuid_node.attrib['FileName'] = target_fname
     # Taken from https://forum.image.sc/t/writing-qupath-bio-formats-compatible-pyramidal-image-with-libvips/51223/6
     if len(img.shape) == 3:
         w, h, c = img.shape
