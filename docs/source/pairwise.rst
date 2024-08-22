@@ -102,7 +102,8 @@ Using this example we can run ``greedyfhist register -c configuration.toml`` and
 
 
 ``registrations`` contains the transformation from moving to fixed_image space. ``transformed_data`` contains the transformed moving image and 
-additionally transformed data. If possible, masks used during preprocessing are also stored.
+additionally transformed data. If possible, masks used during preprocessing are also stored. GreedyFHist stores transformed image data as 
+`ome.tif` files using `pyvips`.
 
 Full example configuration.
 
