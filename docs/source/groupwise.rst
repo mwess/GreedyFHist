@@ -91,7 +91,6 @@ A full example configuration might look like this:
     [[input.section1.additional_data]]
 
     path = 'ann1.ome.tiff'
-    type = 'tiff'
 
     [[input.section1.additional_data]]
 
@@ -124,13 +123,15 @@ GreedyFHist's groupwise registration can be executed the following way:
 
 
 
-This will result in the following output structure:
+This will result in the following output structure (shortened):
 
 .. code-block::
 
     group_out/
+    ├── group_transforms
+    │   ...
     ├── section0
-    │   ├── registration
+    │   ├── transformations
     │   │   ├── fixed_transform
     │   │   │   ├── attributes.json
     │   │   │   └── transform.txt
@@ -138,11 +139,11 @@ This will result in the following output structure:
     │   │       ├── attributes.json
     │   │       └── transform.txt
     │   └── transformed_data
-    │       ├── hes_mask.tif
-    │       ├── hes_ps.csv
-    │       └── hes.tif
+    │       ├── hes_mask.ome.tif
+    │       ├── hes.ome.tif
+    │       └── hes_ps.csv
     ├── section1
-    │   ├── registration
+    │   ├── transformations
     │   │   ├── fixed_transform
     │   │   │   ├── attributes.json
     │   │   │   └── transform.txt
@@ -150,15 +151,16 @@ This will result in the following output structure:
     │   │       ├── attributes.json
     │   │       └── transform.txt
     │   └── transformed_data
-    │       ├── mts_mask.tif
-    │       ├── mts_ps.csv
-    │       └── mts.tif
+    │       ├── mts_mask.ome.tif
+    │       ├── mts.ome.tif
+    │       └── mts_ps.csv
     └── section2
         └── transformed_data
-            └── ihc.tif
+            └── ihc.ome.tif
 
 
-Subfolders named ``registration`` contain the transformation parameters to the fixed image space. E.g. ``group_out/section0/registration`` defines the transformation from the image space of section0 to the image space of section1. All registered data is stored in ``transformed_data`` subfolders.
+`sectionX` contains the registered data as well the transformation from `sectionX` to fixed section. `group_out` contains all computed
+transformations. 
 
 
 -------------------------------------------------------

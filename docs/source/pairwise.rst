@@ -2,7 +2,8 @@
 Pairwise registration example
 ============================= 
 
-In this section we show examples of pairwise registration using the command line interface. We give one example using arguments and one example using a 
+In this section we show examples of pairwise registration using the command line interface. We give one 
+example using arguments and one example using a 
 configuration file.
 
 ---------------------------
@@ -10,10 +11,12 @@ Using commandline arguments
 ---------------------------
 
 
-Using the commandline option requires a moving and fixed image. Registration options can be configured in the ``example_registration.toml`` file. Additional 
-data for transformations can be passed as ``tif-images``, ``tif-annotations``, ``default-images``, ``default-annotations``, ``pointsets``, ``geojsons``.  
-`default-images` refers to any image that is not in `tif` format. GreedyFHist supports most common image formats, but if any are missing, feel free to post 
-an issue. `default-annotations` are annotation masks with the last image channel used to denote classes, e.g., W x H x C.
+Using the commandline option requires a moving and fixed image. Registration options can be 
+configured in the ``example_registration.toml`` file. Additional 
+data for transformations can be passed as ``imagew``, ``annotationw``, ``pointsets``, ``geojsons``. 
+GreedyFHist supports most common image formats, but if any are missing, feel free to post 
+an issue. `annotations` are annotation masks with the last image channel used to denote classes, e.g., W x H x C, 
+if a multichannel image is used.
 
 An example call could look like this:
 
@@ -23,7 +26,7 @@ An example call could look like this:
       --moving-image ../pairwise_examples/images/moving_image.ome.tif \
       --fixed-image ../pairwise_examples/images/fixed_image.ome.tif \
       --config example_registration.toml \
-      --tif-annotations ../pairwise_examples/annotations/moving_annotationmco.ome.tiff \
+      --annotations ../pairwise_examples/annotations/moving_annotationmco.ome.tiff \
       --pointsets ../pairwise_examples/annotations/moving_pointset.csv \
       --geojsons ../pairwise_examples/annotations/moving_annotation.geojson                            
 
@@ -32,8 +35,9 @@ An example call could look like this:
 Using config.toml
 -----------------
 
-Another option for using the commandline is using the ``configuration.toml`` without any additional arguments. If moving and fixed image are supplied as 
-command line arguments, any input data in ``[input]`` in the ``configuration.toml`` is ignored. Sections ``gfh_options`` and ``options`` are 
+Another option for using the commandline is using the ``configuration.toml`` without any additional 
+arguments. If moving and fixed image are supplied as command line arguments, any input data 
+in ``[input]`` in the ``configuration.toml`` is ignored. Sections ``gfh_options`` and ``options`` are 
 explained in config_example. The ``input`` section can be formulated as follows:
 
 
@@ -46,14 +50,11 @@ explained in config_example. The ``input`` section can be formulated as follows:
     [input.moving_image.reference_image]
 
     path = '../pairwise_examples/images/moving_image.ome.tif'
-    type = 'tif'
 
     [[input.moving_image.additional_data]]
 
     path = '../pairwise_examples/annotations/some_annotation.ome.tif'
-    type = 'tif'
     is_annotation = true
-    keep_axis = false
 
     [[input.moving_image.additional_data]]
 
@@ -62,7 +63,6 @@ explained in config_example. The ``input`` section can be formulated as follows:
     [input.fixed_image.reference_image]
 
     path = '../pairwise_examples/images/fixed_image.ome.tif'
-    type = 'tif'
     ...
 
 
@@ -79,19 +79,30 @@ Using this example we can run ``greedyfhist register -c configuration.toml`` and
 
     out/
     ├── registrations
-    │   ├── fixed_transform
-    │   │   ├── attributes.json
-    │   │   └── transform.txt
-    │   └── moving_transform
-    │       ├── attributes.json
-    │       └── transform.txt
+    │   ├── registration_transform
+    │   │   ├── fixed_transform
+    │   │   │   ├── attributes.json
+    │   │   │   └── transform.txt
+    │   │   └── moving_transform
+    │   │       ├── attributes.json
+    │   │       └── transform.txt
+    │   └── reverse_registration_transform
+    │       ├── fixed_transform
+    │       │   ├── attributes.json
+    │       │   └── transform.txt
+    │       └── moving_transform
+    │           ├── attributes.json
+    │           └── transform.txt
     └── transformed_data
-        ├── more_annotations.geojson
         ├── moving_image.ome.tif
-        └── some_annotations.ome.tiff
+        ├── moving_pointset.csv
+        └── preprocessing_data
+            ├── fixed_mask.png
+            └── moving_mask.png        
+
 
 ``registrations`` contains the transformation from moving to fixed_image space. ``transformed_data`` contains the transformed moving image and 
-additionally transformed data.
+additionally transformed data. If possible, masks used during preprocessing are also stored.
 
 Full example configuration.
 
