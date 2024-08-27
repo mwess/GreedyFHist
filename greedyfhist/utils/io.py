@@ -74,7 +74,9 @@ def write_to_ometiffile(img: numpy.array,
                      is_annotation: bool = False,
                      tile: bool = True,
                      tile_size: int = 512,
-                     pyramid: bool = True):
+                     pyramid: bool = True,
+                     skip_channel: bool = False,
+                     skip_tiffdata: bool = False):
     """
     Writes an image as an ometif file. If the image to store was 
     originally extracted as an ome.tif, the metadata from the 
@@ -103,8 +105,8 @@ def write_to_ometiffile(img: numpy.array,
             'channels': [],
             'tiff_data': []
         }
-        if is_annotation:
-            metadata['Interleaved'] = 'false'
+    if is_annotation:
+        metadata['Interleaved'] = 'false'
     ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
     if path.endswith('.ome.tif') or path.endswith('.ome.tiff'):
         target_fname = os.path.basename(path)
@@ -117,7 +119,7 @@ def write_to_ometiffile(img: numpy.array,
     else:
         c = 1
         w, h = img.shape
-    if is_annotation:
+    if is_annotation and len(img.shape) == 3:
         c, w, h = w, h, c
     img_vips = pyvips.Image.new_from_array(img)
     xml_string = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -147,10 +149,12 @@ def write_to_ometiffile(img: numpy.array,
     root = ET.fromstring(xml_string)
     ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
     elem = root.find('*/ns0:Pixels', ns)
-    for channel_ in metadata['channels']:
-        elem.append(channel_)
-    for tiff_data_ in metadata['tiff_data']:
-        elem.append(tiff_data_)
+    if not skip_channel:
+        for channel_ in metadata['channels']:
+            elem.append(channel_)
+    if not skip_tiffdata:
+        for tiff_data_ in metadata['tiff_data']:
+            elem.append(tiff_data_)
     ome_metadata_xml_string = ET.tostring(root, encoding='unicode')
     img_vips.set_type(pyvips.GValue.gint_type, "page-height", img_vips.height)
     img_vips.set_type(pyvips.GValue.gstr_type, "image-description", ome_metadata_xml_string)
