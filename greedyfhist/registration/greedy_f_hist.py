@@ -35,7 +35,7 @@ from greedyfhist.utils.image import (
     read_affine_transform
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps, affine_registration, deformable_registration
-from greedyfhist.segmentation.segmenation import load_yolo_segmentation
+from greedyfhist.segmentation import load_yolo_segmentation
 from greedyfhist.options import RegistrationOptions, PreprocessingOptions
 
 
