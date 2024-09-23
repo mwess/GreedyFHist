@@ -71,7 +71,7 @@ Alternatively, a docker-image for ``greedyfhist`` can be downloaded:
 
 .. code-block:: bash
 
-    docker pull mwess89/greedyfhist:0.0.1
+    docker pull mwess89/greedyfhist:0.0.2
 
 Or the docker image can be built as well:
 
