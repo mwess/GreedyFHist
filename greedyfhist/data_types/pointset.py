@@ -52,7 +52,7 @@ class Pointset:
     def to_numpy(self) -> numpy.array:
         return self.data[[self.x_axis, self.y_axis]].to_numpy()
 
-    def to_file(self, path):
+    def to_file(self, path: str):
         index = True if self.index_col is not None else False
         header = True if self.header is not None else False
         self.data.to_csv(path, index=index, header=header)
@@ -62,7 +62,7 @@ class Pointset:
         output_path = join(directory, fname)
         self.to_file(output_path)
 
-    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms):
+    def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms) -> 'Pointset':
         pointset_data = self.to_numpy()
         warped_pointset_data = registerer.transform_pointset(pointset_data, transformation.backward_transform)
         warped_data = self.data.copy()
@@ -90,7 +90,7 @@ class Pointset:
         return cls(data, path, x_axis, y_axis, index_col, header)
 
     @classmethod
-    def load_from_path(cls, path, x_axis='x', y_axis='y', index_col=None, header=0):
+    def load_from_path(cls, path: str, x_axis='x', y_axis='y', index_col=None, header=0) -> 'Pointset':
         data = pd.read_csv(path, index_col=index_col, header=header)
         if header is None:
             data.rename(columns={0: x_axis, 1: y_axis}, inplace=True)

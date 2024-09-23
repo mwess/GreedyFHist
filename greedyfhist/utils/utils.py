@@ -37,7 +37,7 @@ def composite_warps(path_to_greedy: str,
                     path_small_warp: Optional[str],
                     path_small_ref_img: str,
                     path_small_composite_warp: str,
-                    invert=False):
+                    invert=False) -> subprocess.CompletedProcess:
     
     args = {}
     args['-rf'] = path_small_ref_img
@@ -70,7 +70,7 @@ def affine_registration(path_to_greedy: str,
                         offset:int,
                         ia:str,
                         options: AffineGreedyOptions,
-                        ):
+                        ) -> subprocess.CompletedProcess:
     """Calls greedy's affine registration function.
 
     Args:
@@ -113,9 +113,9 @@ def deformable_registration(path_to_greedy:str,
                             options: NonrigidGreedyOptions,
                             output_warp:Optional[str]=None,
                             output_inv_warp:Optional[str]=None,
-                            affine_pre_transform=None,
+                            affine_pre_transform: Optional[str] = None,
                             ia=None
-                            ):
+                            ) -> subprocess.CompletedProcess:
     """Calls the deformable registration command of greedy.
 
     Args:

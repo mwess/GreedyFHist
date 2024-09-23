@@ -17,27 +17,6 @@ def groupwise_registration(config):
     cmdln_processor.groupwise_registration(config)
 
 
-# @click.command()
-# @click.option('--moving-image', '-m', type=click.Path())
-# @click.option('--fixed-images', '-f', type=click.Path(), multiple=True)
-# @click.option('--output-directory', '-o', type=click.Path())
-# @click.option('--path-to-greedy', '-g', type=click.Path())
-# @click.option('--config', '-c', type=click.Path())
-# def groupwise_registration_simple(moving_images=None,
-#                                   fixed_image=None,
-#                                   output_directory=None,
-#                                   path_to_greedy=None,
-#                                   config=None):
-#     cmdln_processor.groupwise_registration_from_cmdln(
-#         moving_image_paths=moving_images,
-#         fixed_image_path=fixed_image,
-#         output_directory=output_directory,
-#         path_to_greedy=path_to_greedy,
-#         config_path=config
-#     )
-
-
-
 @click.command()
 @click.option('--moving-image', '-m', type=click.Path())
 @click.option('--fixed-image', '-f', type=click.Path())

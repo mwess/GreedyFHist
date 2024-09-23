@@ -12,7 +12,7 @@ from greedyfhist.utils.io import read_image, write_to_ometiffile
 @dataclass
 class Image:
 
-    data: numpy.array
+    data: numpy.ndarray
     path: str
     is_annotation: bool = False
     metadata: Optional[Dict] = None
@@ -39,7 +39,7 @@ class Image:
         write_to_ometiffile(self.data, path, self.metadata, self.is_annotation)
 
     @classmethod
-    def load_data_from_config(cls, dct):
+    def load_data_from_config(cls, dct: dict) -> 'Image':
         path = dct['path']
         is_annotation = dct.get('is_annotation', False)
         return Image.load_from_path(path, is_annotation)
