@@ -263,3 +263,9 @@ def translation_length(x: float, y: float) -> float:
     """
     
     return np.sqrt(np.square(x) + np.square(y))
+
+
+def pad_image_square(img: numpy.array) -> numpy.array:
+    max_dim = np.max(img.shape[:2])
+    padding = get_padding_params(img, max_dim)
+    return pad_asym(img, padding)

@@ -1,8 +1,7 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import cv2
-import numpy
-import numpy as np
+import numpy, numpy as np
 
 
 def postprocess(preds: Tuple[numpy.array, numpy.array], 
@@ -66,7 +65,7 @@ def postprocess(preds: Tuple[numpy.array, numpy.array],
     else:
         return [], [], []
 
-def masks2segments(masks):
+def masks2segments(masks: numpy.ndarray) -> List[numpy.ndarray]:
     """
     It takes a list of masks(n,h,w) and returns a list of segments(n,xy) (Borrowed from
     https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L750)
@@ -87,7 +86,7 @@ def masks2segments(masks):
         segments.append(c.astype("float32"))
     return segments
 
-def crop_mask(masks, boxes):
+def crop_mask(masks: numpy.ndarray, boxes: numpy.ndarray) -> numpy.ndarray:
     """
     It takes a mask and a bounding box, and returns a mask that is cropped to the bounding box. (Borrowed from
     https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L599)
@@ -105,7 +104,10 @@ def crop_mask(masks, boxes):
     c = np.arange(h, dtype=x1.dtype)[None, :, None]
     return masks * ((r >= x1) * (r < x2) * (c >= y1) * (c < y2))
 
-def process_mask(protos, masks_in, bboxes, im0_shape):
+def process_mask(protos: numpy.ndarray, 
+                 masks_in: numpy.ndarray, 
+                 bboxes: numpy.ndarray, 
+                 im0_shape: Tuple[int, int, int]):
     """
     Takes the output of the mask head, and applies the mask to the bounding boxes. This produces masks of higher quality
     but is slower. (Borrowed from https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L618)
@@ -127,7 +129,9 @@ def process_mask(protos, masks_in, bboxes, im0_shape):
     masks = crop_mask(masks, bboxes)
     return np.greater(masks, 0.5)
 
-def scale_mask(masks, im0_shape, ratio_pad=None):
+def scale_mask(masks: numpy.ndarray, 
+               im0_shape: Tuple[int, int, int], 
+               ratio_pad: Optional[Tuple[int, int]] = None):
     """
     Takes a mask, and resizes it to the original image size. (Borrowed from
     https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L305)

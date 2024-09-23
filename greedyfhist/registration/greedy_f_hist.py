@@ -35,7 +35,7 @@ from greedyfhist.utils.image import (
     read_affine_transform
 )
 from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps, affine_registration, deformable_registration
-from greedyfhist.segmentation.segmenation import load_yolo_segmentation
+from greedyfhist.segmentation import load_yolo_segmentation
 from greedyfhist.options import RegistrationOptions, PreprocessingOptions
 
 
@@ -592,7 +592,7 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     return all_transforms
 
 
-def preprocessing(image: numpy.array,
+def preprocessing(image: numpy.ndarray,
                   preprocessing_options: PreprocessingOptions,
                   resolution: Tuple[int, int],
                   kernel_size: int,
@@ -616,7 +616,7 @@ def preprocessing(image: numpy.array,
     return image_preprocessed
 
 
-def affine_transform_to_file(transform, fpath):
+def affine_transform_to_file(transform: SimpleITK.SimpleITK.AffineTransform, fpath: str):
     mat = transform.GetMatrix()
     trans = transform.GetTranslation()
     mat_str = f'{mat[0]} {mat[1]} {trans[0]}\n{mat[2]} {mat[3]} {trans[1]}\n0 0 1'
@@ -624,7 +624,7 @@ def affine_transform_to_file(transform, fpath):
         f.write(mat_str)
 
 
-def preprocess_image_for_greedy(image: numpy.array,
+def preprocess_image_for_greedy(image: numpy.ndarray,
                      kernel: int,
                      resolution: Tuple[int, int],
                      smoothing: int,
@@ -635,7 +635,7 @@ def preprocess_image_for_greedy(image: numpy.array,
 
 
     Args:
-        image (numpy.array):
+        image (numpy.ndarray):
         kernel (int): kernel size
         resolution (Tuple[int, int]): resolution after downscaling
         smoothing (int): Gaussian smoothing applied for preventing 
@@ -678,7 +678,7 @@ def preprocess_image_for_greedy(image: numpy.array,
     return preprocessed_data
 
         
-def derive_subdir(directory, limit=1000) -> Tuple[str, int]:
+def derive_subdir(directory: str, limit=1000) -> Tuple[str, int]:
     """Derives a unique subdirectory. Counts upwards until a new directory is found.
 
     Args:
@@ -697,14 +697,14 @@ def derive_subdir(directory, limit=1000) -> Tuple[str, int]:
 
 
 # TODO: There is probably a better way to ensure the dtype of the image.
-def correct_img_dtype(img: numpy.array) -> numpy.array:
+def correct_img_dtype(img: numpy.ndarray) -> numpy.ndarray:
     """Changes the image type from float to np.uint8 if necessary.
 
     Args:
-        img (numpy.array): 
+        img (numpy.ndarray): 
 
     Returns:
-        numpy.array: 
+        numpy.ndarray: 
     """
     if np.issubdtype(img.dtype, np.floating):
         img = (img * 255).astype(np.uint8)
@@ -740,10 +740,10 @@ class GreedyFHist:
     cmdln_returns: List[Any] = field(default_factory=lambda: [])
 
     def register(self,
-                 moving_img: numpy.array,
-                 fixed_img: numpy.array,
-                 moving_img_mask: Optional[numpy.array] = None,
-                 fixed_img_mask: Optional[numpy.array] = None,
+                 moving_img: numpy.ndarray,
+                 fixed_img: numpy.ndarray,
+                 moving_img_mask: Optional[numpy.ndarray] = None,
+                 fixed_img_mask: Optional[numpy.ndarray] = None,
                  options: Optional[RegistrationOptions] = None) -> 'RegistrationResult':
         """Performs pairwise registration from moving_img to fixed_img. Optional tissue masks can be provided.
         Options are supplied via the options arguments.
@@ -752,10 +752,10 @@ class GreedyFHist:
         
 
         Args:
-            moving_img (numpy.array): 
-            fixed_img (numpy.array): 
-            moving_img_mask (Optional[numpy.array], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
-            fixed_img_mask (Optional[numpy.array], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
+            moving_img (numpy.ndarray): 
+            fixed_img (numpy.ndarray): 
+            moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
+            fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
             options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
 
         Returns:
@@ -769,19 +769,19 @@ class GreedyFHist:
         return reg_result 
 
     def register_(self,
-                 moving_img: numpy.array,
-                 fixed_img: numpy.array,
-                 moving_img_mask: Optional[numpy.array] = None,
-                 fixed_img_mask: Optional[numpy.array] = None,
+                 moving_img: numpy.ndarray,
+                 fixed_img: numpy.ndarray,
+                 moving_img_mask: Optional[numpy.ndarray] = None,
+                 fixed_img_mask: Optional[numpy.ndarray] = None,
                  options: Optional[RegistrationOptions] = None,                  
                  **kwargs: Dict) -> Tuple['RegistrationTransforms', Optional['RegistrationTransforms']]:
         """Computes registration from moving image to fixed image.
 
         Args:
-            moving_img (numpy.array):
-            fixed_img (numpy.array): 
-            moving_img_mask (Optional[numpy.array], optional): Optional moving mask. Is otherwise dervied automatically. Defaults to None.
-            fixed_img_mask (Optional[numpy.array], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
+            moving_img (numpy.ndarray):
+            fixed_img (numpy.ndarray): 
+            moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise dervied automatically. Defaults to None.
+            fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
             options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
 
         Returns:
@@ -1311,9 +1311,9 @@ class GreedyFHist:
 
 
     def groupwise_registration(self,
-                               image_mask_list: List[Union[Tuple[numpy.array, Optional[numpy.array]]]],
+                               image_mask_list: List[Union[Tuple[numpy.ndarray, Optional[numpy.ndarray]]]],
                                options: Optional[RegistrationOptions] = None,
-                               ) -> Tuple[GroupwiseRegResult, List[numpy.array]]:
+                               ) -> Tuple[GroupwiseRegResult, List[numpy.ndarray]]:
         """Performs groupwise registration on a provided image list. 
         For each image, an optional mask can be provided. Fixed 
         image is last image in image_mask_list.
@@ -1328,7 +1328,7 @@ class GreedyFHist:
 
 
         Args:
-            image_mask_list (List[Tuple[numpy.array, Optional[numpy.array]]]): List of images. Last image is fixed image. Every other image is a moving image. For each image, 
+            image_mask_list (List[Tuple[numpy.ndarray, Optional[numpy.ndarray]]]): List of images. Last image is fixed image. Every other image is a moving image. For each image, 
             an optional mask can be supplied.
             options (Optional[RegistrationOptions], optional): Registration options. At this moment, the affine registration is
             always executed. `options.do_affine_registration` is ignored, but the nonrigid registration can be disabled.
@@ -1338,7 +1338,7 @@ class GreedyFHist:
             skip_deformable_registration (bool, optional): Defaults to False.
 
         Returns:
-            Tuple[GroupwiseRegResult, List[numpy.array]]: GroupwiseRegResult contains all computed transformations. List of images are either affine or nonrigid warped images.
+            Tuple[GroupwiseRegResult, List[numpy.ndarray]]: GroupwiseRegResult contains all computed transformations. List of images are either affine or nonrigid warped images.
         """
         if options is None:
             options = RegistrationOptions()
@@ -1405,18 +1405,18 @@ class GreedyFHist:
         return groupwise_registration_results, nonrigid_warped_images
 
     def transform_image(self,
-                        image: numpy.array,
+                        image: numpy.ndarray,
                         transform: 'GFHTransform',
-                        interpolation_mode: str = 'LINEAR') -> numpy.array:
+                        interpolation_mode: str = 'LINEAR') -> numpy.ndarray:
         """Transforms image data from moving to fixed image space using computed transformation.
 
         Args:
-            image (numpy.array): 
+            image (numpy.ndarray): 
             transform (GFHTransform): 
             interpolation_mode (str, optional): Defaults to 'LINEAR'.
 
         Returns:
-            numpy.array: 
+            numpy.ndarray: 
         """
         return self.transform_image_(image,
                                      transform.transform,
@@ -1424,20 +1424,20 @@ class GreedyFHist:
                                      interpolation_mode)
 
     def transform_image_(self,
-                        image: numpy.array, 
+                        image: numpy.ndarray, 
                         transform: SimpleITK.SimpleITK.Transform,
                         size: Tuple[int,int],
-                        interpolation_mode: str = 'LINEAR') -> numpy.array:
+                        interpolation_mode: str = 'LINEAR') -> numpy.ndarray:
         """Transforms image from moving to fixed image space.
 
         Args:
-            image (numpy.array): 
+            image (numpy.ndarray): 
             transform (SimpleITK.SimpleITK.Transform): 
             size (Tuple[int,int]): Fixed image space resolution.
             interpolation_mode (str, optional): 'LINEAR' or 'NN'. Defaults to 'LINEAR'.
 
         Returns:
-            numpy.array: _description_
+            numpy.ndarray: _description_
         """
         interpolator = sitk.sitkLinear if interpolation_mode == 'LINEAR' else sitk.sitkNearestNeighbor
         ref_img = sitk.GetImageFromArray(np.zeros((size[0], size[1])), True)
@@ -1452,16 +1452,16 @@ class GreedyFHist:
         return registered_image
 
     def transform_pointset(self,
-                           pointset: numpy.array,
-                           transform: GFHTransform) -> numpy.array:
+                           pointset: numpy.ndarray,
+                           transform: GFHTransform) -> numpy.ndarray:
         """Transforms pointset from moving to fixed image space.
 
         Args:
-            pointset (numpy.array): 
+            pointset (numpy.ndarray): 
             transform (GFHTransform): 
 
         Returns:
-            numpy.array:
+            numpy.ndarray:
         """
         return self.transform_pointset_(
             pointset,
@@ -1469,16 +1469,16 @@ class GreedyFHist:
         )
 
     def transform_pointset_(self,
-                         pointset: numpy.array,
-                         transform: SimpleITK.SimpleITK.Transform) -> numpy.array:
+                         pointset: numpy.ndarray,
+                         transform: SimpleITK.SimpleITK.Transform) -> numpy.ndarray:
         """Transform pointset from moving to fixed image space.
     
         Args:
-            pointset (numpy.array): 
+            pointset (numpy.ndarray): 
             transformation (SimpleITK.SimpleITK.Transform): 
     
         Returns:
-            numpy.array: 
+            numpy.ndarray: 
         """
         pointset -= 0.5
         warped_points = []

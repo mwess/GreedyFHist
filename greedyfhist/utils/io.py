@@ -75,6 +75,7 @@ def write_to_ometiffile(img: numpy.array,
                      tile: bool = True,
                      tile_size: int = 512,
                      pyramid: bool = True,
+                     bigtiff: bool = False,
                      skip_channel: bool = False,
                      skip_tiffdata: bool = False):
     """
@@ -108,7 +109,7 @@ def write_to_ometiffile(img: numpy.array,
     if is_annotation:
         metadata['Interleaved'] = 'false'
     ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
-    if path.endswith('.ome.tif') or path.endswith('.ome.tiff'):
+    if (path.endswith('.ome.tif') or path.endswith('.ome.tiff')) and not skip_tiffdata and 'tiff_data' in metadata:
         target_fname = os.path.basename(path)
         for tiff_data in metadata['tiff_data']:
             for uuid_node in tiff_data.findall('ns0:UUID', ns):
@@ -150,15 +151,17 @@ def write_to_ometiffile(img: numpy.array,
     ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
     elem = root.find('*/ns0:Pixels', ns)
     if not skip_channel:
-        for channel_ in metadata['channels']:
+        channels = metadata.get('channels', [])
+        for channel_ in channels:
             elem.append(channel_)
     if not skip_tiffdata:
-        for tiff_data_ in metadata['tiff_data']:
+        tiff_data = metadata.get('tiff_data', [])
+        for tiff_data_ in tiff_data:
             elem.append(tiff_data_)
     ome_metadata_xml_string = ET.tostring(root, encoding='unicode')
     img_vips.set_type(pyvips.GValue.gint_type, "page-height", img_vips.height)
     img_vips.set_type(pyvips.GValue.gstr_type, "image-description", ome_metadata_xml_string)
-    img_vips.tiffsave(path, tile=tile, tile_width=tile_size, tile_height=tile_size, pyramid=pyramid)
+    img_vips.tiffsave(path, tile=tile, tile_width=tile_size, tile_height=tile_size, pyramid=pyramid, bigtiff=bigtiff)
 
 
 def is_tiff_file(suffix: str) -> bool:
@@ -204,4 +207,11 @@ def get_metadata_from_tif(xml_string: str) -> Dict:
     tiff_data = root.findall('**/ns0:TiffData', ns)
     metadata['channels'] = channels
     metadata['tiff_data'] = tiff_data
+    if 'PhysicalSizeX' in metadata:
+        metadata['PhysicalSizeX'] = float(metadata['PhysicalSizeX'])
+    if 'PhysicalSizeY' in metadata:
+        metadata['PhysicalSizeY'] = float(metadata['PhysicalSizeY'])
+    del metadata['SizeX']
+    del metadata['SizeY']
+    del metadata['SizeC']
     return metadata
