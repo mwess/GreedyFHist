@@ -83,7 +83,9 @@ class GroupwiseRegResult:
         # Composite transforms
         composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
         composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
-        reg_result = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
+        registration = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
+        reverse_registration = RegistrationTransforms(composited_backward_transform, composited_forward_transform)
+        reg_result = RegistrationResult(registration, reverse_registration)
         return reg_result
 
     def get_transforms(self,
@@ -119,7 +121,9 @@ class GroupwiseRegResult:
         # Composite transforms
         composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
         composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
-        reg_result = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
+        registration = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
+        reverse_registration = RegistrationTransforms(composited_backward_transform, composited_forward_transform)
+        reg_result = RegistrationResult(registration, reverse_registration)
         return reg_result
     
     def to_file(self, path: str):
@@ -238,31 +242,31 @@ class GFHTransform:
 @dataclass
 class RegistrationResult:
 
-    registration_transforms: 'RegistrationTransforms'
+    registration: 'RegistrationTransforms'
 
-    reverse_registration_transforms: Optional['RegistrationTransforms']
+    reverse_registration: Optional['RegistrationTransforms']
 
     def to_directory(self, path: str):
         """
         Save 'RegistrationResult' to file.
         """
         create_if_not_exists(path)
-        reg_path = join(path, 'registration_transform')
-        self.registration_transforms.to_directory(reg_path)
-        if self.reverse_registration_transforms is not None:
-            rev_reg_path = join(path, 'reverse_registration_transform')
-            self.reverse_registration_transforms.to_directory(rev_reg_path)
+        reg_path = join(path, 'registration')
+        self.registration.to_directory(reg_path)
+        if self.reverse_registration is not None:
+            rev_reg_path = join(path, 'reverse_registration')
+            self.reverse_registration.to_directory(rev_reg_path)
 
     @staticmethod
     def load(path: str) -> 'RegistrationResult':
-        reg_path = join(path, 'registration_transform')
-        registration_transforms = RegistrationTransforms.load(reg_path)
-        rev_reg_path = join(path, 'reverse_registration_transform')
+        reg_path = join(path, 'registration')
+        registration = RegistrationTransforms.load(reg_path)
+        rev_reg_path = join(path, 'reverse_registration')
         if exists(rev_reg_path):
-            reverse_registration_transforms = RegistrationTransforms.load(rev_reg_path)
+            reverse_registration = RegistrationTransforms.load(rev_reg_path)
         else:
-            reverse_registration_transforms = None
-        return RegistrationResult(registration_transforms, reverse_registration_transforms)
+            reverse_registration = None
+        return RegistrationResult(registration, reverse_registration)
         
 
 @dataclass
@@ -735,9 +739,14 @@ class GreedyFHist:
     """
 
     name: str = 'GreedyFHist'
-    path_to_greedy: str = ''
+    path_to_greedy: str = 'greedy'
+    use_docker_container: bool = False
     segmentation_function: Optional[Callable] = None
     cmdln_returns: List[Any] = field(default_factory=lambda: [])
+
+    def __post_init__(self):
+        if self.segmentation_function is None:
+            self.segmentation_function = load_yolo_segmentation()
 
     def register(self,
                  moving_img: numpy.ndarray,
@@ -927,7 +936,9 @@ class GreedyFHist:
                                             path_small_affine,
                                             offset,
                                             ia_init,
-                                            options.affine_registration_options
+                                            options.affine_registration_options,
+                                            self.use_docker_container,
+                                            path_temp
                                             )
             self.cmdln_returns.append(aff_ret)    
         else:
@@ -1117,7 +1128,9 @@ class GreedyFHist:
                                                         output_warp=path_small_warp,
                                                         output_inv_warp=path_small_warp_inv,
                                                         affine_pre_transform=nonrigid_affine_trans_path,
-                                                        ia=ia_init)
+                                                        ia=ia_init,
+                                                        use_docker_container=self.use_docker_container,
+                                                        temp_directory=path_temp)
         return deformable_reg_ret, new_paths, moving_img_preprocessed, fixed_img_preprocessed
            
     def reg_postprocess(self,
@@ -1310,6 +1323,7 @@ class GreedyFHist:
         return registration_result
 
 
+    # TODO: Add option for skipping affine registration.
     def groupwise_registration(self,
                                image_mask_list: List[Union[Tuple[numpy.ndarray, Optional[numpy.ndarray]]]],
                                options: Optional[RegistrationOptions] = None,
@@ -1333,9 +1347,6 @@ class GreedyFHist:
             options (Optional[RegistrationOptions], optional): Registration options. At this moment, the affine registration is
             always executed. `options.do_affine_registration` is ignored, but the nonrigid registration can be disabled.
             Defaults to None.
-            affine_options (Optional[RegistrationOptions], optional): Affine registration options. Defaults to None.
-            nonrigid_option (Optional[RegistrationOptions], optional): Nonrigid registration options. Defaults to None.
-            skip_deformable_registration (bool, optional): Defaults to False.
 
         Returns:
             Tuple[GroupwiseRegResult, List[numpy.ndarray]]: GroupwiseRegResult contains all computed transformations. List of images are either affine or nonrigid warped images.
@@ -1362,8 +1373,8 @@ class GreedyFHist:
                 fixed_image = fixed_tuple
                 fixed_mask = None
             reg_result = self.register_(moving_image, fixed_image, moving_mask, fixed_mask, options)
-            affine_transform_lists.append(reg_result.registration_transforms)
-            reverse_affine_transform_list.append(reg_result.reverse_registration_transforms)
+            affine_transform_lists.append(reg_result.registration)
+            reverse_affine_transform_list.append(reg_result.reverse_registration)
             moving_image = fixed_image
             moving_mask = fixed_mask
         # Stage 2: Take the matched images and do a nonrigid registration
@@ -1393,10 +1404,10 @@ class GreedyFHist:
             warped_image = self.transform_image(moving_image, composited_fixed_transform, 'LINEAR')
             warped_mask = self.transform_image(moving_mask, composited_fixed_transform, 'NN')
             nonrigid_reg_result = self.register(warped_image, fixed_image, warped_mask, fixed_mask, options=options)
-            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration_transforms.forward_transform, 'LINEAR')
+            deformable_warped_image = self.transform_image(warped_image, nonrigid_reg_result.registration.forward_transform, 'LINEAR')
             nonrigid_warped_images.append(deformable_warped_image)
-            nonrigid_transformations.append(nonrigid_reg_result.registration_transforms)
-            reverse_nonrigid_transformations.append(nonrigid_reg_result.reverse_registration_transforms)
+            nonrigid_transformations.append(nonrigid_reg_result.registration)
+            reverse_nonrigid_transformations.append(nonrigid_reg_result.reverse_registration)
         reverse_nonrigid_transformations = reverse_nonrigid_transformations[::-1]
         groupwise_registration_results = GroupwiseRegResult(affine_transform_lists, 
                                                             reverse_affine_transform_list,

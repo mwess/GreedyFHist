@@ -259,17 +259,17 @@ def register(moving_image_path: Optional[str] = None,
     output_directory_transformation_data = join(output_directory, 'transformed_data')
     create_if_not_exists(output_directory_transformation_data)
 
-    warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result.registration_transforms,
+    warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result.registration,
                                                                              registerer=registerer)
     warped_histology_section.to_directory(output_directory_transformation_data)
     output_directory_transformation_data_prep = join(output_directory_transformation_data, 'preprocessing_data')
     create_if_not_exists(output_directory_transformation_data_prep)
     # Try writing masks to file.
     try:
-        moving_preprocessing_mask = registration_result.registration_transforms.reg_params.moving_preprocessing_params['moving_img_mask']
+        moving_preprocessing_mask = registration_result.registration.reg_params.moving_preprocessing_params['moving_img_mask']
         path = join(output_directory_transformation_data_prep, 'moving_mask.png')
         cv2.imwrite(path, moving_preprocessing_mask)
-        fixed_preprocessing_mask = registration_result.registration_transforms.reg_params.fixed_preprocessing_params['fixed_img_mask']
+        fixed_preprocessing_mask = registration_result.registration.reg_params.fixed_preprocessing_params['fixed_img_mask']
         path = join(output_directory_transformation_data_prep, 'fixed_mask.png')
         cv2.imwrite(path, fixed_preprocessing_mask)
     except Exception:

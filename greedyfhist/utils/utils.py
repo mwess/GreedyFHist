@@ -1,6 +1,7 @@
 """
 General utils files. Lowest level of utils. Cannot import from anywhere else in the project.
 """
+import os
 import shlex
 import subprocess
 from typing import Dict, List, Optional, Union
@@ -70,6 +71,8 @@ def affine_registration(path_to_greedy: str,
                         offset:int,
                         ia:str,
                         options: AffineGreedyOptions,
+                        use_docker_container: bool = False,
+                        temp_directory: str = ''
                         ) -> subprocess.CompletedProcess:
     """Calls greedy's affine registration function.
 
@@ -85,6 +88,11 @@ def affine_registration(path_to_greedy: str,
     Returns:
         _type_: Return of command line execution.
     """
+    if use_docker_container:
+        abs_temp_directory = os.path.abspath(temp_directory)
+        # v_option = f'$(pwd)/{abs_temp_directory}:/{temp_directory}'
+        v_option = f'{abs_temp_directory}:/{temp_directory}'
+        path_to_greedy = f'docker run -v {v_option} {path_to_greedy}'
     cost_fun_params = options.cost_function
     if options.cost_function == 'ncc' or options.cost_function == 'wncc':
         cost_fun_params += f' {options.kernel_size}x{options.kernel_size}'
@@ -114,7 +122,9 @@ def deformable_registration(path_to_greedy:str,
                             output_warp:Optional[str]=None,
                             output_inv_warp:Optional[str]=None,
                             affine_pre_transform: Optional[str] = None,
-                            ia=None
+                            ia=None,
+                            use_docker_container: bool = False,
+                            temp_directory: str = ''
                             ) -> subprocess.CompletedProcess:
     """Calls the deformable registration command of greedy.
 
@@ -130,6 +140,11 @@ def deformable_registration(path_to_greedy:str,
     Returns:
         _type_: Return of command line execution.
     """
+    if use_docker_container:
+        abs_temp_directory = os.path.abspath(temp_directory)
+        # v_option = f'$(pwd)/{abs_temp_directory}:/{temp_directory}'
+        v_option = f'{abs_temp_directory}:/{temp_directory}'
+        path_to_greedy = f'docker run -v {v_option} {path_to_greedy}'
     cost_fun_params = options.cost_function
     if options.cost_function == 'ncc' or options.cost_function == 'wncc':
         cost_fun_params += f' {options.kernel_size}x{options.kernel_size}'
