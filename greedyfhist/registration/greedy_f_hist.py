@@ -722,8 +722,6 @@ class GreedyFHist:
     """
     Registration class. Performs registrations and transformation for paiwise images and groupwise images.
 
-    GreedyFHist should be initialized via the classmethod `from_config` as it ensures that the segmentation_function is loaded correctly.
-
     Attributes
     ----------
 
@@ -805,11 +803,15 @@ class GreedyFHist:
         path_output = join(path_temp, 'output', 'registrations')
         path_output, subdir_num = derive_subdir(path_output)
         create_if_not_exists(path_output)
-        # TODO: Implement autodownsampling if not set to get images to not bigger than 2000px
         pre_sampling_factor = options.pre_sampling_factor
         if pre_sampling_factor == 'auto':
-            moving_resampling_factor = derive_resampling_factor(moving_img)
-            fixed_resampling_factor = derive_resampling_factor(fixed_img)
+            pre_sampling_max_img_size = options.pre_sampling_max_img_size
+            if pre_sampling_max_img_size is not None:
+                max_size = max(moving_img.shape[0], moving_img.shape[1], fixed_img.shape[0], fixed_img.shape[1])
+                if max_size > pre_sampling_max_img_size:
+                    resampling_factor = pre_sampling_max_img_size / max_size
+                    moving_resampling_factor = resampling_factor
+                    fixed_resampling_factor = resampling_factor
         else:
             moving_resampling_factor = pre_sampling_factor
             fixed_resampling_factor = pre_sampling_factor

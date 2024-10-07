@@ -7,7 +7,7 @@ line-length = 79
 
 [tool.poetry]
 name = "GreedyFHist"
-version = "0.0.1"
+version = "0.0.2"
 description = "Registration for stained histology"
 authors = ["Maximilian Wess <maximilian.wess@ntnu.no>"]
 

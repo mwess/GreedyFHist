@@ -319,20 +319,19 @@ class RegistrationOptions:
         Options for preprocessing and calling Greedy with nonrigid
         registration options.
 
-    pre_sampling_factor: Union[float, str] = 1
+    pre_sampling_factor: Union[float, str] = 'auto'
         Sampling factor prior to preprocessing. Does not
         affect registration accuracy, but can help to speed up the 
         registration considerable, especially for large images. If
         the factor is a float it is interpreted as a scaling factor
         that is applied on both images prior to preprocessing. If
-        'auto', then the pre_sampling_auto_factor is used to
+        'auto', then the `pre_sampling_max_img_size` is used to
         scale both images to have a maximum resolution of that factor.
         
-    pre_sampling_auto_factor: Optional[int] = 3500
-        Determines the maximum resolution if pre_sampling_factor is
-        set to 'auto'. Ignored otherwise.
-        Helpful when image size is unkown or resolution between moving
-        and fixed image varies too much.
+    pre_sampling_max_img_size: Optional[int] = 2000
+        Resizes moving and fixed image such that the largest axis
+        of both images is set to a maximum of `pre_sampling_resize_factor`.
+        This option is used if `pre_sampling_factor` is set to auto. 
 
     do_affine_registration: bool = True
         Whether an affine registration is performed or not.
@@ -364,8 +363,8 @@ class RegistrationOptions:
 
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
     nonrigid_registration_options: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_options)
-    pre_sampling_factor: Union[float, str] = 1
-    pre_sampling_auto_factor: Optional[int] = 3500    
+    pre_sampling_factor: Union[float, str] = 'auto'
+    pre_sampling_max_img_size: Optional[int] = 2000    
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
     compute_reverse_nonrigid_registration: bool = False
