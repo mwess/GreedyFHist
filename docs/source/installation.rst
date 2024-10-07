@@ -61,11 +61,8 @@ Either build the Dockerfile locally and set an alias (for instance in your ``~/.
     cd docker
     docker build -f Dockerfile_greedy -t greedy .
 
-Setting the alias:
-
-.. code-block:: bash
-
-    alias greedy='docker run greedy'
+Note, that currently GreedyFHist cannot be used from the commandline if `greedy` is accessed as an external docker container.
+For now, please refer to the interactive API.
 
 Alternatively, a docker-image for ``greedyfhist`` can be downloaded:
 
