@@ -20,7 +20,7 @@ GreedyFHist can be installed by running the following command:
 
 .. code-block:: bash
 
-    pip install --user git+https://github.com/mwess/greedyfhist@v0.0.2
+    pip install --user git+https://github.com/mwess/greedyfhist@v0.0.2-rc2
 
 
 ----------------------------
@@ -68,7 +68,7 @@ Alternatively, a docker-image for ``greedyfhist`` can be downloaded:
 
 .. code-block:: bash
 
-    docker pull mwess89/greedyfhist:0.0.2
+    docker pull mwess89/greedyfhist:0.0.2-rc2
 
 Or the docker image can be built as well:
 
