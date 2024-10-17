@@ -96,7 +96,7 @@ def write_to_ometiffile(img: numpy.array,
         tile_size: Size of tile. Defaults to 512.
         pyramid (bool): Build pyramidical. Defaults to True.
     """
-    if metadata is None:
+    if not metadata:
         metadata = {
             'PhysicalSizeX': 1,
             'PhysicalSizeXUnit': 'px',
