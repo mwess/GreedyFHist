@@ -812,9 +812,15 @@ class GreedyFHist:
                     resampling_factor = pre_sampling_max_img_size / max_size
                     moving_resampling_factor = resampling_factor
                     fixed_resampling_factor = resampling_factor
+                else:
+                    moving_resampling_factor = 1
+                    fixed_resampling_factor = 1
+            else:
+                moving_resampling_factor = 1
+                fixed_resampling_factor = 1
         else:
-            moving_resampling_factor = pre_sampling_factor
-            fixed_resampling_factor = pre_sampling_factor
+            moving_resampling_factor = 1
+            fixed_resampling_factor = 1
 
         original_moving_image_size = moving_img.shape[:2]
         original_fixed_image_size = fixed_img.shape[:2]

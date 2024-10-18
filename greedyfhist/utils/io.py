@@ -66,6 +66,18 @@ def derive_output_path(directory: str, fname: str, limit: int = 1000) -> str:
         if not os.path.exists(new_target_path):
             return new_target_path
     return target_path
+        
+def get_default_metadata():
+    metadata = {
+        'PhysicalSizeX': 1,
+        'PhysicalSizeXUnit': 'px',
+        'PhysicalSizeY': 1,
+        'PhysicalSizeYUnit': 'px',
+        'Interleaved': 'true',
+        'channels': [],
+        'tiff_data': []
+    }
+    return metadata
 
 
 def write_to_ometiffile(img: numpy.array, 
