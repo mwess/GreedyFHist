@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import os
 from os.path import join
-from typing import Any, Dict, Optional
 
 import numpy, numpy as np
 import pandas, pandas as pd
@@ -46,8 +45,8 @@ class Pointset:
     path: str
     x_axis: str = 'x'
     y_axis: str = 'y'
-    index_col: Optional[int] = None
-    header: Optional[int] = None
+    index_col: int | None = None
+    header: int | None = None
 
     def to_numpy(self) -> numpy.array:
         return self.data[[self.x_axis, self.y_axis]].to_numpy()
@@ -78,7 +77,7 @@ class Pointset:
         )
 
     @classmethod
-    def load_data(cls, dct: Dict) -> 'Pointset':
+    def load_data(cls, dct: dict) -> 'Pointset':
         index_col = dct.get('index_col', None)
         path = dct['path']
         x_axis = dct.get('x', 'x')

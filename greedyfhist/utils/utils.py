@@ -4,7 +4,6 @@ General utils files. Lowest level of utils. Cannot import from anywhere else in 
 import os
 import shlex
 import subprocess
-from typing import Dict, List, Optional, Union
 
 from greedyfhist.options import AffineGreedyOptions, NonrigidGreedyOptions
 
@@ -18,7 +17,7 @@ def call_command(cmd: str):
     return ret
 
 
-def build_cmd_string(path_to_exec: str, args: Dict[str, Union[str, List[str]]]) -> str:
+def build_cmd_string(path_to_exec: str, args: dict[str, str | list[str]]) -> str:
     """Small custom function for collection arguments in a function call."""
     cmd = [path_to_exec]
     for key in args:
@@ -34,8 +33,8 @@ def build_cmd_string(path_to_exec: str, args: Dict[str, Union[str, List[str]]]) 
 
 
 def composite_warps(path_to_greedy: str,
-                    path_small_affine: Optional[str],
-                    path_small_warp: Optional[str],
+                    path_small_affine: str | None,
+                    path_small_warp: str | None,
                     path_small_ref_img: str,
                     path_small_composite_warp: str,
                     invert=False) -> subprocess.CompletedProcess:
@@ -49,7 +48,6 @@ def composite_warps(path_to_greedy: str,
         if path_small_warp:
             transform_paths.append(path_small_warp)
         args['-r'] = transform_paths
-        # args['-r'] = [f'{path_small_affine},-1', path_small_warp]
     else:
         transform_paths = []
         if path_small_warp is not None:
@@ -57,7 +55,6 @@ def composite_warps(path_to_greedy: str,
         if path_small_affine is not None:
             transform_paths.append(path_small_affine)
         args['-r'] = transform_paths
-        # args['-r'] = [path_small_warp, path_small_affine]
     args['-rc'] = path_small_composite_warp
     cmd = build_cmd_string(path_to_greedy, args)
     ret = call_command(cmd)
@@ -115,14 +112,14 @@ def affine_registration(path_to_greedy: str,
     aff_ret = call_command(aff_cmd)
     return aff_ret
 
-def deformable_registration(path_to_greedy:str,
-                            path_fixed_image:str,
-                            path_moving_image:str,
+def deformable_registration(path_to_greedy: str,
+                            path_fixed_image: str,
+                            path_moving_image: str,
                             options: NonrigidGreedyOptions,
-                            output_warp:Optional[str]=None,
-                            output_inv_warp:Optional[str]=None,
-                            affine_pre_transform: Optional[str] = None,
-                            ia=None,
+                            output_warp: str | None = None,
+                            output_inv_warp: str | None = None,
+                            affine_pre_transform: str | None = None,
+                            ia: tuple[str, str] = None,
                             use_docker_container: bool = False,
                             temp_directory: str = ''
                             ) -> subprocess.CompletedProcess:
@@ -142,7 +139,6 @@ def deformable_registration(path_to_greedy:str,
     """
     if use_docker_container:
         abs_temp_directory = os.path.abspath(temp_directory)
-        # v_option = f'$(pwd)/{abs_temp_directory}:/{temp_directory}'
         v_option = f'{abs_temp_directory}:/{temp_directory}'
         path_to_greedy = f'docker run -v {v_option} {path_to_greedy}'
     cost_fun_params = options.cost_function
@@ -152,12 +148,10 @@ def deformable_registration(path_to_greedy:str,
     if affine_pre_transform is not None:
         def_args['-it'] = affine_pre_transform
     def_args['-d'] = options.dim
-    # def_args['-m'] = f'NCC {kernel}x{kernel}'
     def_args['-m'] = cost_fun_params
     def_args['-i'] = [path_fixed_image, path_moving_image]
     pyramid_iterations = 'x'.join([str(x) for x in options.iteration_pyramid])
     def_args['-n'] = pyramid_iterations
-    # def_args['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
     def_args['-threads'] = options.n_threads
     def_args['-s'] = [f'{options.s1}vox', f'{options.s2}vox']
     def_args['-o'] = output_warp

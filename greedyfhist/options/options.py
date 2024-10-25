@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Union, Dict, Any
-
+from typing import Any
 
 def get_3_step_pyramid_iterations():
     return [100, 50, 10]
@@ -63,7 +62,7 @@ class PreprocessingOptions:
             d[key] = self.__getattribute__(key)
         return d
     
-    def parse_dict(self, args_dict: Dict):
+    def parse_dict(self, args_dict: dict):
         """Function made to automatically parse attributes from dictionary. 
 
         Args:
@@ -127,13 +126,13 @@ class AffineGreedyOptions:
     """
 
     dim: int = 2
-    resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
+    resolution: tuple[int, int] = field(default_factory=load_default_resolution)
     preprocessing_options: 'PreprocessingOptions' = field(default_factory=PreprocessingOptions.default_options)
     kernel_size: int = 10
     cost_function: str = 'ncc'
-    rigid_iterations: Union[int, str] = 10000
+    rigid_iterations: int | str = 10000
     ia: str = 'ia-com-init'
-    iteration_pyramid: List[int] = field(default_factory=get_3_step_pyramid_iterations)
+    iteration_pyramid: list[int] = field(default_factory=get_3_step_pyramid_iterations)
     n_threads: int = 1
     keep_affine_transform_unbounded: bool = True
     dof: int = 12
@@ -141,7 +140,7 @@ class AffineGreedyOptions:
     def __post_init__(self):
         self.preprocessing_options = PreprocessingOptions()
 
-    def parse_dict(self, args_dict: Dict):
+    def parse_dict(self, args_dict: dict):
         """Function made to automatically parse attributes from dictionary. 
 
         Args:
@@ -154,7 +153,7 @@ class AffineGreedyOptions:
         if 'preprocessing_options' in args_dict:
             self.preprocessing_options.parse_dict(args_dict['preprocessing_options'])
 
-    def __assign_if_present(self, key: Any, args_dict: Dict):
+    def __assign_if_present(self, key: Any, args_dict: dict):
         """Assigns value if key is present in class's __annotations__.
 
         Args:
@@ -166,7 +165,7 @@ class AffineGreedyOptions:
             if key in self.__annotations__:
                 self.__setattr__(key, value)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Return options as dictionary.
 
         Returns:
@@ -241,23 +240,23 @@ class NonrigidGreedyOptions:
     """
 
     dim: int = 2
-    resolution: Tuple[int, int] = field(default_factory=load_default_resolution)
+    resolution: tuple[int, int] = field(default_factory=load_default_resolution)
     preprocessing_options: PreprocessingOptions = field(default_factory=PreprocessingOptions.default_options)    
     s1: float = 5.0
     s2: float = 5.0
     kernel_size: int = 10
     cost_function: str = 'ncc'
     ia: str = 'ia-com-init'
-    iteration_pyramid: List[int] = field(default_factory=get_4_step_pyramid_iterations)
+    iteration_pyramid: list[int] = field(default_factory=get_4_step_pyramid_iterations)
     n_threads: int = 1
     use_sv: bool = False
     use_svlb: bool = False
-    exp: Optional[int] = None
+    exp: int | None = None
 
     def __post_init__(self):
         self.preprocessing_options.enable_denoising = False
 
-    def parse_dict(self, args_dict: Dict):
+    def parse_dict(self, args_dict: dict):
         """Function made to automatically parse attributes from dictionary. 
 
         Args:
@@ -270,7 +269,7 @@ class NonrigidGreedyOptions:
         if 'preprocessing_options' in args_dict:
             self.preprocessing_options.parse_dict(args_dict['preprocessing_options'])
 
-    def __assign_if_present(self, key: Any, args_dict: Dict):
+    def __assign_if_present(self, key: Any, args_dict: dict):
         """Assigns value if key is present in class's __annotations__.
 
         Args:
@@ -282,7 +281,7 @@ class NonrigidGreedyOptions:
             if key in self.__annotations__:
                 self.__setattr__(key, value)
         
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Return options as dictionary.
 
         Returns:
@@ -363,8 +362,8 @@ class RegistrationOptions:
 
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
     nonrigid_registration_options: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_options)
-    pre_sampling_factor: Union[float, str] = 'auto'
-    pre_sampling_max_img_size: Optional[int] = 2000    
+    pre_sampling_factor: float | str = 'auto'
+    pre_sampling_max_img_size: int | None = 2000    
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
     compute_reverse_nonrigid_registration: bool = False
@@ -397,7 +396,7 @@ class RegistrationOptions:
         return d
 
     @staticmethod
-    def parse_cmdln_dict(args_dict: Dict) -> 'RegistrationOptions':
+    def parse_cmdln_dict(args_dict: dict) -> 'RegistrationOptions':
         """Sets all values in dictionary that have a matching key in 
         class's __annotation__ field. key/value pairs for GreedyOpts
         are put in a sub dict, called 'greedy'. 'resolution' is in

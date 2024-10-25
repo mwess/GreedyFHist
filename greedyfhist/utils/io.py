@@ -5,7 +5,7 @@ import os
 from os.path import join
 from pathlib import Path
 import shutil
-from typing import Dict, Optional, Union
+from typing import Optional
 import xml.etree.ElementTree as ET
 
 
@@ -82,7 +82,7 @@ def get_default_metadata():
 
 def write_to_ometiffile(img: numpy.array, 
                      path: str, 
-                     metadata: Dict = None, 
+                     metadata: dict = None, 
                      is_annotation: bool = False,
                      tile: bool = True,
                      tile_size: int = 512,
@@ -180,7 +180,7 @@ def is_tiff_file(suffix: str) -> bool:
     return suffix in ['.tif', '.tiff']
 
 
-def read_image(path: str, is_annotation: bool = False) -> Union[numpy.array, Optional[Dict]]:
+def read_image(path: str, is_annotation: bool = False) -> numpy.array | Optional[dict]:
     suffix = os.path.splitext(path)[1]
     metadata = None
     if is_tiff_file(suffix):
@@ -201,7 +201,7 @@ def read_image(path: str, is_annotation: bool = False) -> Union[numpy.array, Opt
     return img, metadata
 
 
-def get_metadata_from_tif(xml_string: str) -> Dict:
+def get_metadata_from_tif(xml_string: str) -> dict:
     """
     Extracts metadata from tiffile.
 

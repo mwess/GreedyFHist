@@ -1,7 +1,4 @@
-from typing import  Tuple
-
-import numpy
-import numpy as np
+import numpy, numpy as np
 import pandas
 
 
@@ -19,7 +16,7 @@ def compute_distance_for_lm(warped_df: pandas.core.frame.DataFrame, fixed_df: pa
     return merged_df
 
 
-def compute_tre(target_landmarks: pandas.core.frame.DataFrame, warped_landmarks: pandas.core.frame.DataFrame, target_shape: Tuple[int, int]):
+def compute_tre(target_landmarks: pandas.core.frame.DataFrame, warped_landmarks: pandas.core.frame.DataFrame, target_shape: tuple[int, int]):
     unified_lms = compute_distance_for_lm(warped_landmarks, target_landmarks)
     image_diagonal = np.sqrt(np.square(target_shape[0]) + np.square(target_shape[1]))
     unified_lms['rtre'] = unified_lms['tre']/image_diagonal

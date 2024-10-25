@@ -1,10 +1,7 @@
-import os
 from os.path import join, split
-from typing import Callable
 
 import cv2
-import numpy
-import numpy as np
+import numpy, numpy as np
 from skimage.measure import regionprops, label
 from skimage.restoration import denoise_tv_chambolle
 from skimage.morphology import reconstruction
@@ -64,7 +61,7 @@ def resolve_path_to_model() -> str:
     
 
 
-def load_yolo_segmentation() -> Callable:
+def load_yolo_segmentation() -> callable:
     """Loads YOLO8 based segmentation function.
 
     Returns:

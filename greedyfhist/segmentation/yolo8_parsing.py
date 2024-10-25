@@ -1,14 +1,12 @@
-from typing import Tuple, List, Optional
-
 import cv2
 import numpy, numpy as np
 
 
-def postprocess(preds: Tuple[numpy.array, numpy.array], 
+def postprocess(preds: tuple[numpy.array, numpy.array], 
                 conf_threshold: float = 0.4, 
                 iou_threshold: float = 0.45, 
                 nm: int = 32, 
-                shape: Tuple[int, int] = (640,640)):
+                shape: tuple[int, int] = (640,640)):
     """
     Post-process the prediction.
 
@@ -65,7 +63,7 @@ def postprocess(preds: Tuple[numpy.array, numpy.array],
     else:
         return [], [], []
 
-def masks2segments(masks: numpy.ndarray) -> List[numpy.ndarray]:
+def masks2segments(masks: numpy.ndarray) -> list[numpy.ndarray]:
     """
     It takes a list of masks(n,h,w) and returns a list of segments(n,xy) (Borrowed from
     https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L750)
@@ -107,7 +105,7 @@ def crop_mask(masks: numpy.ndarray, boxes: numpy.ndarray) -> numpy.ndarray:
 def process_mask(protos: numpy.ndarray, 
                  masks_in: numpy.ndarray, 
                  bboxes: numpy.ndarray, 
-                 im0_shape: Tuple[int, int, int]):
+                 im0_shape: tuple[int, int, int]):
     """
     Takes the output of the mask head, and applies the mask to the bounding boxes. This produces masks of higher quality
     but is slower. (Borrowed from https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L618)
@@ -130,8 +128,8 @@ def process_mask(protos: numpy.ndarray,
     return np.greater(masks, 0.5)
 
 def scale_mask(masks: numpy.ndarray, 
-               im0_shape: Tuple[int, int, int], 
-               ratio_pad: Optional[Tuple[int, int]] = None):
+               im0_shape: tuple[int, int, int], 
+               ratio_pad: tuple[int, int] | None = None):
     """
     Takes a mask, and resizes it to the original image size. (Borrowed from
     https://github.com/ultralytics/ultralytics/blob/465df3024f44fa97d4fad9986530d5a13cdabdca/ultralytics/utils/ops.py#L305)

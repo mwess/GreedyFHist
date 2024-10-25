@@ -1,5 +1,5 @@
+from typing import Any
 from dataclasses import dataclass, field
-from typing import Optional, Any, List
 
 import numpy
 
@@ -26,15 +26,15 @@ class HistologySection:
         Contains additional imaging data.
     """
     
-    ref_image: Optional[Image]
-    ref_mask: Optional[Image]
-    additional_data: List[Any] = field(default_factory=list)
+    ref_image: Image | None
+    ref_mask: Image | None
+    additional_data: list[Any] = field(default_factory=list)
     
     def register_to_image(self, 
                           fixed_image: numpy.array, 
-                          fixed_mask: Optional[numpy.array] = None, 
-                          options: Optional[RegistrationOptions] = None,
-                          registerer: Optional[GreedyFHist] = None) -> RegistrationTransforms:
+                          fixed_mask: numpy.array | None = None, 
+                          options: RegistrationOptions | None = None,
+                          registerer: GreedyFHist | None = None) -> RegistrationTransforms:
         if registerer is None:
             registerer = GreedyFHist.load_from_config({})
 
@@ -49,7 +49,7 @@ class HistologySection:
 
     def apply_transformation(self,
                              registration_result: RegistrationTransforms,
-                             registerer: Optional[GreedyFHist] = None) -> 'HistologySection':
+                             registerer: GreedyFHist | None = None) -> 'HistologySection':
         if registerer is None:
             registerer = GreedyFHist.load_from_config({})
         if self.ref_image is not None:

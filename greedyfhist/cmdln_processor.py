@@ -1,6 +1,6 @@
 import logging
 from os.path import join
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import cv2
 import toml
@@ -14,7 +14,7 @@ from greedyfhist.data_types import Pointset, GeoJsonData, HistologySection, Imag
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.WARN)
 
 
-def all_paths_are_none(path_list: List[str]) -> bool:
+def all_paths_are_none(path_list: list[str]) -> bool:
     """Checks whether all paths are None.
 
     Args:
@@ -26,7 +26,7 @@ def all_paths_are_none(path_list: List[str]) -> bool:
     return all(map(lambda x: x is None, path_list))
 
 
-def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+def get_paths_from_config(config: dict | None = None) -> tuple[str | None, str | None, str | None, str | None]:
     """Extracts moving and fixed image file paths from config.
 
     Args:
@@ -45,9 +45,9 @@ def get_paths_from_config(config: Optional[Dict] = None) -> Tuple[Optional[str],
     
 
 def resolve_variable(selector: str, 
-                    choice1: Optional[Any] = None, 
-                    config: Optional[Any] = None,
-                    fallback_value: Optional[Any] = None) -> Optional[Any]:
+                    choice1: Any | None = None, 
+                    config: Any | None = None,
+                    fallback_value: Any | None = None) -> Any | None:
     """Select a variable either from first candidate, from config dictionary or a default value. Return None if neither is found.
 
     Args:
@@ -69,7 +69,7 @@ def resolve_variable(selector: str,
     return choice2
 
     
-def load_image_from_config(config: Dict) -> Image:
+def load_image_from_config(config: dict) -> Image:
     """Load image based on config.
 
     Args:
@@ -91,7 +91,7 @@ def guess_type(path: str) -> str:
     return 'default'
 
 
-def load_data_from_config(config: Dict) -> Union[Image, Pointset, GeoJsonData]:
+def load_data_from_config(config: dict) -> Image | Pointset | GeoJsonData:
     type_ = config.get('type', None)
     if type_ is None:
         type_ = guess_type(config['path'])
@@ -104,7 +104,7 @@ def load_data_from_config(config: Dict) -> Union[Image, Pointset, GeoJsonData]:
     # Throw an error message otherwise.
 
 
-def load_sections(section_configs: Dict) -> List[HistologySection]:
+def load_sections(section_configs: dict) -> list[HistologySection]:
     sections = []
     sorted_keys = sorted(section_configs.keys(), key=lambda x: int(x.replace('section', '')))
     for key in sorted_keys:
@@ -114,7 +114,7 @@ def load_sections(section_configs: Dict) -> List[HistologySection]:
     return sections
 
 
-def load_histology_section_from_config(config: Dict) -> HistologySection:
+def load_histology_section_from_config(config: dict) -> HistologySection:
     ref_img_config = config.get('reference_image', None)
     if ref_img_config is not None:
         reference_image = load_image_from_config(ref_img_config)
@@ -138,8 +138,8 @@ def load_histology_section_from_config(config: Dict) -> HistologySection:
     )
 
 
-def load_base_histology_section(image_path: Optional[str] = None,
-                                mask_path: Optional[str] = None):
+def load_base_histology_section(image_path: str | None = None,
+                                mask_path: str | None = None):
     if image_path is not None:
         image = Image.load_from_path(image_path)
     else:
@@ -153,17 +153,17 @@ def load_base_histology_section(image_path: Optional[str] = None,
     return histology_section
 
 
-def register(moving_image_path: Optional[str] = None,
-             fixed_image_path: Optional[str] = None,
-             output_directory: Optional[str] = None,
-             moving_mask_path: Optional[str] = None,
-             fixed_mask_path: Optional[str] = None,
-             path_to_greedy: Optional[str] = None,
-             config_path: Optional[str] = None,
-             images: Optional[List[str]] = None,
-             annotations: Optional[List[str]] = None,
-             pointsets: Optional[List[str]] = None,
-             geojsons: Optional[List[str]] = None):
+def register(moving_image_path: str | None = None,
+             fixed_image_path: str | None = None,
+             output_directory: str | None = None,
+             moving_mask_path: str | None = None,
+             fixed_mask_path: str | None = None,
+             path_to_greedy: str | None = None,
+             config_path: str | None = None,
+             images: list[str] | None = None,
+             annotations: list[str] | None = None,
+             pointsets: list[str] | None = None,
+             geojsons: list[str] | None = None):
     """Performs GreedyFHist registration between moving and fixed image followed by
     transformation of provided data. GreedyFHist parameters are read from the 
     config file. Otherwise, uses default. Optionally, masks are loaded included
@@ -278,13 +278,13 @@ def register(moving_image_path: Optional[str] = None,
 
   
 def apply_transformation(
-             output_directory: Optional[str] = None,
-             config_path: Optional[str] = None,
-             path_to_transform: Optional[str] = None,
-             images: Optional[List[str]] = None,
-             annotations: Optional[List[str]] = None,
-             pointsets: Optional[List[str]] = None,
-             geojsons: Optional[List[str]] = None):
+             output_directory: str | None = None,
+             config_path: str | None = None,
+             path_to_transform: str | None = None,
+             images: list[str] | None = None,
+             annotations: list[str] | None = None,
+             pointsets: list[str] | None = None,
+             geojsons: list[str] | None = None):
     """Transforms provided data from moving to fixed image space by
     load a computed transformation. If registration_result
     is None, a registration_result is read from file. Registration_result

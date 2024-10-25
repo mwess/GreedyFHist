@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import os
 from os.path import join
-from typing import Dict, Optional
 
 import numpy, numpy as np
 
@@ -15,7 +14,7 @@ class Image:
     data: numpy.ndarray
     path: str
     is_annotation: bool = False
-    metadata: Optional[Dict] = None
+    metadata: dict | None = None
     
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms) -> 'Image':
         interpolation = 'LINEAR' if not self.is_annotation else 'NN'

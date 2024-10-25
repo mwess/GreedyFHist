@@ -1,8 +1,6 @@
 """
 Utils for transformation of image and warp functions.
 """
-from typing import Any, Optional, Tuple
-
 import cv2
 import numpy
 import numpy as np
@@ -96,7 +94,7 @@ def apply_mask(image: numpy.array, mask: numpy.array) -> numpy.array:
     return image * np.expand_dims(mask, -1).astype(np.uint8)
 
 
-def get_symmetric_padding(img1: numpy.array, img2: numpy.array) -> Tuple[padding_type, padding_type]:
+def get_symmetric_padding(img1: numpy.array, img2: numpy.array) -> tuple[padding_type, padding_type]:
     max_size = max(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
     # print(max_size)
     padding_img1 = get_padding_params(img1, max_size)
@@ -118,7 +116,11 @@ def get_padding_params(img: numpy.array, shape: int) -> padding_type:
     return pad_y_l, pad_y_u, pad_x_l, pad_x_u
 
 
-def denoise_image(image: numpy.array, resolution: int =512, sp: int =20, sr: int =20, maxLevel: int =2) -> numpy.array:
+def denoise_image(image: numpy.array, 
+                  resolution: int = 512, 
+                  sp: int = 20, 
+                  sr: int = 20, 
+                  maxLevel: int = 2) -> numpy.array:
     shape = image.shape
     img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     img_hsv = cv2.resize(img_hsv, (resolution, resolution))
@@ -159,7 +161,7 @@ def pad_asym(image: numpy.array, padding: padding_type, constant_values: int = 0
     return image
 
 
-def cropping(mask: numpy.array) -> Tuple[numpy.array, padding_type]:
+def cropping(mask: numpy.array) -> tuple[numpy.array, padding_type]:
     p = np.argwhere(mask == 1)
     min_x = int(np.min(p[:,0]))
     max_x = int(np.max(p[:,0]))
@@ -178,7 +180,7 @@ def resample_by_factor(img: numpy.array, factor: float) -> numpy.array:
 # TODO: Fix type for interpolator
 def resample_image_sitk(image: numpy.array, 
                         scaling_factor: float, 
-                        ref_image_shape: Optional[Tuple[int, int]] = None,
+                        ref_image_shape: tuple[int, int] | None = None,
                         interpolator: int = sitk.sitkLinear):
     if scaling_factor == 1:
         return image
@@ -199,17 +201,6 @@ def resample_image_sitk(image: numpy.array,
     return resampled_image_np
     
     
-def read_image(fpath: str, squeeze=False) -> numpy.array:
-    if fpath.endswith('tiff') or fpath.endswith('tif'):
-        image = tifffile.imread(fpath)
-        return image
-    sitk_image = sitk.ReadImage(fpath)
-    image = sitk.GetArrayFromImage(sitk_image)
-    if squeeze:
-        image = np.squeeze(image)
-    return image
-
-
 def derive_resampling_factor(image: numpy.array, 
                              max_resample_dim = 3500) -> float:
     """Determines the resampling factor necessary for rescaling the 
