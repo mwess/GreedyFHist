@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import os
 from os.path import join
-from typing import Dict, List, Union
 
 import geojson
 
@@ -22,7 +21,7 @@ class GeoJsonData:
         original_file_path
     """
     
-    data: Union[geojson.feature.FeatureCollection, List[geojson.feature.Feature]]
+    data: geojson.feature.FeatureCollection | list[geojson.feature.Feature]
     path: str
 
     def to_file(self, path: str):
@@ -40,7 +39,7 @@ class GeoJsonData:
         return GeoJsonData(warped_data, self.path)
     
     @classmethod
-    def load_data(cls, dct: Dict) -> 'GeoJsonData':
+    def load_data(cls, dct: dict) -> 'GeoJsonData':
         path = dct['path']
         with open(path, 'rb') as f:
             data = geojson.load(f)

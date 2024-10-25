@@ -1,4 +1,2 @@
-from typing import Tuple, Union
-
-padding_type = Tuple[int, int, int, int]
-image_shape = Union[Tuple[int, int, int], Tuple[int, int]]
+padding_type = tuple[int, int, int, int]
+image_shape = tuple[int, int, int] | tuple[int, int]

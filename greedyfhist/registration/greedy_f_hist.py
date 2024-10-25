@@ -1550,7 +1550,7 @@ class GreedyFHist:
         shutil.rmtree(directory)
 
     @classmethod
-    def load_from_config(cls, config: Optional[Dict[str, Any]] = None) -> 'GreedyFHist':
+    def load_from_config(cls, config: Optional[dict[str, Any]] = None) -> 'GreedyFHist':
         """Loads GreedyFHist registerer using additional arguments supplied in config.
 
         Args:
