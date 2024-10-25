@@ -7,6 +7,7 @@ import subprocess
 
 from greedyfhist.options import AffineGreedyOptions, NonrigidGreedyOptions
 
+
 def call_command(cmd: str):
     """
     Simple wrapper function around a command.
@@ -111,6 +112,7 @@ def affine_registration(path_to_greedy: str,
     aff_cmd = build_cmd_string(path_to_greedy, aff_rgs)
     aff_ret = call_command(aff_cmd)
     return aff_ret
+
 
 def deformable_registration(path_to_greedy: str,
                             path_fixed_image: str,
