@@ -5,19 +5,28 @@ GreedyFHist class. Results are exported as GroupwiseRegResult or
 RegistrationTransforms. 
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import os
 from os.path import join, exists
+from pathlib import Path
 import shutil
 import subprocess
-from typing import Any
+from typing import Any, Optional
 
 import geojson
 import numpy, numpy as np
 import SimpleITK, SimpleITK as sitk
 
-from greedyfhist.utils.io import create_if_not_exists, write_mat_to_file, clean_if_exists
+from greedyfhist.utils.io import (
+    create_if_not_exists, 
+    write_mat_to_file, 
+    clean_if_exists, 
+    read_image,
+    write_to_ometiffile
+)
+
 from greedyfhist.utils.image import (
     rescale_warp,
     rescale_affine,
@@ -34,7 +43,15 @@ from greedyfhist.utils.image import (
     realign_displacement_field,
     read_affine_transform
 )
-from greedyfhist.utils.utils import deformable_registration, affine_registration, composite_warps, affine_registration, deformable_registration
+
+from greedyfhist.utils.utils import (
+    deformable_registration, 
+    affine_registration, 
+    composite_warps, 
+    affine_registration, 
+    deformable_registration
+)
+
 from greedyfhist.segmentation import load_yolo_segmentation
 from greedyfhist.options import RegistrationOptions, PreprocessingOptions
 
@@ -244,7 +261,7 @@ class RegistrationResult:
 
     registration: 'RegistrationTransforms'
 
-    reverse_registration: 'RegistrationTransforms' | None
+    reverse_registration: Optional['RegistrationTransforms'] = None
 
     def to_directory(self, path: str):
         """
@@ -739,12 +756,105 @@ class GreedyFHist:
     name: str = 'GreedyFHist'
     path_to_greedy: str = 'greedy'
     use_docker_container: bool = False
-    segmentation_function: callable | None = None
+    segmentation_function: Callable | None = None
     cmdln_returns: list[Any] = field(default_factory=lambda: [])
 
     def __post_init__(self):
         if self.segmentation_function is None:
             self.segmentation_function = load_yolo_segmentation()
+
+    def register_from_filepaths(self,
+                                moving_img_path: str,
+                                fixed_img_path: str,
+                                target_img_path: str,
+                                moving_img_mask_path: str | None = None,
+                                fixed_img_mask_path: str | None = None,
+                                options: RegistrationOptions | None = None,
+                                transform_path: str | None = False
+                                ) -> tuple['RegistrationResult', numpy.ndarray | None]:
+        """Register two images by supplying only filepaths. Optionally filepaths for masks can be supplied.
+        If images cannot be read for some reason, consider the method `register`.
+        
+        Args:
+            moving_img_path (str): Path to source image.
+            fixed_img_path (str): Path to target image.
+            moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
+            fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
+            options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+
+        Returns:
+            RegistrationResult: Contains computed registration result.        
+        """
+        moving_image, mov_metadata = read_image(moving_img_path)
+        fixed_image, fix_metadata = read_image(fixed_img_path)
+        if moving_img_mask_path is not None:
+            moving_img_mask, _ = read_image(moving_img_mask_path, True)
+        else:
+            moving_img_mask = None
+        if fixed_img_mask_path is not None:
+            fixed_img_mask, _ = read_image(fixed_img_mask_path, True)
+        else:
+            fixed_img_mask = None
+        registration_result = self.register(moving_image,
+                                            fixed_image,
+                                            moving_img_mask,
+                                            fixed_img_mask,
+                                            options)
+        
+        warped_image = self.transform_image(moving_image, registration_result.registration.forward_transform)
+        write_to_ometiffile(warped_image,
+                            target_img_path,
+                            metadata=fix_metadata)
+        if transform_path is not None:
+            registration_result.to_directory(transform_path)
+        return registration_result, warped_image
+
+    def groupwise_registration_from_filepaths(self,
+                               image_mask_filepaths: list[tuple[str, str | None]],
+                               target_directory: str,
+                               options: RegistrationOptions | None = None,
+                               ) -> tuple[GroupwiseRegResult, list[numpy.ndarray]]:
+        """Performs groupwise registration based on filepaths. 
+
+        Args:
+            image_mask_filepaths (list[tuple[str, str  |  None]]): _description_
+            options (RegistrationOptions | None, optional): _description_. Defaults to None.
+
+        Returns:
+            tuple[GroupwiseRegResult, list[numpy.ndarray]]: _description_
+        """
+        img_mask_list = []
+        img_paths = []
+        for paths in image_mask_filepaths:
+            if isinstance(paths, tuple) or isinstance(paths, list):
+                img_path = paths[0]
+                mask_path = paths[1]
+            else:
+                img_path = paths
+                mask_path = None
+            img_paths.append(img_path)
+            img, _ = read_image(img_path)
+            if mask_path is not None:
+                mask, _ = read_image(mask_path, True).squeeze()
+            else:
+                mask = None
+            img_mask_list.append((img, mask))
+        groupwise_registration_result, warped_images = self.groupwise_registration(img_mask_list, options)
+        warped_images.append(img_mask_list[-1][0])
+        image_target_directory = join(target_directory, 'images')
+        Path(image_target_directory).mkdir(parents=True, exist_ok=True)
+        for img, img_path in zip(warped_images, img_paths):
+            fname = os.path.basename(img_path)
+            if fname.endswith('.ome.tif'):
+                fname = fname.replace('.ome.tif', '')
+            else:
+                fname = os.path.splitext(fname)[0]
+            fname = os.path.join(image_target_directory, f'{fname}.ome.tif')
+            write_to_ometiffile(img, fname)
+        groupwise_registration_result.to_file(join(target_directory, 'transform'))
+        return groupwise_registration_result, warped_images
+            
+        
 
     def register(self,
                  moving_img: numpy.ndarray,
@@ -759,8 +869,8 @@ class GreedyFHist:
         
 
         Args:
-            moving_img (numpy.ndarray): 
-            fixed_img (numpy.ndarray): 
+            moving_img (numpy.ndarray): Source image.
+            fixed_img (numpy.ndarray): Target image.
             moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
             fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
             options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
@@ -781,7 +891,7 @@ class GreedyFHist:
                  moving_img_mask: numpy.ndarray | None = None,
                  fixed_img_mask: numpy.ndarray | None = None,
                  options: RegistrationOptions | None = None,                  
-                 **kwargs: dict) -> tuple['RegistrationTransforms', 'RegistrationTransforms' | None]:
+                 **kwargs: dict) -> tuple['RegistrationTransforms', Optional['RegistrationTransforms']]:
         """Computes registration from moving image to fixed image.
 
         Args:

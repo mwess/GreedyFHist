@@ -31,8 +31,8 @@ class HistologySection:
     additional_data: list[Any] = field(default_factory=list)
     
     def register_to_image(self, 
-                          fixed_image: numpy.array, 
-                          fixed_mask: numpy.array | None = None, 
+                          fixed_image: numpy.ndarray, 
+                          fixed_mask: numpy.ndarray | None = None, 
                           options: RegistrationOptions | None = None,
                           registerer: GreedyFHist | None = None) -> RegistrationTransforms:
         if registerer is None:

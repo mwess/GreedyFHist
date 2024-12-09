@@ -10,14 +10,14 @@ import onnxruntime as ort
 from greedyfhist.segmentation.yolo8_parsing import postprocess
 
 
-def fill_hole(mask: numpy.array) -> numpy.array:
+def fill_hole(mask: numpy.ndarray) -> numpy.ndarray:
     """Fills any holes in the computed mask.
 
     Args:
-        mask (numpy.array): 2d mask.
+        mask (numpy.ndarray): 2d mask.
 
     Returns:
-        numpy.array: Mask filled with holes.
+        numpy.ndarray: Mask filled with holes.
     """
     seed = np.copy(mask)
     seed[1:-1, 1:-1] = 1 
@@ -27,7 +27,7 @@ def fill_hole(mask: numpy.array) -> numpy.array:
     return filled
 
 
-def preprocess_for_segmentation(image: numpy.array) -> numpy.array:
+def preprocess_for_segmentation(image: numpy.ndarray) -> numpy.ndarray:
     """Applies preprocessing steps to image before segmentation:
         1. Downscaling (640x640)
         2. Grayscale conversion
@@ -35,10 +35,10 @@ def preprocess_for_segmentation(image: numpy.array) -> numpy.array:
         4. Stacking of grayscale images.
 
     Args:
-        image (numpy.array): Image to preprocess
+        image (numpy.ndarray): Image to preprocess
 
     Returns:
-        numpy.array: Preprocessed image.
+        numpy.ndarray: Preprocessed image.
     """
     image = cv2.resize(image, (640, 640))
     image_gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -75,16 +75,16 @@ def load_yolo_segmentation() -> callable:
     IMAGE_SHAPE = (640, 640)
 
 
-    def _predict(image: numpy.array, min_area_size: int = 10000, fill_holes: bool = True) -> numpy.array:
+    def _predict(image: numpy.ndarray, min_area_size: int = 10000, fill_holes: bool = True) -> numpy.ndarray:
         """Segmentation function for foreground segmentation of histology image.
 
         Args:
-            image (numpy.array): Image to segment.
+            image (numpy.ndarray): Image to segment.
             min_area_size (int, optional): Filters out all smaller patches of misclassified noise by removing every region smaller than limit. Defaults to 10000.
             fill_holes (bool, optional): If True, fills all holes in mask.. Defaults to True.
 
         Returns:
-            numpy.array: Segmented image.
+            numpy.ndarray: Segmented image.
         """
         preprocessed_image = preprocess_for_segmentation(image)
         preprocessed_image = (np.expand_dims(np.moveaxis(preprocessed_image, 2, 0), 0) / 255.).astype(np.float32)

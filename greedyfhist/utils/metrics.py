@@ -2,7 +2,7 @@ import numpy, numpy as np
 import pandas
 
 
-def eucl(src: numpy.array, dst: numpy.array) -> float:
+def eucl(src: numpy.ndarray, dst: numpy.ndarray) -> float:
     return np.sqrt(np.square(src[:, 0] - dst[:, 0]) + np.square(src[:, 1] - dst[:, 1]))
 
 

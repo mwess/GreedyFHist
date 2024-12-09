@@ -34,11 +34,11 @@ def clean_if_exists(path: str):
         shutil.rmtree(path)
 
 
-def write_mat_to_file(mat: numpy.array, fname: str) -> None:
+def write_mat_to_file(mat: numpy.ndarray, fname: str) -> None:
     """Writes 2d affine matrix to file. File format is human readable.
 
     Args:
-        mat (numpy.array): 
+        mat (numpy.ndarray): 
         fname (str):
     """
     out_str = f'{mat[0,0]} {mat[0,1]} {mat[0,2]}\n{mat[1,0]} {mat[1,1]} {mat[1,2]}\n{mat[2,0]} {mat[2,1]} {mat[2,2]}'
@@ -80,7 +80,7 @@ def get_default_metadata():
     return metadata
 
 
-def write_to_ometiffile(img: numpy.array, 
+def write_to_ometiffile(img: numpy.ndarray, 
                      path: str, 
                      metadata: dict = None, 
                      is_annotation: bool = False,
@@ -97,7 +97,7 @@ def write_to_ometiffile(img: numpy.array,
     the format C x W x H is expected, otherwise W x H x C, or W x H.  
 
     Args:
-        img (numpy.array): Image to be stored. 
+        img (numpy.ndarray): Image to be stored. 
         path (str): Output path.
         metadata (Dict): Contains metadata for ome.tif. Only used if
                          images original source was also tif. If None,
@@ -180,7 +180,7 @@ def is_tiff_file(suffix: str) -> bool:
     return suffix in ['.tif', '.tiff']
 
 
-def read_image(path: str, is_annotation: bool = False) -> numpy.array | Optional[dict]:
+def read_image(path: str, is_annotation: bool = False) -> numpy.ndarray | Optional[dict]:
     suffix = os.path.splitext(path)[1]
     metadata = None
     if is_tiff_file(suffix):

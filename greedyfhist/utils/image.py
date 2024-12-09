@@ -16,7 +16,7 @@ from greedyfhist.utils.utils import call_command
 from greedyfhist.custom_types import padding_type, image_shape
 
 
-def com_affine_matrix(fixed: numpy.array, moving: numpy.array) -> numpy.array:
+def com_affine_matrix(fixed: numpy.ndarray, moving: numpy.ndarray) -> numpy.ndarray:
     """
     Compute the difference in center of mass between fixed and moving image masks.
 
@@ -30,12 +30,12 @@ def com_affine_matrix(fixed: numpy.array, moving: numpy.array) -> numpy.array:
     return mat
 
 
-def get_com_offset(mat: numpy.array) -> float:
+def get_com_offset(mat: numpy.ndarray) -> float:
     """
     Computes the translation offset of the given matrix.
     
     Args:
-        mat (numpy.array):
+        mat (numpy.ndarray):
             transform matrix
             
     Returns:
@@ -88,13 +88,13 @@ def rescale_warp(small_warp_path: str,
     sitk.WriteImage(big_warp_sitk, big_warp_path)
 
 
-def apply_mask(image: numpy.array, mask: numpy.array) -> numpy.array:
+def apply_mask(image: numpy.ndarray, mask: numpy.ndarray) -> numpy.ndarray:
     if len(image.shape) == 2:
         return image * mask
     return image * np.expand_dims(mask, -1).astype(np.uint8)
 
 
-def get_symmetric_padding(img1: numpy.array, img2: numpy.array) -> tuple[padding_type, padding_type]:
+def get_symmetric_padding(img1: numpy.ndarray, img2: numpy.ndarray) -> tuple[padding_type, padding_type]:
     max_size = max(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
     # print(max_size)
     padding_img1 = get_padding_params(img1, max_size)
@@ -102,7 +102,7 @@ def get_symmetric_padding(img1: numpy.array, img2: numpy.array) -> tuple[padding
     return padding_img1, padding_img2
 
 
-def get_padding_params(img: numpy.array, shape: int) -> padding_type:
+def get_padding_params(img: numpy.ndarray, shape: int) -> padding_type:
     pad_x = shape - img.shape[0]
     pad_x_l = pad_x // 2
     pad_x_u = pad_x // 2
@@ -116,11 +116,11 @@ def get_padding_params(img: numpy.array, shape: int) -> padding_type:
     return pad_y_l, pad_y_u, pad_x_l, pad_x_u
 
 
-def denoise_image(image: numpy.array, 
+def denoise_image(image: numpy.ndarray, 
                   resolution: int = 512, 
                   sp: int = 20, 
                   sr: int = 20, 
-                  maxLevel: int = 2) -> numpy.array:
+                  maxLevel: int = 2) -> numpy.ndarray:
     shape = image.shape
     img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     img_hsv = cv2.resize(img_hsv, (resolution, resolution))
@@ -130,7 +130,7 @@ def denoise_image(image: numpy.array,
     return img_denoised
 
 
-def resample_image_with_gaussian(image: numpy.array, resolution: image_shape, sigma: float):
+def resample_image_with_gaussian(image: numpy.ndarray, resolution: image_shape, sigma: float):
     image = gaussian(image, sigma, channel_axis=-1)
     image = resize(image, resolution)
     if len(image.shape) == 3:
@@ -140,7 +140,7 @@ def resample_image_with_gaussian(image: numpy.array, resolution: image_shape, si
     return image
 
 
-def pad_image(image: numpy.array, padding: padding_type, constant_values: float = 0) -> numpy.array:
+def pad_image(image: numpy.ndarray, padding: padding_type, constant_values: float = 0) -> numpy.ndarray:
     dims = len(image.shape)
     if dims == 2:
         padded_image = np.pad(image, ((padding, padding), (padding, padding)), constant_values=constant_values)
@@ -151,7 +151,7 @@ def pad_image(image: numpy.array, padding: padding_type, constant_values: float 
     return padded_image
 
 
-def pad_asym(image: numpy.array, padding: padding_type, constant_values: int = 0) -> numpy.array:
+def pad_asym(image: numpy.ndarray, padding: padding_type, constant_values: int = 0) -> numpy.ndarray:
     left, right, top, bottom = padding
     if len(image.shape) == 2:
         image = np.pad(image, ((top, bottom), (left, right)), constant_values=constant_values)
@@ -161,7 +161,7 @@ def pad_asym(image: numpy.array, padding: padding_type, constant_values: int = 0
     return image
 
 
-def cropping(mask: numpy.array) -> tuple[numpy.array, padding_type]:
+def cropping(mask: numpy.ndarray) -> tuple[numpy.ndarray, padding_type]:
     p = np.argwhere(mask == 1)
     min_x = int(np.min(p[:,0]))
     max_x = int(np.max(p[:,0]))
@@ -171,14 +171,14 @@ def cropping(mask: numpy.array) -> tuple[numpy.array, padding_type]:
     return cropped_mask, (min_x, max_x, min_y, max_y)    
 
 
-def resample_by_factor(img: numpy.array, factor: float) -> numpy.array:
+def resample_by_factor(img: numpy.ndarray, factor: float) -> numpy.ndarray:
     h, w = img.shape[:2]
     img2 = cv2.resize(img, (int(w*factor), int(h*factor)))
     return img2
 
 
 # TODO: Fix type for interpolator
-def resample_image_sitk(image: numpy.array, 
+def resample_image_sitk(image: numpy.ndarray, 
                         scaling_factor: float, 
                         ref_image_shape: tuple[int, int] | None = None,
                         interpolator: int = sitk.sitkLinear):
@@ -201,7 +201,7 @@ def resample_image_sitk(image: numpy.array,
     return resampled_image_np
     
     
-def derive_resampling_factor(image: numpy.array, 
+def derive_resampling_factor(image: numpy.ndarray, 
                              max_resample_dim = 3500) -> float:
     """Determines the resampling factor necessary for rescaling the 
     given image to max_resample_dim. If the image's maximum 
@@ -209,7 +209,7 @@ def derive_resampling_factor(image: numpy.array,
     scaling factor of 1 will be returned.
 
     Args:
-        image (numpy.array): 
+        image (numpy.ndarray): 
         max_resample_dim (int, optional): Defaults to 3500.
 
     Returns:
@@ -256,7 +256,7 @@ def translation_length(x: float, y: float) -> float:
     return np.sqrt(np.square(x) + np.square(y))
 
 
-def pad_image_square(img: numpy.array) -> numpy.array:
+def pad_image_square(img: numpy.ndarray) -> numpy.ndarray:
     max_dim = np.max(img.shape[:2])
     padding = get_padding_params(img, max_dim)
     return pad_asym(img, padding)

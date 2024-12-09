@@ -2,7 +2,7 @@ import cv2
 import numpy, numpy as np
 
 
-def postprocess(preds: tuple[numpy.array, numpy.array], 
+def postprocess(preds: tuple[numpy.ndarray, numpy.ndarray], 
                 conf_threshold: float = 0.4, 
                 iou_threshold: float = 0.45, 
                 nm: int = 32, 

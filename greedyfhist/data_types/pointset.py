@@ -48,7 +48,7 @@ class Pointset:
     index_col: int | None = None
     header: int | None = None
 
-    def to_numpy(self) -> numpy.array:
+    def to_numpy(self) -> numpy.ndarray:
         return self.data[[self.x_axis, self.y_axis]].to_numpy()
 
     def to_file(self, path: str):
