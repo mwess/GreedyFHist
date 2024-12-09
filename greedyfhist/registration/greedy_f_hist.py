@@ -818,10 +818,11 @@ class GreedyFHist:
 
         Args:
             image_mask_filepaths (list[tuple[str, str  |  None]]): _description_
-            options (RegistrationOptions | None, optional): _description_. Defaults to None.
+            target_directory (str): Target directory for storing registered images and transformations.
+            options (RegistrationOptions | None, optional): Options for registration. Defaults to None.
 
         Returns:
-            tuple[GroupwiseRegResult, list[numpy.ndarray]]: _description_
+            tuple[GroupwiseRegResult, list[numpy.ndarray]]: Transformations and transformed images.
         """
         img_mask_list = []
         img_paths = []

@@ -387,7 +387,7 @@ def groupwise_registration(config_path: str):
             section_output_directory_transform = join(section_output_directory, 'transformations')
             create_if_not_exists(section_output_directory_transform)
             transform.to_directory(section_output_directory_transform)
-        warped_section = section.apply_transformation(transform, registerer)
+        warped_section = section.apply_transformation(transform.registration, registerer)
         section_output_directory_data = join(section_output_directory, 'transformed_data')
         create_if_not_exists(section_output_directory_data)
         warped_section.to_directory(section_output_directory_data)

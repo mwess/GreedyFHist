@@ -6,7 +6,7 @@ path_to_greedy = ''
 
 [gfh_options]
 
-pre_sampling_factor = 0.25
+pre_sampling_factor = 'auto'
 pre_sampling_auto_factor = 3500
 do_affine_registration = true
 do_nonrigid_registration = true
