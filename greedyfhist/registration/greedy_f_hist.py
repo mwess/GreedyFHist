@@ -1538,7 +1538,7 @@ class GreedyFHist:
                         image: numpy.ndarray,
                         transform: 'GFHTransform',
                         interpolation_mode: str = 'LINEAR') -> numpy.ndarray:
-        """Transforms image data from moving to fixed image space using computed transformation.
+        """Transforms image data from moving to fixed image space using computed transformation. Use forward_transform attribute.
 
         Args:
             image (numpy.ndarray): 
@@ -1584,7 +1584,7 @@ class GreedyFHist:
     def transform_pointset(self,
                            pointset: numpy.ndarray,
                            transform: GFHTransform) -> numpy.ndarray:
-        """Transforms pointset from moving to fixed image space.
+        """Transforms pointset from moving to fixed image space. Use backward_transform attribute.
 
         Args:
             pointset (numpy.ndarray): 
