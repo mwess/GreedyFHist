@@ -6,7 +6,7 @@ import cv2
 import toml
 
 from greedyfhist.utils.io import create_if_not_exists, write_to_ometiffile
-from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms
+from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms, RegistrationResult
 from greedyfhist.options.options import RegistrationOptions
 from greedyfhist.data_types import Pointset, GeoJsonData, HistologySection, Image
 
@@ -231,7 +231,7 @@ def register(moving_image_path: str | None = None,
 
 
     # Setup file structure
-    output_directory_registrations = join(output_directory, 'registrations')
+    output_directory_registrations = join(output_directory, 'transformation')
     create_if_not_exists(output_directory_registrations)
 
     fixed_image = Image.load_from_path(fixed_image_path)
@@ -295,16 +295,13 @@ def apply_transformation(
 
 
     Args:
-        moving_image_path (Optional[str], optional): Defaults to None.
-        fixed_image_path (Optional[str], optional): Defaults to None.
-        output_directory (Optional[str], optional): Defaults to None.
-        moving_mask_path (Optional[str], optional): Defaults to None.
-        fixed_mask_path (Optional[str], optional): Defaults to None.
-        config_path (Optional[str], optional): Defaults to None.
-        additional_images (Optional[List[str]], optional): Defaults to None.
-        additional_annotations (Optional[List[str]], optional): Defaults to None.
-        additional_pointsets (Optional[List[str]], optional): Defaults to None.
-        additional_geojsons (Optional[List[str]], optional): Defaults to None.
+        output_directory (str | None, optional): _description_. Defaults to None.
+        config_path (str | None, optional): _description_. Defaults to None.
+        path_to_transform (str | None, optional): _description_. Defaults to None.
+        images (list[str] | None, optional): _description_. Defaults to None.
+        annotations (list[str] | None, optional): _description_. Defaults to None.
+        pointsets (list[str] | None, optional): _description_. Defaults to None.
+        geojsons (list[str] | None, optional): _description_. Defaults to None.
     """
     if images is None:
         images = []
@@ -328,7 +325,7 @@ def apply_transformation(
         print('No transform provided.')
         exit(0)
     # TODO: Load registration_result
-    registration_result = None
+    registration_result = RegistrationTransforms.load(path_to_transform)
 
     moving_histology_section = HistologySection(ref_image=None, ref_mask=None)
     for image_path in images:

@@ -71,14 +71,12 @@ def transform(transformation=None,
          pointsets=None,
          geojsons=None):
     cmdln_processor.apply_transformation(output_directory=output_directory,
-                                         config=config,
+                                         config_path=config,
+                                         path_to_transform=transformation,
                                          images=images,
                                          annotations=annotations,
                                          pointsets=pointsets,
-                                         geojsons=geojsons,                                         
-                                         registerer=None,
-                                         registration_result=None,
-                                         registration_result_path=transformation)
+                                         geojsons=geojsons)
 
 
 

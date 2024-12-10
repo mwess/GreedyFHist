@@ -31,6 +31,8 @@ secret_scripts/
 
 examples/scripts/out
 examples/scripts/group_out
+examples/scripts/pairwise-transform-example
 examples/notebooks/out
+
 
 docs/build/
