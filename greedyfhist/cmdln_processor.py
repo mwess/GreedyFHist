@@ -82,6 +82,14 @@ def load_image_from_config(config: dict) -> Image:
 
 
 def guess_type(path: str) -> str:
+    """Guesses which intrinsic GreedyFHist datatype fits best.
+
+    Args:
+        path (str): 
+
+    Returns:
+        str:
+    """
     if path.endswith('geojson'):
         return 'geojson'
     if path.endswith('csv'):
@@ -92,6 +100,14 @@ def guess_type(path: str) -> str:
 
 
 def load_data_from_config(config: dict) -> Image | Pointset | GeoJsonData:
+    """Loads datatypes from config.
+
+    Args:
+        config (dict):
+
+    Returns:
+        Image | Pointset | GeoJsonData:
+    """
     type_ = config.get('type', None)
     if type_ is None:
         type_ = guess_type(config['path'])
@@ -105,6 +121,14 @@ def load_data_from_config(config: dict) -> Image | Pointset | GeoJsonData:
 
 
 def load_sections(section_configs: dict) -> list[HistologySection]:
+    """Loads multiple histology sections from config.
+
+    Args:
+        section_configs (dict):
+
+    Returns:
+        list[HistologySection]:
+    """
     sections = []
     sorted_keys = sorted(section_configs.keys(), key=lambda x: int(x.replace('section', '')))
     for key in sorted_keys:
@@ -115,6 +139,14 @@ def load_sections(section_configs: dict) -> list[HistologySection]:
 
 
 def load_histology_section_from_config(config: dict) -> HistologySection:
+    """Loads one histology section from config.
+
+    Args:
+        config (dict): 
+
+    Returns:
+        HistologySection: 
+    """
     ref_img_config = config.get('reference_image', None)
     if ref_img_config is not None:
         reference_image = load_image_from_config(ref_img_config)
@@ -139,7 +171,16 @@ def load_histology_section_from_config(config: dict) -> HistologySection:
 
 
 def load_base_histology_section(image_path: str | None = None,
-                                mask_path: str | None = None):
+                                mask_path: str | None = None) -> 'HistologySection':
+    """Loads histology section from filepath. Optionally an image mask can be parsed along.
+
+    Args:
+        image_path (str | None, optional): Defaults to None.
+        mask_path (str | None, optional): Defaults to None.
+
+    Returns:
+        HistologySection: 
+    """
     if image_path is not None:
         image = Image.load_from_path(image_path)
     else:
@@ -353,6 +394,11 @@ def apply_transformation(
 
 
 def groupwise_registration(config_path: str):
+    """Performs groupwise registration based on config.
+
+    Args:
+        config_path (str):
+    """
     if config_path is not None:
         with open(config_path) as f:
             config = toml.load(f)

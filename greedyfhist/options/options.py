@@ -1,15 +1,30 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-def get_3_step_pyramid_iterations():
+def get_3_step_pyramid_iterations() -> list[int]:
+    """Returns a default 3 step pyramid with iterations 100, 50 and 10.
+
+    Returns:
+        list[int]: pyramid with iterations
+    """
     return [100, 50, 10]
 
 
-def get_4_step_pyramid_iterations():
+def get_4_step_pyramid_iterations() -> list[int]:
+    """Returns a default 3 step pyramid with iterations 100, 100, 50 and 10.
+
+    Returns:
+        list[int]:
+    """
     return [100, 100, 50, 10]
 
 
-def load_default_resolution():
+def load_default_resolution() -> tuple[int, int]:
+    """Loads the default resolution of 1024 x 1024.
+
+    Returns:
+        tuple[int, int]:
+    """
     return (1024, 1024)
 
 

@@ -5,6 +5,9 @@ import os
 import shlex
 import subprocess
 
+import numpy, numpy as np
+import SimpleITK, SimpleITK as sitk
+
 from greedyfhist.options import AffineGreedyOptions, NonrigidGreedyOptions
 
 
@@ -39,6 +42,19 @@ def composite_warps(path_to_greedy: str,
                     path_small_ref_img: str,
                     path_small_composite_warp: str,
                     invert=False) -> subprocess.CompletedProcess:
+    """Calls greedy to composite transformations.
+
+    Args:
+        path_to_greedy (str):
+        path_small_affine (str | None): Path to affine transform.
+        path_small_warp (str | None): Path to displacement field.
+        path_small_ref_img (str): Path to reference image.
+        path_small_composite_warp (str): Path to output composite displacement field.
+        invert (bool, optional): If True, inverts to order of composition. Defaults to False.
+
+    Returns:
+        subprocess.CompletedProcess: 
+    """
     
     args = {}
     args['-rf'] = path_small_ref_img
@@ -172,3 +188,159 @@ def deformable_registration(path_to_greedy: str,
     def_cmd = build_cmd_string(path_to_greedy, def_args)
     def_ret = call_command(def_cmd)
     return def_ret
+
+
+def composite_sitk_transforms(transforms: list[SimpleITK.SimpleITK.Transform]) -> SimpleITK.SimpleITK.Transform:
+    """Composites all Transforms into one composite transform.
+
+    Args:
+        transforms (List[SimpleITK.SimpleITK.Transform]): 
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: 
+    """
+    composited_transform = sitk.CompositeTransform(2)
+    for transform in transforms:
+        composited_transform.AddTransform(transform)
+    return composited_transform
+
+
+def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
+                           moving_preprocessing_params: dict,
+                           fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
+    """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward affine/nonrigid registration.  
+
+    Args:
+        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
+        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
+        reverse (bool): Switches moving and fixed preprocessing params if True.
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: Composited end-to-end registration.
+    """
+    moving_padding = moving_preprocessing_params['padding']
+    moving_cropping = moving_preprocessing_params['cropping_params']
+    fixed_padding = fixed_preprocessing_params['padding']
+    fixed_cropping = fixed_preprocessing_params['cropping_params']
+    mov_ds_factor = moving_preprocessing_params['resampling_factor']
+    fix_ds_factor = fixed_preprocessing_params['resampling_factor']
+    
+    all_transforms = sitk.CompositeTransform(2)
+
+    pre_downscale_transform = sitk.ScaleTransform(2, (1/mov_ds_factor, 1/mov_ds_factor))
+    post_upscale_transform = sitk.ScaleTransform(2, (fix_ds_factor, fix_ds_factor))
+    
+    aff_trans1 = sitk.TranslationTransform(2)
+    offset_x = moving_cropping[2]
+    offset_y = moving_cropping[0]
+    aff_trans1.SetOffset((offset_x, offset_y))
+
+    aff_trans2 = sitk.TranslationTransform(2)
+    offset_x = -moving_padding[0]
+    offset_y = -moving_padding[2]
+    aff_trans2.SetOffset((offset_x, offset_y))
+    
+
+    
+    aff_trans3 = sitk.TranslationTransform(2)
+    aff_trans3.SetOffset((fixed_padding[0], fixed_padding[2]))
+    
+    aff_trans4 = sitk.TranslationTransform(2)
+    aff_trans4.SetOffset((-fixed_cropping[2], -fixed_cropping[0]))
+
+    all_transforms.AddTransform(pre_downscale_transform)
+    all_transforms.AddTransform(aff_trans1)
+    all_transforms.AddTransform(aff_trans2)
+    all_transforms.AddTransform(transform)
+    all_transforms.AddTransform(aff_trans3)
+    all_transforms.AddTransform(aff_trans4)
+    all_transforms.AddTransform(post_upscale_transform)
+    return all_transforms
+
+def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
+                               moving_preprocessing_params: dict,
+                               fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
+    """Pre- and appends preprocessing steps from moving and fixed image as transforms to backward affine/nonrigid registration.  
+
+    Args:
+        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
+        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: Composited end-to-end transform.
+    """
+    moving_padding = moving_preprocessing_params['padding']
+    moving_cropping = moving_preprocessing_params['cropping_params']
+    fixed_padding = fixed_preprocessing_params['padding']
+    fixed_cropping = fixed_preprocessing_params['cropping_params']
+    mov_ds_factor = moving_preprocessing_params['resampling_factor']
+    fix_ds_factor = fixed_preprocessing_params['resampling_factor']
+    
+    all_transforms = sitk.CompositeTransform(2)
+
+    pre_downscale_transform = sitk.ScaleTransform(2, (1/fix_ds_factor, 1/fix_ds_factor))
+    post_upscale_transform = sitk.ScaleTransform(2, (mov_ds_factor, mov_ds_factor))
+
+    aff_trans1 = sitk.TranslationTransform(2)
+    offset_x = moving_cropping[2]
+    offset_y = moving_cropping[0]
+    aff_trans1.SetOffset((offset_x, offset_y))
+
+    aff_trans2 = sitk.TranslationTransform(2)
+    offset_x = -moving_padding[0]
+    offset_y = -moving_padding[2]
+    aff_trans2.SetOffset((offset_x, offset_y))
+    
+
+    aff_trans3 = sitk.TranslationTransform(2)
+    aff_trans3.SetOffset((fixed_padding[0], fixed_padding[2]))
+    
+    aff_trans4 = sitk.TranslationTransform(2)
+    aff_trans4.SetOffset((-fixed_cropping[2], -fixed_cropping[0]))
+
+    all_transforms.AddTransform(pre_downscale_transform)
+    all_transforms.AddTransform(aff_trans4)
+    all_transforms.AddTransform(aff_trans3)
+    all_transforms.AddTransform(transform)
+    all_transforms.AddTransform(aff_trans2)
+    all_transforms.AddTransform(aff_trans1)
+    all_transforms.AddTransform(post_upscale_transform)
+    return all_transforms
+
+
+# TODO: There is probably a better way to ensure the dtype of the image.
+def correct_img_dtype(img: numpy.ndarray) -> numpy.ndarray:
+    """Changes the image type from float to np.uint8 if necessary.
+
+    Args:
+        img (numpy.ndarray): 
+
+    Returns:
+        numpy.ndarray: 
+    """
+    if np.issubdtype(img.dtype, np.floating):
+        img = (img * 255).astype(np.uint8)
+    else:
+        img = img.astype(np.uint8)
+    return img
+
+
+def derive_sampling_factors(pre_sampling_factor: float | str,
+                           max_size: int,
+                           pre_sampling_max_img_size: int | None) -> tuple[float, float]:
+        if pre_sampling_factor == 'auto':
+            if pre_sampling_max_img_size is not None:
+                if max_size > pre_sampling_max_img_size:
+                    resampling_factor = pre_sampling_max_img_size / max_size
+                    moving_resampling_factor = resampling_factor
+                    fixed_resampling_factor = resampling_factor
+                else:
+                    moving_resampling_factor = 1
+                    fixed_resampling_factor = 1
+            else:
+                moving_resampling_factor = 1
+                fixed_resampling_factor = 1
+        else:
+            moving_resampling_factor = 1
+            fixed_resampling_factor = 1
+        return moving_resampling_factor, fixed_resampling_factor 

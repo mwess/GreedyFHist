@@ -2,17 +2,14 @@
 Utils for transformation of image and warp functions.
 """
 import cv2
-import numpy
-import numpy as np
+import numpy, numpy as np
 import scipy.ndimage as nd
-import SimpleITK
-import SimpleITK as sitk
+import SimpleITK, SimpleITK as sitk
 from skimage.transform import resize
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
 import tifffile
 
-from greedyfhist.utils.utils import call_command
 from greedyfhist.custom_types import padding_type, image_shape
 
 
@@ -46,6 +43,14 @@ def get_com_offset(mat: numpy.ndarray) -> float:
 
 
 def read_affine_transform(small_affine_path: str) -> SimpleITK.SimpleITK.Transform:
+    """Reads affine transform from file.
+
+    Args:
+        small_affine_path (str): Source file path.
+
+    Returns:
+        SimpleITK.SimpleITK.Transform:
+    """
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
     # Modify translation vector
@@ -56,8 +61,16 @@ def read_affine_transform(small_affine_path: str) -> SimpleITK.SimpleITK.Transfo
     return affine_transform
     
 
-
 def rescale_affine(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK.Transform:
+    """Reads affine transformation matrix and scales it by factor.
+
+    Args:
+        small_affine_path (str): 
+        factor (float): 
+
+    Returns:
+        SimpleITK.SimpleITK.Transform: 
+    """
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
     # Modify translation vector
@@ -75,6 +88,15 @@ def rescale_warp(small_warp_path: str,
                  small_resolution: image_shape,
                  original_resolution: image_shape,
                  factor: float):
+    """Reads a displacement field, removes padding, scales it by factor and writes it to a new file.
+
+    Args:
+        small_warp_path (str): Source file path.
+        big_warp_path (str): Target file path.
+        small_resolution (image_shape): Source resolution without padding
+        original_resolution (image_shape): Target resolution
+        factor (float): Scaling factor.
+    """
     warp_sitk = sitk.ReadImage(small_warp_path)
     warp = sitk.GetArrayFromImage(warp_sitk)
     mask = np.ones((small_resolution[0], small_resolution[1], 2), dtype=np.uint8)
@@ -89,12 +111,30 @@ def rescale_warp(small_warp_path: str,
 
 
 def apply_mask(image: numpy.ndarray, mask: numpy.ndarray) -> numpy.ndarray:
+    """Applies mask to image.
+
+    Args:
+        image (numpy.ndarray): 
+        mask (numpy.ndarray): 
+
+    Returns:
+        numpy.ndarray: 
+    """
     if len(image.shape) == 2:
         return image * mask
     return image * np.expand_dims(mask, -1).astype(np.uint8)
 
 
 def get_symmetric_padding(img1: numpy.ndarray, img2: numpy.ndarray) -> tuple[padding_type, padding_type]:
+    """Get padding parameters to make img1 and img2 uniform.
+
+    Args:
+        img1 (numpy.ndarray): 
+        img2 (numpy.ndarray): 
+
+    Returns:
+        tuple[padding_type, padding_type]: 
+    """
     max_size = max(img1.shape[0], img1.shape[1], img2.shape[0], img2.shape[1])
     # print(max_size)
     padding_img1 = get_padding_params(img1, max_size)
@@ -103,6 +143,15 @@ def get_symmetric_padding(img1: numpy.ndarray, img2: numpy.ndarray) -> tuple[pad
 
 
 def get_padding_params(img: numpy.ndarray, shape: int) -> padding_type:
+    """Get padding parameters for img.
+
+    Args:
+        img (numpy.ndarray):
+        shape (int): Square shape.
+
+    Returns:
+        padding_type: Padding
+    """
     pad_x = shape - img.shape[0]
     pad_x_l = pad_x // 2
     pad_x_u = pad_x // 2
@@ -121,6 +170,22 @@ def denoise_image(image: numpy.ndarray,
                   sp: int = 20, 
                   sr: int = 20, 
                   maxLevel: int = 2) -> numpy.ndarray:
+    """Applies mean shift filtering to denoise the input image:
+        - Image is changed from RGB to HSV.
+        - Downscaling
+        - Mean shift filtering.
+        - Upscaling. 
+
+    Args:
+        image (numpy.ndarray): Input image.
+        resolution (int, optional): Downscaling applied prior to denoising. Defaults to 512.
+        sp (int, optional): Spatial window radius. Defaults to 20.
+        sr (int, optional): Color window radius. Defaults to 20.
+        maxLevel (int, optional): Maximum recursion level. Defaults to 2.
+
+    Returns:
+        numpy.ndarray: Denoised input image.
+    """
     shape = image.shape
     img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     img_hsv = cv2.resize(img_hsv, (resolution, resolution))
@@ -130,7 +195,18 @@ def denoise_image(image: numpy.ndarray,
     return img_denoised
 
 
-def resample_image_with_gaussian(image: numpy.ndarray, resolution: image_shape, sigma: float):
+def resample_image_with_gaussian(image: numpy.ndarray, resolution: image_shape, sigma: float) -> numpy.ndarray:
+    """Resamples image to target resolution. Gaussian smoothing is applied beforehand to 
+    help with anti-aliasing effects.
+
+    Args:
+        image (numpy.ndarray): 
+        resolution (image_shape): 
+        sigma (float): Applied to gaussian.
+
+    Returns:
+        numpy.ndarray: Resampled image.
+    """
     image = gaussian(image, sigma, channel_axis=-1)
     image = resize(image, resolution)
     if len(image.shape) == 3:
@@ -140,7 +216,17 @@ def resample_image_with_gaussian(image: numpy.ndarray, resolution: image_shape, 
     return image
 
 
-def pad_image(image: numpy.ndarray, padding: padding_type, constant_values: float = 0) -> numpy.ndarray:
+def pad_image(image: numpy.ndarray, padding: int, constant_values: float = 0) -> numpy.ndarray:
+    """Pads image symmetrically with given padding value.
+
+    Args:
+        image (numpy.ndarray): 
+        padding (padding_type): 
+        constant_values (float, optional): Padding value. Defaults to 0.
+
+    Returns:
+        numpy.ndarray: Padded image.
+    """
     dims = len(image.shape)
     if dims == 2:
         padded_image = np.pad(image, ((padding, padding), (padding, padding)), constant_values=constant_values)
@@ -152,6 +238,16 @@ def pad_image(image: numpy.ndarray, padding: padding_type, constant_values: floa
 
 
 def pad_asym(image: numpy.ndarray, padding: padding_type, constant_values: int = 0) -> numpy.ndarray:
+    """Pads image with given padding information.
+
+    Args:
+        image (numpy.ndarray): 
+        padding (padding_type): 
+        constant_values (float, optional): Padding value. Defaults to 0.
+
+    Returns:
+        numpy.ndarray: Padded image.
+    """    
     left, right, top, bottom = padding
     if len(image.shape) == 2:
         image = np.pad(image, ((top, bottom), (left, right)), constant_values=constant_values)
@@ -161,8 +257,17 @@ def pad_asym(image: numpy.ndarray, padding: padding_type, constant_values: int =
     return image
 
 
-def cropping(mask: numpy.ndarray) -> tuple[numpy.ndarray, padding_type]:
-    p = np.argwhere(mask == 1)
+def cropping(mask: numpy.ndarray, crop_value: int = 1) -> tuple[numpy.ndarray, padding_type]:
+    """Crops image around given value.
+
+    Args:
+        mask (numpy.ndarray): 
+        crop_value (int, optional): Defaults to 1.
+
+    Returns:
+        tuple[numpy.ndarray, padding_type]: Cropped image and cropping parameters.
+    """
+    p = np.argwhere(mask == crop_value)
     min_x = int(np.min(p[:,0]))
     max_x = int(np.max(p[:,0]))
     min_y = int(np.min(p[:,1]))
@@ -172,6 +277,15 @@ def cropping(mask: numpy.ndarray) -> tuple[numpy.ndarray, padding_type]:
 
 
 def resample_by_factor(img: numpy.ndarray, factor: float) -> numpy.ndarray:
+    """Resample image by a given factor.
+
+    Args:
+        img (numpy.ndarray): 
+        factor (float):
+
+    Returns:
+        numpy.ndarray: Resampled image.
+    """
     h, w = img.shape[:2]
     img2 = cv2.resize(img, (int(w*factor), int(h*factor)))
     return img2
@@ -181,7 +295,18 @@ def resample_by_factor(img: numpy.ndarray, factor: float) -> numpy.ndarray:
 def resample_image_sitk(image: numpy.ndarray, 
                         scaling_factor: float, 
                         ref_image_shape: tuple[int, int] | None = None,
-                        interpolator: int = sitk.sitkLinear):
+                        interpolator: int = sitk.sitkLinear) -> numpy.ndarray:
+    """Resample an image by a given factor using SimpleITK functionality..
+
+    Args:
+        image (numpy.ndarray): 
+        scaling_factor (float): 
+        ref_image_shape (tuple[int, int] | None, optional): Defaults to None.
+        interpolator (int, optional): _description_. Defaults to sitk.sitkLinear.
+
+    Returns:
+        numpy.ndarray: Resampled image.
+    """
     if scaling_factor == 1:
         return image
     if ref_image_shape is None:
@@ -257,6 +382,14 @@ def translation_length(x: float, y: float) -> float:
 
 
 def pad_image_square(img: numpy.ndarray) -> numpy.ndarray:
+    """Returns an image with square shape. Ends of image are padded symmetrically.
+
+    Args:
+        img (numpy.ndarray): 
+
+    Returns:
+        numpy.ndarray: 
+    """
     max_dim = np.max(img.shape[:2])
     padding = get_padding_params(img, max_dim)
     return pad_asym(img, padding)

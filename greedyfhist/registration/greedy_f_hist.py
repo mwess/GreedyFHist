@@ -19,12 +19,25 @@ import geojson
 import numpy, numpy as np
 import SimpleITK, SimpleITK as sitk
 
+from greedyfhist.registration.result_types import (
+    GroupwiseRegResult,
+    GFHTransform,
+    RegistrationResult,
+    RegistrationTransforms,
+    InternalRegParams,
+    PreprocessedData,
+    compose_transforms
+)
+
+
 from greedyfhist.utils.io import (
     create_if_not_exists, 
     write_mat_to_file, 
     clean_if_exists, 
     read_image,
-    write_to_ometiffile
+    write_to_ometiffile,
+    affine_transform_to_file,
+    derive_subdir
 )
 
 from greedyfhist.utils.image import (
@@ -49,570 +62,16 @@ from greedyfhist.utils.utils import (
     affine_registration, 
     composite_warps, 
     affine_registration, 
-    deformable_registration
+    deformable_registration,
+    compose_reg_transforms,
+    compose_inv_reg_transforms,
+    correct_img_dtype,
+    derive_sampling_factors
 )
 
 from greedyfhist.segmentation import load_yolo_segmentation
 from greedyfhist.options import RegistrationOptions, PreprocessingOptions
-
-
-# TODO: Write serialization
-@dataclass
-class GroupwiseRegResult:
-    """Collection of all transforms computed during groupwise registration.
-
-    Attributes
-    ----------
-    affine_transform: List[GFHTransform]
-        List of affine transforms. Affine transforms contain transform from current index of the transform in the list to the next index. 
-        Order of affine transforms is based on the order images supplied to affine registration.
-    
-    deformable_transform: List[GFHTransform]
-        List of nonrigid transforms. Each transform warps from an affinely transformed image to the fixed image.
-
-    Methods
-    -------
-        
-    get_transforms(source): int
-        Computes the end-to-end transformation from source image to fixed image.
-
-    """
-
-    affine_transform: list['RegistrationTransforms']
-    reverse_affine_transform: list['RegistrationTransforms']
-    nonrigid_transform: list['RegistrationTransforms']
-    reverse_nonrigid_transform: list['RegistrationTransforms']
-
-    def __get_transform_to_fixed_image(self,
-                                       source:int) -> 'RegistrationTransforms':
-        """Retrieves registration from one moving image indexed by 'source'.
-
-        Args:
-            source (int): Index of moving image.
-
-        Returns:
-            RegistrationTransforms: transformation from source to reference image.
-        """
-        # TODO: At the moment only one direction works.
-        transforms = self.affine_transform[source:]
-        if self.nonrigid_transform is not None and len(self.nonrigid_transform) > 0:
-            transforms.append(self.nonrigid_transform[source])
-        # Composite transforms
-        composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
-        composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
-        registration = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
-        reverse_registration = RegistrationTransforms(composited_backward_transform, composited_forward_transform)
-        reg_result = RegistrationResult(registration, reverse_registration)
-        return reg_result
-
-    def get_transforms(self,
-                       source: int,
-                       target: int | None = None,
-                       skip_nonrigid: bool = False) -> 'RegistrationTransforms':
-        """Retrieves registration from one moving image indexed by 'source'.
-
-        Args:
-            source (int): Index of moving image.
-
-        Returns:
-            RegistrationTransforms: transformation from source to reference image.
-        """
-        if target is None:
-            return self.__get_transform_to_fixed_image(source)
-        if source < target:
-            reverse = False
-        else:
-            reverse = True
-
-        if not reverse:
-            transforms = [self.affine_transform[x] for x in range(source, target)]
-        else:
-            transforms = [self.reverse_affine_transform[x] for x in range(source - 1, target - 1, -1)]
-
-        if not skip_nonrigid and self.nonrigid_transform is not None and len(self.nonrigid_transform) > 0:
-            if not reverse:
-                transforms.append(self.nonrigid_transform[target-1])
-            else:
-                transforms.append(self.reverse_nonrigid_transform[target])
-            
-        # Composite transforms
-        composited_forward_transform = compose_transforms([x.forward_transform for x in transforms])
-        composited_backward_transform = compose_transforms([x.backward_transform for x in transforms][::-1])
-        registration = RegistrationTransforms(composited_forward_transform, composited_backward_transform)
-        reverse_registration = RegistrationTransforms(composited_backward_transform, composited_forward_transform)
-        reg_result = RegistrationResult(registration, reverse_registration)
-        return reg_result
-    
-    def to_file(self, path: str):
-        aff_dir = join(path, 'affine_transforms')
-        GroupwiseRegResult.__save_transforms_to_file(self.affine_transform, aff_dir)
-        aff_rev_dir = join(path, 'reverse_affine_transforms')
-        GroupwiseRegResult.__save_transforms_to_file(self.reverse_affine_transform, aff_rev_dir)
-        nr_dir = join(path, 'nonrigid_transforms')
-        GroupwiseRegResult.__save_transforms_to_file(self.nonrigid_transform, nr_dir)
-        nr_rev_dir = join(path, 'reverse_nonrigid_transforms')
-        GroupwiseRegResult.__save_transforms_to_file(self.reverse_nonrigid_transform, nr_rev_dir)
-    
-    @staticmethod
-    def __save_transforms_to_file(transform_list: list['RegistrationTransforms'], path: str):
-        create_if_not_exists(path)
-        for idx, transform in enumerate(transform_list):
-            dir_i = join(path, f'{idx}')
-            create_if_not_exists(dir_i)
-            transform.to_directory(dir_i)
-
-    @staticmethod
-    def __load_transforms_from_dir(path: str) -> list['GroupwiseRegResult']:
-        sub_dirs = os.listdir(path)
-        sub_dirs = sorted(sub_dirs, lambda x: int(sub_dirs))
-        transforms = []
-        for sub_dir in sub_dirs:
-            path = join(path, sub_dir)
-            transform = RegistrationTransforms.load(path)
-            transforms.append(transform)
-        return transforms
-
-    @staticmethod
-    def load(path: str) -> 'GroupwiseRegResult':
-        aff_dir = join(path, 'affine_transforms')
-        aff_transforms  = GroupwiseRegResult.__load_transforms_from_dir(aff_dir)
-        rev_aff_dir = join(path, 'reverse_affine_transforms')
-        rev_aff_transforms = GroupwiseRegResult.__load_transforms_from_dir(rev_aff_dir)
-        nr_dir = join(path, 'nonrigid_transforms')
-        nr_transforms = GroupwiseRegResult.__load_transforms_from_dir(nr_dir)
-        nr_rev_dir = join(path, 'reverse_nonrigid_transforms')
-        rev_nr_transforms = GroupwiseRegResult.__load_transforms_from_dir(nr_rev_dir)
-        return GroupwiseRegResult(
-            affine_transform=aff_transforms,
-            reverse_affine_transform=rev_aff_transforms,
-            nonrigid_transform=nr_transforms,
-            reverse_nonrigid_transform=rev_nr_transforms
-        )
-
-
-@dataclass
-class GFHTransform:
-    """
-    Contains transform from one image space to another.
-
-    Attributes
-    ----------
-
-    size: Tuple[int, int]
-        Resolution of target image space.
-
-    transform: SimpleITK.SimpleITK.Transform
-        Transform from source to target image space.
-
-    Methods
-    -------
-
-    to_file(path): str
-        Saves GFHTransform to file.
-
-    load_transform(path): str
-        Loads transform from file.
-    """
-    
-    size: tuple[int, int]
-    transform: SimpleITK.SimpleITK.Transform
-
-    # TODO: Check that path is directory and change name since we are storing to a directory and not to one file.
-    def to_file(self, path: str):
-        """Saves transform to hard drive. Note, transforms are flattened before storing.
-
-        Args:
-            path (str): Location to store.
-        """
-        create_if_not_exists(path)
-        attributes = {
-            'width': self.size[0],
-            'height': self.size[1]
-        }
-        attributes_path = join(path, 'attributes.json')
-        with open(attributes_path, 'w') as f:
-            json.dump(attributes, f)
-        transform_path = join(path, 'transform.txt')
-        self.transform.FlattenTransform()
-        sitk.WriteTransform(self.transform, transform_path)
-
-
-    @staticmethod
-    def load_transform(path: str) -> 'GFHTransform':
-        """Load transform from directory.
-
-        Args:
-            path (str): Source location
-
-        Returns:
-            GFHTransform: 
-        """
-        attributes_path = join(path, 'attributes.json')
-        with open(attributes_path) as f:
-            attributes = json.load(f)
-        size = (attributes['width'], attributes['height'])
-        transform_path = join(path, 'transform.txt')
-        transform = sitk.ReadTransform(transform_path)
-        return GFHTransform(size, transform)
-
-
-@dataclass
-class RegistrationResult:
-
-    registration: 'RegistrationTransforms'
-
-    reverse_registration: Optional['RegistrationTransforms'] = None
-
-    def to_directory(self, path: str):
-        """
-        Save 'RegistrationResult' to file.
-        """
-        create_if_not_exists(path)
-        reg_path = join(path, 'registration')
-        self.registration.to_directory(reg_path)
-        if self.reverse_registration is not None:
-            rev_reg_path = join(path, 'reverse_registration')
-            self.reverse_registration.to_directory(rev_reg_path)
-
-    @staticmethod
-    def load(path: str) -> 'RegistrationResult':
-        reg_path = join(path, 'registration')
-        registration = RegistrationTransforms.load(reg_path)
-        rev_reg_path = join(path, 'reverse_registration')
-        if exists(rev_reg_path):
-            reverse_registration = RegistrationTransforms.load(rev_reg_path)
-        else:
-            reverse_registration = None
-        return RegistrationResult(registration, reverse_registration)
-        
-
-@dataclass
-class RegistrationTransforms:
-    """
-    Result of one pairwise registrations.
-
-    Attributes
-    ----------
-    
-    forward_transform: GFHTransform
-        Transform from moving to fixed image space. Used for transforming image data from moving to fixed image space.
-
-    backward_transform: GFHTransform
-        Transform from fixed to moving image space. Used for transforming pointset data from moving to fixed image space.
-
-    cmdln_returns: Optional[List[subprocess.CompletedProcess]]
-        Contains log output from command line executions.
-
-    reg_params: Dict
-        Contains internally computed registration parameters.
-
-    Methods
-    -------
-
-    to_file(path): str
-        Saves RegistrationTransforms to file.
-
-    load(path): str -> RegistrationTransforms
-        Load RegistrationTransforms from file.
-    """
-    
-    forward_transform: 'GFHTransform'
-    backward_transform: 'GFHTransform'
-    cmdln_returns: list[subprocess.CompletedProcess] | None = None
-    reg_params: dict | None = None
-    
-    # TODO: Can I add cmdln_returns and reg_params somehow
-    def to_directory(self, path: str):
-        """Saves 'RegistrationTransforms' to file.
-
-        Args:
-            path (str): Directory location.
-        """
-        create_if_not_exists(path)
-        forward_transform_path = join(path, 'fixed_transform')
-        self.forward_transform.to_file(forward_transform_path)
-        backward_transform_path = join(path, 'moving_transform')
-        self.backward_transform.to_file(backward_transform_path)
-
-    @staticmethod
-    def load(path: str) -> 'RegistrationTransforms':
-        """Load RegistrationTransforms from location.
-
-        Args:
-            path (str): Directory.
-
-        Returns:
-            RegistrationTransforms: 
-        """
-        fixed_transform_path = join(path, 'fixed_transform')
-        fixed_transform = GFHTransform.load_transform(fixed_transform_path)
-        moving_transform_path = join(path, 'moving_transform')
-        moving_transform = GFHTransform.load_transform(moving_transform_path)
-        return RegistrationTransforms(fixed_transform, moving_transform)
-
-
-@dataclass
-class InternalRegParams:
-    """
-    Collected params with several filenames, logs and registration parameters. Used to move information around for post processing.
-
-    Attributes
-    ----------
-
-    path_to_small_fixed: str
-
-    path_to_small_moving: str
-
-    path_to_small_composite: str
-
-    path_to_big_composite: str
-
-    path_to_small_inv_composite: str
-
-    path_to_big_inv_composite: str
-
-    cmdl_log: Optional[List[subprocess.CompletedProcess]]
-
-    reg_params: Optional[Any]
-
-    path_to_small_ref_image: str
-
-    sub_dir_key: int
-
-    displacement_field: SimpleITK.SimpleITK.Image
-
-    inv_displacement_field: SimpleITK.SimpleITK.Image
-
-
-    Methods
-    -------
-
-    from_directory(directory) -> InternalRegParams
-        Load from directory.
-
-    """
-    path_to_small_fixed: str
-    path_to_small_moving: str
-    path_to_small_composite: str
-    path_to_big_composite: str
-    path_to_small_inv_composite: str
-    path_to_big_inv_composite: str
-    cmdl_log: list[subprocess.CompletedProcess] | None
-    reg_params: Any | None
-    moving_preprocessing_params: dict
-    fixed_preprocessing_params: dict
-    path_to_small_ref_image: str
-    sub_dir_key: int
-    displacement_field: SimpleITK.SimpleITK.Image
-    inv_displacement_field: SimpleITK.SimpleITK.Image
-
-    @classmethod
-    def from_directory(cls, directory: str) -> 'InternalRegParams':
-        """Load from directory.
-
-        Args:
-            directory (str): 
-
-        Raises:
-            Exception: Thrown if directory does not exist.
-
-        Returns:
-            InternalRegResult: 
-        """
-        if not exists(directory):
-            raise Exception(f'Could not load transformation. Directory {directory} not found.')
-        with open(join(directory, 'reg_params.json')) as f:
-            reg_params = json.load(f)
-        path_to_big_warp = join(directory, 'metrics/full_resolution/big_warp.nii.gz')
-        path_to_big_inv_warp = join(directory, 'metrics/full_resolution/big_inv_warp.nii.gz')
-        path_to_big_affine = join(directory, 'metrics/full_resolution/Affine.mat')
-        path_to_small_affine = join(directory, 'metrics/small_resolution/small_affine.mat')
-        path_to_small_warp = join(directory, 'metrics/small_resolution/small_warp.nii.gz')
-        path_to_small_inv_warp = join(directory, 'metrics/small_resolution/small_inv_warp.nii.gz')
-        path_to_small_ref_image = join(directory, 'small_ref_image.nii.gz')
-        width_downscaling_factor = reg_params['width_downscaling_factor']
-        height_downscaling_factor = reg_params['height_downscaling_factor']
-        sub_dir_key = int(os.path.split(os.path.normpath(directory))[1])
-        return cls(
-            path_to_small_affine=path_to_small_affine,
-            path_to_big_affine=path_to_big_affine,
-            path_to_small_warp=path_to_small_warp,
-            path_to_big_warp=path_to_big_warp,
-            path_to_small_inv_warp=path_to_small_inv_warp,
-            path_to_big_inv_warp=path_to_big_inv_warp,
-            width_downscaling_factor=width_downscaling_factor,
-            height_downscaling_factor=height_downscaling_factor,
-            path_to_small_fixed='',
-            path_to_small_moving='',
-            cmdl_log=None,
-            reg_params=reg_params,
-            path_to_small_ref_image=path_to_small_ref_image,
-            sub_dir_key=sub_dir_key
-        )
-
-
-@dataclass
-class PreprocessedData:
-    """
-    Information about preprocessed image.
-
-    Attributes
-    ----------
-
-    image_path: str
-        Path to preprocessed image.
-    
-    height: int
-
-    width: int
-
-    height_padded: int
-
-    width_padded: int
-
-    height_original: int
-
-    width_original: int
-    """
-    image_path: str
-    height: int
-    width: int
-    height_padded: int
-    width_padded: int
-    height_original: int
-    width_original: int
-
-
-# TODO: Write a sub function that just works with simpleitk transforms.
-def composite_sitk_transforms(transforms: list[SimpleITK.SimpleITK.Transform]) -> SimpleITK.SimpleITK.Transform:
-    """Composites all Transforms into one composite transform.
-
-    Args:
-        transforms (List[SimpleITK.SimpleITK.Transform]): 
-
-    Returns:
-        SimpleITK.SimpleITK.Transform: 
-    """
-    composited_transform = sitk.CompositeTransform(2)
-    for transform in transforms:
-        composited_transform.AddTransform(transform)
-    return composited_transform
-    
-
-def compose_transforms(gfh_transforms: list['GFHTransform']) -> 'GFHTransform':
-    """Composes a list of gfh_transforms.
-
-    Args:
-        gfh_transforms (List[GFHTransform]):
-
-    Returns:
-        GFHTransform:
-    """
-    composited_transform = composite_sitk_transforms([x.transform for x in gfh_transforms])
-    gfh_comp_trans = GFHTransform(gfh_transforms[-1].size, composited_transform)
-    return gfh_comp_trans
-
-def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-                           moving_preprocessing_params: dict,
-                           fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
-    """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward affine/nonrigid registration.  
-
-    Args:
-        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
-        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
-        reverse (bool): Switches moving and fixed preprocessing params if True.
-
-    Returns:
-        SimpleITK.SimpleITK.Transform: Composited end-to-end registration.
-    """
-    moving_padding = moving_preprocessing_params['padding']
-    moving_cropping = moving_preprocessing_params['cropping_params']
-    fixed_padding = fixed_preprocessing_params['padding']
-    fixed_cropping = fixed_preprocessing_params['cropping_params']
-    mov_ds_factor = moving_preprocessing_params['resampling_factor']
-    fix_ds_factor = fixed_preprocessing_params['resampling_factor']
-    
-    all_transforms = sitk.CompositeTransform(2)
-
-    pre_downscale_transform = sitk.ScaleTransform(2, (1/mov_ds_factor, 1/mov_ds_factor))
-    post_upscale_transform = sitk.ScaleTransform(2, (fix_ds_factor, fix_ds_factor))
-    
-    aff_trans1 = sitk.TranslationTransform(2)
-    offset_x = moving_cropping[2]
-    offset_y = moving_cropping[0]
-    aff_trans1.SetOffset((offset_x, offset_y))
-
-    aff_trans2 = sitk.TranslationTransform(2)
-    offset_x = -moving_padding[0]
-    offset_y = -moving_padding[2]
-    aff_trans2.SetOffset((offset_x, offset_y))
-    
-
-    
-    aff_trans3 = sitk.TranslationTransform(2)
-    aff_trans3.SetOffset((fixed_padding[0], fixed_padding[2]))
-    
-    aff_trans4 = sitk.TranslationTransform(2)
-    aff_trans4.SetOffset((-fixed_cropping[2], -fixed_cropping[0]))
-
-    all_transforms.AddTransform(pre_downscale_transform)
-    all_transforms.AddTransform(aff_trans1)
-    all_transforms.AddTransform(aff_trans2)
-    all_transforms.AddTransform(transform)
-    all_transforms.AddTransform(aff_trans3)
-    all_transforms.AddTransform(aff_trans4)
-    all_transforms.AddTransform(post_upscale_transform)
-    return all_transforms
-
-def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-                               moving_preprocessing_params: dict,
-                               fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
-    """Pre- and appends preprocessing steps from moving and fixed image as transforms to backward affine/nonrigid registration.  
-
-    Args:
-        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
-        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
-
-    Returns:
-        SimpleITK.SimpleITK.Transform: Composited end-to-end transform.
-    """
-    moving_padding = moving_preprocessing_params['padding']
-    moving_cropping = moving_preprocessing_params['cropping_params']
-    fixed_padding = fixed_preprocessing_params['padding']
-    fixed_cropping = fixed_preprocessing_params['cropping_params']
-    mov_ds_factor = moving_preprocessing_params['resampling_factor']
-    fix_ds_factor = fixed_preprocessing_params['resampling_factor']
-    
-    all_transforms = sitk.CompositeTransform(2)
-
-    pre_downscale_transform = sitk.ScaleTransform(2, (1/fix_ds_factor, 1/fix_ds_factor))
-    post_upscale_transform = sitk.ScaleTransform(2, (mov_ds_factor, mov_ds_factor))
-
-    aff_trans1 = sitk.TranslationTransform(2)
-    offset_x = moving_padding[0]
-    offset_y = moving_padding[2]
-    aff_trans1.SetOffset((offset_x, offset_y))
-    
-    aff_trans2 = sitk.TranslationTransform(2)
-    offset_x = -moving_cropping[2]
-    offset_y = -moving_cropping[0]
-    aff_trans2.SetOffset((offset_x, offset_y))
-
-    aff_trans3 = sitk.TranslationTransform(2)
-    aff_trans3.SetOffset((fixed_cropping[2], fixed_cropping[0]))
-    
-    aff_trans4 = sitk.TranslationTransform(2)
-    aff_trans4.SetOffset((-fixed_padding[0], -fixed_padding[2]))
-
-    all_transforms.AddTransform(pre_downscale_transform)
-    all_transforms.AddTransform(aff_trans4)
-    all_transforms.AddTransform(aff_trans3)
-    all_transforms.AddTransform(transform)
-    all_transforms.AddTransform(aff_trans2)
-    all_transforms.AddTransform(aff_trans1)
-    all_transforms.AddTransform(post_upscale_transform)
-    return all_transforms
-
+from greedyfhist.utils.tiling import reassemble_sitk_displacement_field, ImageTile
 
 def preprocessing(image: numpy.ndarray,
                   preprocessing_options: PreprocessingOptions,
@@ -621,6 +80,21 @@ def preprocessing(image: numpy.ndarray,
                   tmp_path: str,
                   skip_denoising: bool = False
                   ) -> 'PreprocessedData':
+    """Image preprocessing applied after images have transformed to a uniform shape. 
+    Preprocessing steps are: (1) Denoising, (2) Gaussian smoothing, (3) Downsampling, 
+    (4) Grayscale conversion, (5) Padding.
+
+    Args:
+        image (numpy.ndarray): Source image to be preprocessed.
+        preprocessing_options (PreprocessingOptions): Contains parameters for mean shift filtering.
+        resolution (tuple[int, int]): Target downscaling resolution
+        kernel_size (int): Size of kernel used for padding after downscaling
+        tmp_path (str): Temporary directory used for storing the preprocessed image.
+        skip_denoising (bool, optional): Another toggle to enable/disable mean shift filtering. Defaults to False.
+
+    Returns:
+        PreprocessedData: Preprocessed image data.
+    """
     create_if_not_exists(tmp_path)
     if preprocessing_options.enable_denoising and not skip_denoising:
         image = denoise_image(image,
@@ -636,14 +110,6 @@ def preprocessing(image: numpy.ndarray,
                                                      smoothing,
                                                      tmp_dir)
     return image_preprocessed
-
-
-def affine_transform_to_file(transform: SimpleITK.SimpleITK.AffineTransform, fpath: str):
-    mat = transform.GetMatrix()
-    trans = transform.GetTranslation()
-    mat_str = f'{mat[0]} {mat[1]} {trans[0]}\n{mat[2]} {mat[3]} {trans[1]}\n0 0 1'
-    with open(fpath, 'w') as f:
-        f.write(mat_str)
 
 
 def preprocess_image_for_greedy(image: numpy.ndarray,
@@ -699,40 +165,14 @@ def preprocess_image_for_greedy(image: numpy.ndarray,
     )
     return preprocessed_data
 
-        
-def derive_subdir(directory: str, limit=1000) -> tuple[str, int]:
-    """Derives a unique subdirectory. Counts upwards until a new directory is found.
 
-    Args:
-        directory (_type_): 
-        limit (int, optional): Maximum subdir count. Defaults to 1000.
-
-    Returns:
-        Tuple[str, int]: Subdir and final count.
-    """
-    for subdir_num in range(limit):
-        subdir = f'{directory}/{subdir_num}'
-        if not exists(subdir):
-            return subdir, subdir_num
-    # TODO: Do better error handling here, but who has 1000 sections to register, really?!
-    return subdir, subdir_num
-
-
-# TODO: There is probably a better way to ensure the dtype of the image.
-def correct_img_dtype(img: numpy.ndarray) -> numpy.ndarray:
-    """Changes the image type from float to np.uint8 if necessary.
-
-    Args:
-        img (numpy.ndarray): 
-
-    Returns:
-        numpy.ndarray: 
-    """
-    if np.issubdtype(img.dtype, np.floating):
-        img = (img * 255).astype(np.uint8)
-    else:
-        img = img.astype(np.uint8)
-    return img
+def reassemble_to_gfh_transform(displ_tiles, trx_shape):
+    displ_np = reassemble_sitk_displacement_field(displ_tiles, trx_shape)
+    displ_sitk = sitk.GetImageFromArray(displ_np, True)
+    displ_sitk = sitk.Cast(displ_sitk, sitk.sitkVectorFloat64)
+    trx = sitk.DisplacementFieldTransform(displ_sitk)
+    gfh_transform = GFHTransform(trx_shape, trx)
+    return gfh_transform
 
 
 @dataclass
@@ -784,7 +224,7 @@ class GreedyFHist:
             options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
 
         Returns:
-            RegistrationResult: Contains computed registration result.        
+            RegistrationResult: Computed registration result.        
         """
         moving_image, mov_metadata = read_image(moving_img_path)
         fixed_image, fix_metadata = read_image(fixed_img_path)
@@ -855,7 +295,76 @@ class GreedyFHist:
             write_to_ometiffile(img, fname)
         groupwise_registration_result.to_file(join(target_directory, 'transform'))
         return groupwise_registration_result, warped_images
-            
+
+
+    def register_tiles(self,
+                       moving_image_tiles: ImageTile,
+                       fixed_image_tiles: ImageTile):
+        fw_displ_tiles = []
+        bw_displ_tiles = []
+        tile_transforms = []
+        for idx, (moving_image_tile_, fixed_image_tile_) in enumerate(zip(moving_image_tiles, fixed_image_tiles)):
+            nrrt_options = RegistrationOptions()
+            nrrt_options.do_affine_registration = False
+            # nrrt_options.nonrigid_registration_options.resolution = (512, 512)
+            nrrt_options.nonrigid_registration_options.resolution = (2048, 2048)
+            nrrt_options.remove_temporary_directory = False
+            nrrt_options.temporary_directory = f'tmp_{idx}'
+            nrrt_options.pre_sampling_max_img_size = 2500
+
+            moving_image_ = moving_image_tile_.image
+            fixed_image_ = fixed_image_tile_.image
+            mask = np.ones(moving_image_.shape[:2])
+
+            try:
+                registration_result_ = self.register(moving_img=moving_image_,
+                                                            fixed_img=fixed_image_,
+                                                            moving_img_mask=mask,
+                                                            fixed_img_mask=mask,
+                                                            options=nrrt_options)
+                tile_transforms.append(registration_result_)
+                # Dont forget the backward transforms.
+                # Foward transform
+                transform_to_displacementfield = sitk.TransformToDisplacementField(
+                    registration_result_.registration.forward_transform.transform,
+                    outputPixelType=sitk.sitkVectorFloat64,
+                    size=registration_result_.registration.forward_transform.size[::-1]
+                )
+                # print(transform_to_displacementfield.GetSize())
+                fw_displ_tile = ImageTile(transform_to_displacementfield,
+                                    fixed_image_tile_.x_props,
+                                    fixed_image_tile_.y_props,
+                                    
+                )
+                # Backward transform
+                transform_to_displacementfield = sitk.TransformToDisplacementField(
+                    registration_result_.registration.backward_transform.transform,
+                    outputPixelType=sitk.sitkVectorFloat64,
+                    size=registration_result_.registration.backward_transform.size[::-1]
+                )
+                # print(transform_to_displacementfield.GetSize())
+                bw_displ_tile = ImageTile(transform_to_displacementfield,
+                                    fixed_image_tile_.x_props,
+                                    fixed_image_tile_.y_props
+                )        
+            except Exception as e:
+                print(f'Something went wrong in tile: {idx}')
+                print(e)
+                # TODO: Fix this! Needs to be a transform.
+                fw_displ_tile = ImageTile(sitk.GetImageFromArray(np.dstack((mask.astype(np.float64), mask.astype(np.float64))), True),
+                                    fixed_image_tile_.x_props,
+                                    fixed_image_tile_.y_props)
+                bw_displ_tile = ImageTile(sitk.GetImageFromArray(np.dstack((mask.astype(np.float64), mask.astype(np.float64))), True),
+                                    moving_image_tile_.x_props,
+                                    moving_image_tile_.y_props)
+                
+            fw_displ_tiles.append(fw_displ_tile)
+            bw_displ_tiles.append(bw_displ_tile)
+        fixed_transform = reassemble_to_gfh_transform(fw_displ_tiles, fixed_image_tiles[0].original_shape)
+        moving_transform = reassemble_to_gfh_transform(bw_displ_tiles, moving_image_tiles[0].original_shape)
+        registration_transforms = RegistrationTransforms(forward_transform=fixed_transform, backward_transform=moving_transform)
+        rev_registration_transforms = RegistrationTransforms(forward_transform=moving_transform, backward_transform=fixed_transform)
+        return RegistrationResult(registration_transforms, rev_registration_transforms)  
         
 
     def register(self,
@@ -915,24 +424,12 @@ class GreedyFHist:
         path_output = join(path_temp, 'output', 'registrations')
         path_output, subdir_num = derive_subdir(path_output)
         create_if_not_exists(path_output)
-        pre_sampling_factor = options.pre_sampling_factor
-        if pre_sampling_factor == 'auto':
-            pre_sampling_max_img_size = options.pre_sampling_max_img_size
-            if pre_sampling_max_img_size is not None:
-                max_size = max(moving_img.shape[0], moving_img.shape[1], fixed_img.shape[0], fixed_img.shape[1])
-                if max_size > pre_sampling_max_img_size:
-                    resampling_factor = pre_sampling_max_img_size / max_size
-                    moving_resampling_factor = resampling_factor
-                    fixed_resampling_factor = resampling_factor
-                else:
-                    moving_resampling_factor = 1
-                    fixed_resampling_factor = 1
-            else:
-                moving_resampling_factor = 1
-                fixed_resampling_factor = 1
-        else:
-            moving_resampling_factor = 1
-            fixed_resampling_factor = 1
+        max_size = max(moving_img.shape[0], moving_img.shape[1], fixed_img.shape[0], fixed_img.shape[1])            
+        moving_resampling_factor, fixed_resampling_factor = derive_sampling_factors(
+            options.pre_sampling_factor,
+            max_size,
+            options.pre_sampling_max_img_size
+        )
 
         original_moving_image_size = moving_img.shape[:2]
         original_fixed_image_size = fixed_img.shape[:2]

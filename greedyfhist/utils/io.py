@@ -2,7 +2,7 @@
 Contains io helper functions
 """
 import os
-from os.path import join
+from os.path import join, exists
 from pathlib import Path
 import shutil
 from typing import Optional
@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 import numpy, numpy as np
 import pyvips
-import SimpleITK as sitk
+import SimpleITK, SimpleITK as sitk
 import tifffile
 
 
@@ -107,6 +107,9 @@ def write_to_ometiffile(img: numpy.ndarray,
         tile (bool): Use tiling. Defaults to True.
         tile_size: Size of tile. Defaults to 512.
         pyramid (bool): Build pyramidical. Defaults to True.
+        bigtiff (bool): Stores image as bigtiff. Experimental, should not be used.
+        skip_channel (bool): Skips channel information, if set to True. Defaults to False.
+        skip_tiffdata (bool): SKips tiff_data attribute in metadata if set to True. Defaults to False.
     """
     if not metadata:
         metadata = {
@@ -177,10 +180,27 @@ def write_to_ometiffile(img: numpy.ndarray,
 
 
 def is_tiff_file(suffix: str) -> bool:
+    """Returns True, if file suffix matches tif file ending.
+
+    Args:
+        suffix (str): File suffix. Should contain a '.' in the beginning.
+
+    Returns:
+        bool:
+    """
     return suffix in ['.tif', '.tiff']
 
 
 def read_image(path: str, is_annotation: bool = False) -> numpy.ndarray | Optional[dict]:
+    """Reads an image. Tries to iterate through different file readers until something that works is found. 
+
+    Args:
+        path (str): 
+        is_annotation (bool, optional): If set to true, axis are swapped at after loading image. Defaults to False.
+
+    Returns:
+        numpy.ndarray | Optional[dict]: Image and additional metadata.
+    """
     suffix = os.path.splitext(path)[1]
     metadata = None
     if is_tiff_file(suffix):
@@ -227,3 +247,36 @@ def get_metadata_from_tif(xml_string: str) -> dict:
     del metadata['SizeY']
     del metadata['SizeC']
     return metadata
+
+
+def affine_transform_to_file(transform: SimpleITK.SimpleITK.AffineTransform, fpath: str):
+    """Save affube transform to file.
+
+    Args:
+        transform (SimpleITK.SimpleITK.AffineTransform): Affine transform.
+        fpath (str): Target path.
+    """
+    mat = transform.GetMatrix()
+    trans = transform.GetTranslation()
+    mat_str = f'{mat[0]} {mat[1]} {trans[0]}\n{mat[2]} {mat[3]} {trans[1]}\n0 0 1'
+    with open(fpath, 'w') as f:
+        f.write(mat_str)
+        
+        
+def derive_subdir(directory: str, limit=1000) -> tuple[str, int]:
+    """Derives a unique subdirectory. Counts upwards until a new directory is found.
+
+    Args:
+        directory (_type_): 
+        limit (int, optional): Maximum subdir count. Defaults to 1000.
+
+    Returns:
+        Tuple[str, int]: Subdir and final count.
+    """
+    for subdir_num in range(limit):
+        subdir = f'{directory}/{subdir_num}'
+        if not exists(subdir):
+            return subdir, subdir_num
+    # TODO: Do better error handling here, but who has 1000 sections to register, really?!
+    return subdir, subdir_num
+        
