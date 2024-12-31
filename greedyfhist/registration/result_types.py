@@ -480,3 +480,28 @@ def compose_transforms(gfh_transforms: list['GFHTransform']) -> 'GFHTransform':
     composited_transform = composite_sitk_transforms([x.transform for x in gfh_transforms])
     gfh_comp_trans = GFHTransform(gfh_transforms[-1].size, composited_transform)
     return gfh_comp_trans    
+
+
+
+def compose_registration_results(reg_results: list['RegistrationResult']) -> 'RegistrationResult':
+    """Composites all registrations in a list of RegistrationResults into one RegistrationResult.
+    Target size are taken from the last RegistrationResult in the list.
+
+    Args:
+        reg_results (list[RegistrationResult]):
+
+    Returns:
+        RegistrationResult:
+    """
+    reg_fw = compose_transforms([x.registration.forward_transform for x in reg_results])
+    reg_bw = compose_transforms([x.registration.backward_transform for x in reg_results])
+    rev_reg_fw = compose_transforms([x.reverse_registration.forward_transform for x in reg_results])
+    rev_reg_bw = compose_transforms([x.reverse_registration.backward_transform for x in reg_results])
+
+    reg_transforms = RegistrationTransforms(forward_transform=reg_fw,
+                                            backward_transform=reg_bw)
+    rev_reg_transforms = RegistrationTransforms(forward_transform=rev_reg_fw,
+                                            backward_transform=rev_reg_bw)
+
+    reg_result = RegistrationResult(registration=reg_transforms, reverse_registration=rev_reg_transforms)
+    return reg_result

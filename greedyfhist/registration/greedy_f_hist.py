@@ -6,6 +6,7 @@ RegistrationTransforms.
 """
 
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field
 import json
 import os
@@ -18,6 +19,7 @@ from typing import Any, Optional
 import geojson
 import numpy, numpy as np
 import SimpleITK, SimpleITK as sitk
+import tqdm
 
 from greedyfhist.registration.result_types import (
     GroupwiseRegResult,
@@ -26,7 +28,8 @@ from greedyfhist.registration.result_types import (
     RegistrationTransforms,
     InternalRegParams,
     PreprocessedData,
-    compose_transforms
+    compose_transforms,
+    compose_registration_results
 )
 
 
@@ -71,7 +74,12 @@ from greedyfhist.utils.utils import (
 
 from greedyfhist.segmentation import load_yolo_segmentation
 from greedyfhist.options import RegistrationOptions, PreprocessingOptions
-from greedyfhist.utils.tiling import reassemble_sitk_displacement_field, ImageTile
+from greedyfhist.utils.tiling import (
+    reassemble_sitk_displacement_field, 
+    ImageTile, 
+    extract_image_tiles, 
+    get_tile_params
+)
 
 def preprocessing(image: numpy.ndarray,
                   preprocessing_options: PreprocessingOptions,
@@ -298,20 +306,37 @@ class GreedyFHist:
 
 
     def register_tiles(self,
-                       moving_image_tiles: ImageTile,
-                       fixed_image_tiles: ImageTile):
+                       moving_image_tiles: list[ImageTile],
+                       fixed_image_tiles: list[ImageTile],
+                       tile_reg_opts: RegistrationOptions | None = None,
+                       verbose: bool = False) -> RegistrationResult:
+        """Register moving and fixed image tiles. Each tile in `moving_image_tiles` is registered
+        with a corresponding tile at the same position as `fixed_image_tiles`. 
+
+        Args:
+            moving_image_tiles (ImageTile): List of moving image tiles.
+            fixed_image_tiles (ImageTile): List of fixed image tiles.
+            tile_reg_opts (RegistrationOptions | None, optional): Nonrigid registration options applied to register pairs
+            of tiles. Defaults to None.
+            verbose (bool, optional): Defaults to False.
+
+        Returns:
+            RegistrationResult:
+        """
         fw_displ_tiles = []
         bw_displ_tiles = []
         tile_transforms = []
-        for idx, (moving_image_tile_, fixed_image_tile_) in enumerate(zip(moving_image_tiles, fixed_image_tiles)):
-            nrrt_options = RegistrationOptions()
-            nrrt_options.do_affine_registration = False
-            # nrrt_options.nonrigid_registration_options.resolution = (512, 512)
-            nrrt_options.nonrigid_registration_options.resolution = (2048, 2048)
-            nrrt_options.remove_temporary_directory = False
-            nrrt_options.temporary_directory = f'tmp_{idx}'
-            nrrt_options.pre_sampling_max_img_size = 2500
+        for idx, (moving_image_tile_, fixed_image_tile_) in tqdm.tqdm(enumerate(zip(moving_image_tiles, fixed_image_tiles)), disable=not verbose):
+            if tile_reg_opts is None:
+                nrrt_options = RegistrationOptions()
+                nrrt_options.do_affine_registration = False
+                # nrrt_options.remove_temporary_directory = False
+                # nrrt_options.temporary_directory = f'tmp_{idx}'
+            else:
+                nrrt_options = tile_reg_opts
 
+            if verbose:
+                print(nrrt_options)
             moving_image_ = moving_image_tile_.image
             fixed_image_ = fixed_image_tile_.image
             mask = np.ones(moving_image_.shape[:2])
@@ -322,15 +347,12 @@ class GreedyFHist:
                                                             moving_img_mask=mask,
                                                             fixed_img_mask=mask,
                                                             options=nrrt_options)
-                tile_transforms.append(registration_result_)
-                # Dont forget the backward transforms.
                 # Foward transform
                 transform_to_displacementfield = sitk.TransformToDisplacementField(
                     registration_result_.registration.forward_transform.transform,
                     outputPixelType=sitk.sitkVectorFloat64,
                     size=registration_result_.registration.forward_transform.size[::-1]
                 )
-                # print(transform_to_displacementfield.GetSize())
                 fw_displ_tile = ImageTile(transform_to_displacementfield,
                                     fixed_image_tile_.x_props,
                                     fixed_image_tile_.y_props,
@@ -342,19 +364,23 @@ class GreedyFHist:
                     outputPixelType=sitk.sitkVectorFloat64,
                     size=registration_result_.registration.backward_transform.size[::-1]
                 )
-                # print(transform_to_displacementfield.GetSize())
                 bw_displ_tile = ImageTile(transform_to_displacementfield,
                                     fixed_image_tile_.x_props,
                                     fixed_image_tile_.y_props
                 )        
             except Exception as e:
-                print(f'Something went wrong in tile: {idx}')
-                print(e)
+                if verbose:
+                    print(f'Something went wrong in tile: {idx}')
+                    print(e)
                 # TODO: Fix this! Needs to be a transform.
-                fw_displ_tile = ImageTile(sitk.GetImageFromArray(np.dstack((mask.astype(np.float64), mask.astype(np.float64))), True),
+                fw_tile = sitk.GetImageFromArray(np.dstack((mask.astype(np.float64), mask.astype(np.float64))), True)
+                fw_tile = sitk.Cast(fw_tile, sitk.sitkVectorFloat64)
+                fw_displ_tile = ImageTile(fw_tile,
                                     fixed_image_tile_.x_props,
                                     fixed_image_tile_.y_props)
-                bw_displ_tile = ImageTile(sitk.GetImageFromArray(np.dstack((mask.astype(np.float64), mask.astype(np.float64))), True),
+                bw_tile = sitk.GetImageFromArray(np.dstack((mask.astype(np.float64), mask.astype(np.float64))), True)
+                bw_tile = sitk.Cast(bw_tile, sitk.sitkVectorFloat64)
+                bw_displ_tile = ImageTile(bw_tile,
                                     moving_image_tile_.x_props,
                                     moving_image_tile_.y_props)
                 
@@ -365,14 +391,182 @@ class GreedyFHist:
         registration_transforms = RegistrationTransforms(forward_transform=fixed_transform, backward_transform=moving_transform)
         rev_registration_transforms = RegistrationTransforms(forward_transform=moving_transform, backward_transform=fixed_transform)
         return RegistrationResult(registration_transforms, rev_registration_transforms)  
+
+
+    def nrpt_registration(self,
+                          moving_image: numpy.ndarray,
+                          fixed_image: numpy.ndarray,
+                          registration_options: RegistrationOptions,
+                          verbose: bool = False) -> RegistrationResult:
+        """Pyramidical tiling nonrigid registration (ptnr) mode. A registration modus that can be used in addition, or instead
+        of nonrigid registration. 
         
+        The base idea behind ptnr is that images are divided into tiles which can then be registered one-by-one due to the locality of 
+        nonrigid registration. After tiles have been registered, the resulting deformation fields are stitched together.
+        
+        nrpt is pyramidical with each layer increasing the number of tiles to approximate the most accurate registration as close as possible.
+        By default, pyramids grow quadratically, though other options exist.
+        
+        Note: Images are expected to be of the same shape. Performing an affine or nonrigid registration beforehand guarantees that both
+        input images have the same shape.
+
+        Args:
+            moving_image (numpy.ndarray): 
+            fixed_image (numpy.ndarray): 
+            registration_options (RegistrationOptions): 
+            verbose (bool, optional): Defaults to False.
+
+        Returns:
+            RegistrationResult:
+        """
+        registration_options.do_affine_registration = False
+        nrpt_opts = registration_options.nrpt_options
+        return self.nrpt_registration_(
+            moving_image,
+            fixed_image,
+            stop_condition_tile_resolution=nrpt_opts.stop_condition_tile_resolution,
+            stop_condition_pyramid_counter=nrpt_opts.stop_condition_pyramid_counter,
+            max_pyramid_depth=nrpt_opts.max_pyramid_depth,
+            pyramid_resolutions=nrpt_opts.pyramid_resolutions,
+            pyramid_tiles_per_axis=nrpt_opts.pyramid_tiles_per_axis,
+            nrpt_tile_options=registration_options,
+            tile_overlap=nrpt_opts.tile_overlap,
+            verbose=verbose
+        )
+
+
+    def nrpt_registration_(self,
+                        moving_image: numpy.ndarray,
+                        fixed_image: numpy.ndarray,
+                        stop_condition_tile_resolution: bool = True,
+                        stop_condition_pyramid_counter: bool = False,
+                        max_pyramid_depth: int | None = None,
+                        pyramid_resolutions: list[int] | None = None,
+                        pyramid_tiles_per_axis: list[int] | None = None,
+                        nrpt_tile_options: RegistrationOptions | None = None,
+                        tile_overlap: float = 0.75,
+                        verbose: bool = False) -> RegistrationResult:
+        """Pyramidical tiling nonrigid registration (ptnr) mode. A registration modus that can be used in addition, or instead
+        of nonrigid registration. 
+        
+        The base idea behind ptnr is that images are divided into tiles which can then be registered one-by-one due to the locality of 
+        nonrigid registration. After tiles have been registered, the resulting deformation fields are stitched together.
+        
+        nrpt is pyramidical with each layer increasing the number of tiles to approximate the most accurate registration as close as possible.
+        By default, pyramids grow quadratically, though other options exist.
+        
+        Note: Images are expected to be of the same shape. Performing an affine or nonrigid registration beforehand guarantees that both
+        input images have the same shape.
+
+        Args:
+            moving_image (numpy.ndarray): Source image.
+            fixed_image (numpy.ndarray): Target image.
+            stop_condition_tile_resolution (bool, optional): If True, stops the pyramid once the size of tiles is smaller than that of 
+                resampled images in GreedyFHist's preprocessing. Defaults to True.
+            stop_condition_pyramid_counter (bool, optional): If True, stops the pyramid pyramid after `max_pyramid_depth` has been reached. 
+                `stop_condition_tile_resolution` has precedence. Defaults to False.
+            max_pyramid_depth (int | None, optional): Maximum depth of pyramid. Only used if `stop_condition_pyramid_counter` is True. Defaults to None.
+            pyramid_resolutions (list[int] | None, optional): Tile resolutions used at each pyramid level. Requires that `stop_condition_pyramid_counter`
+            is True and `max_pyramid_depth` is None. Uses list length as maximum depth. Defaults to None.
+            pyramid_tiles_per_axis (list[int] | None, optional): Tiles per axis for each pyramid. Requires that `stop_condition_pyramid_counter`
+            is True and `max_pyramid_depth` is None. Uses list length as maximum depth. Defaults to None.
+            nrpt_tile_options (RegistrationOptions | None, optional): Registration options passed to each tile registration. If None,
+                default options are used. Defaults to None.
+            tile_overlap (float, optional): Overlap between two neighboring tiles. Needed to avoid false registration along edges. Discarded during stitching. Defaults to 0.75.
+            verbose (bool, optional): Prints more information. Defaults to False.
+
+        Returns:
+            RegistrationResult: _description_
+        """
+        
+        if nrpt_tile_options is None: 
+            nrpt_tile_options = RegistrationOptions()
+        
+        nrpt_tile_options.do_affine_registration = False
+        
+        temp_image = moving_image.copy()
+
+        # Should it start with 0 or not. 
+        loop_counter = 1
+
+        reg_results = []
+        temp_images = [temp_image]
+
+        actual_tile_size = np.inf
+
+        downsampling_size = nrpt_tile_options.nonrigid_registration_options.resolution[0]
+
+        if stop_condition_pyramid_counter and stop_condition_tile_resolution:
+            stop_condition_tile_resolution = True
+            stop_condition_pyramid_counter = False
+
+        if stop_condition_pyramid_counter and max_pyramid_depth is None:
+            max_pyramid_depth = np.inf
+            if pyramid_tiles_per_axis is not None:
+                max_pyramid_depth = len(pyramid_tiles_per_axis)
+            if pyramid_resolutions is not None:
+                max_pyramid_depth = min(max_pyramid_depth, len(pyramid_resolutions))
+            if max_pyramid_depth == np.inf:
+                raise Exception('Passed arguments are incompatible.')
+        idx = 0
+        while True:
+            if verbose:
+                print(f'Next loop: {loop_counter}')
+            
+            if stop_condition_pyramid_counter and loop_counter > max_pyramid_depth:
+                if verbose:
+                    print('Aborting loop because maximum pyramid depth has been reached.')
+                break
+
+            ptnr_opts = deepcopy(nrpt_tile_options)
+            
+            if pyramid_resolutions is not None:
+                res = pyramid_resolutions[idx]
+                nrpt_tile_options.nonrigid_registration_options.resolution = (res, res)
+                
+            # If loop_counter == 0 just do a normal nonrigid registration, since this will at least ensure
+            # that both images have the same shape.
+            
+            
+            n_tiles = int(2**loop_counter) if pyramid_tiles_per_axis is None else pyramid_tiles_per_axis[idx]
+            if verbose:
+                print(f'Number of tiles: {n_tiles}')
+            x_tile_props = get_tile_params(temp_image.shape[0], n_tiles = n_tiles, overlap = tile_overlap)
+            y_tile_props = get_tile_params(temp_image.shape[1], n_tiles = n_tiles, overlap = tile_overlap)    
+            
+            actual_tile_size = x_tile_props[4][0] - x_tile_props[1][0]
+            if verbose:
+                print(f'Actual tile size: {actual_tile_size}')
+            if actual_tile_size < downsampling_size and stop_condition_tile_resolution:
+                if verbose:
+                    print('Aborting loop because minimal tile size has been reached.')
+                break
+            
+            moving_image_tiles = extract_image_tiles(temp_image, x_tile_props, y_tile_props)
+            fixed_image_tiles = extract_image_tiles(fixed_image, x_tile_props, y_tile_props)
+            
+            if verbose:
+                print('Tiles extracted.')
+                
+            ptnr_reg = self.register_tiles(moving_image_tiles, fixed_image_tiles, ptnr_opts, verbose)
+            reg_results.append(ptnr_reg)
+            
+            if verbose:
+                print('Tiles registered.')
+            temp_image = self.transform_image(temp_image, ptnr_reg.registration.forward_transform, 'LINEAR')
+            temp_images.append(temp_image)
+            
+            loop_counter += 1    
+        final_reg_result = compose_registration_results(reg_results)
+        return final_reg_result
 
     def register(self,
                  moving_img: numpy.ndarray,
                  fixed_img: numpy.ndarray,
                  moving_img_mask: numpy.ndarray | None = None,
                  fixed_img_mask: numpy.ndarray | None = None,
-                 options: RegistrationOptions | None = None) -> 'RegistrationResult':
+                 options: RegistrationOptions | None = None,
+                 verbose: bool = False) -> 'RegistrationResult':
         """Performs pairwise registration from moving_img to fixed_img. Optional tissue masks can be provided.
         Options are supplied via the options arguments.
 
@@ -385,10 +579,13 @@ class GreedyFHist:
             moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
             fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
             options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+            verbose (bool): Prints out more information. Defaults to False.
 
         Returns:
             RegistrationResult: Contains computed registration result.
         """
+        if options is None:
+            options = RegistrationOptions()
         reg_result = self.register_(moving_img,
                                     fixed_img,
                                     moving_img_mask,
@@ -663,14 +860,29 @@ class GreedyFHist:
         return registration_result
 
     def do_deformable_registration(self,
-                                   moving_img,
-                                   fixed_img,
-                                   moving_img_mask,
-                                   fixed_img_mask,
-                                   options,
-                                   paths,
-                                   reg_params,
-                                   compute_reverse_nonrigid_registration=False):
+                                   moving_img: numpy.ndarray,
+                                   fixed_img: numpy.ndarray,
+                                   moving_img_mask: numpy.ndarray,
+                                   fixed_img_mask: numpy.ndarray,
+                                   options: RegistrationOptions,
+                                   paths: dict,
+                                   reg_params: dict,
+                                   compute_reverse_nonrigid_registration: bool = False) -> tuple[subprocess.CompletedProcess, dict, PreprocessedData, PreprocessedData]:
+        """Performs deformable registration.
+
+        Args:
+            moving_img (numpy.ndarray): 
+            fixed_img (numpy.ndarray): 
+            moving_img_mask (numpy.ndarray): 
+            fixed_img_mask (numpy.ndarray): 
+            options (RegistrationOptions): 
+            paths (dict): Paths to various files that have been computed in previous steps.
+            reg_params (dict): Collect registration parameters.
+            compute_reverse_nonrigid_registration (bool, optional): If True, computes switched moving and fixed image. Defaults to False.
+
+        Returns:
+            tuple[subprocess.CompletedProcess, dict, PreprocessedData, PreprocessedData]: Return value from calling greedy, new paths, preprocessed data for moving and fixed image.
+        """
         path_metrics_small_resolution = paths['path_metrics_small_resolution']
         if options.do_affine_registration:
             src_resolution = options.affine_registration_options.resolution[0]
@@ -751,15 +963,32 @@ class GreedyFHist:
         return deformable_reg_ret, new_paths, moving_img_preprocessed, fixed_img_preprocessed
            
     def reg_postprocess(self,
-                        moving_img_preprocessed,
-                        fixed_img_preprocessed,
-                        moving_preprocessing_params,
-                        fixed_preprocessing_params,
-                        options,
-                        moving_img,
-                        reg_params,
-                        paths,
-                        reverse=False):
+                        moving_img_preprocessed: PreprocessedData,
+                        fixed_img_preprocessed: PreprocessedData,
+                        moving_preprocessing_params: dict,
+                        fixed_preprocessing_params: dict,
+                        options: RegistrationOptions,
+                        moving_img: numpy.ndarray,
+                        reg_params: dict,
+                        paths: dict,
+                        reverse: bool = False) -> RegistrationResult:
+        """Post processing of registration. Rescales and/or composes affine and
+        nonrigid registration.
+
+        Args:
+            moving_img_preprocessed (PreprocessedData): 
+            fixed_img_preprocessed (PreprocessedData): 
+            moving_preprocessing_params (dict): 
+            fixed_preprocessing_params (dict): 
+            options (RegistrationOptions): 
+            moving_img (numpy.ndarray): 
+            reg_params (dict): 
+            paths (dict): 
+            reverse (bool, optional): Defaults to False.
+
+        Returns:
+            RegistrationResult: 
+        """
         path_output = paths['path_output']
         path_small_affine = paths['path_small_affine']
 
@@ -1120,8 +1349,17 @@ class GreedyFHist:
     # TODO: Fix types for geojson.
     def transform_geojson(self,
                           geojson_data: geojson.GeoJSON,
-                          transformation: SimpleITK.SimpleITK.Image,
-                          **kwards) -> Any:
+                          transformation: SimpleITK.SimpleITK.Transform,
+                          **kwards) -> list[geojson.GeoJSON] | geojson.GeoJSON:
+        """Applies transformation to geojson data. Can be a feature collection ot a list of features.
+
+        Args:
+            geojson_data (geojson.GeoJSON): 
+            transformation (SimpleITK.SimpleITK.Image): 
+
+        Returns:
+            list[geojson.GeoJSON] | geojson.GeoJSON: 
+        """
         if not isinstance(geojson_data, list):
             geometries = geojson_data['features']
         else:

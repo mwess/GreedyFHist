@@ -320,6 +320,29 @@ class NonrigidGreedyOptions:
         """
         return NonrigidGreedyOptions()
 
+
+@dataclass
+class NrptOptions:
+    """Options for performing nonrigid-pyramid tiling registration.
+    """
+    
+    stop_condition_tile_resolution: bool = True
+    stop_condition_pyramid_counter: bool = False
+    max_pyramid_depth: int | None = None
+    pyramid_resolutions: list[int] | None = None
+    pyramid_tiles_per_axis: list[int] | None = None
+    tile_overlap: float = 0.75
+    
+    @staticmethod
+    def default_options() -> 'NrptOptions':
+        """Returns default options.
+
+        Returns:
+            NrptOptions: 
+        """
+        return NrptOptions()
+    
+
 @dataclass
 class RegistrationOptions:
     """
@@ -353,6 +376,11 @@ class RegistrationOptions:
     do_nonrigid_registration: bool = True
         Whether a deformable registration is performed or not.     
 
+    do_nrpt_registration: bool = False
+        If True, will perform nonrigid-pyramidic tiling registration. Will 
+        automatically set `do_affine_registration` to False and use 
+        `nonrigid_registration_options` for registration of tiles.
+
     compute_reverse_nonrigid_registration: bool = False
         Compute the reverse nonrigid registration. If do_affine_registration
         is True, uses the inverse of affine transformation as an
@@ -373,6 +401,9 @@ class RegistrationOptions:
 
     yolo_segmentation_min_size: int
         Threshold for recognition of tissue. Everything smaller is removed from masks.        
+        
+    nrpt_options: NrptOptions
+        Options for defining tiling options in nrpt registration.
     """
 
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
@@ -381,10 +412,12 @@ class RegistrationOptions:
     pre_sampling_max_img_size: int | None = 2000    
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
+    do_nrpt_registration: bool = False
     compute_reverse_nonrigid_registration: bool = False
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
     yolo_segmentation_min_size: int = 5000
+    nrpt_options: NrptOptions = field(default_factory=NrptOptions.default_options)
     
     def __assign_if_present(self, key, args_dict):
         """Assigns value of given key in args_dict if key in class's __annotations__.
