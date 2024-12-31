@@ -174,7 +174,17 @@ def preprocess_image_for_greedy(image: numpy.ndarray,
     return preprocessed_data
 
 
-def reassemble_to_gfh_transform(displ_tiles, trx_shape):
+def reassemble_to_gfh_transform(displ_tiles: list[ImageTile], 
+                                trx_shape: tuple[int, int] | tuple[int, int, int]) -> GFHTransform:
+    """Reassembles transformations for each tile into one transformation.
+
+    Args:
+        displ_tiles (list[ImageTile]): 
+        trx_shape (tuple[int, int] | tuple[int, int, int]): 
+
+    Returns:
+        GFHTransform: 
+    """
     displ_np = reassemble_sitk_displacement_field(displ_tiles, trx_shape)
     displ_sitk = sitk.GetImageFromArray(displ_np, True)
     displ_sitk = sitk.Cast(displ_sitk, sitk.sitkVectorFloat64)

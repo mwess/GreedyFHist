@@ -153,7 +153,7 @@ def deformable_registration(path_to_greedy: str,
         affine_pre_transform (_type_, optional): Contains path to affine_pre_transform. Necessary if ia is ia-com-init. Defaults to None.
 
     Returns:
-        _type_: Return of command line execution.
+        subprocess.CompletedProcess: Return of command line execution.
     """
     if use_docker_container:
         abs_temp_directory = os.path.abspath(temp_directory)
@@ -328,19 +328,29 @@ def correct_img_dtype(img: numpy.ndarray) -> numpy.ndarray:
 def derive_sampling_factors(pre_sampling_factor: float | str,
                            max_size: int,
                            pre_sampling_max_img_size: int | None) -> tuple[float, float]:
-        if pre_sampling_factor == 'auto':
-            if pre_sampling_max_img_size is not None:
-                if max_size > pre_sampling_max_img_size:
-                    resampling_factor = pre_sampling_max_img_size / max_size
-                    moving_resampling_factor = resampling_factor
-                    fixed_resampling_factor = resampling_factor
-                else:
-                    moving_resampling_factor = 1
-                    fixed_resampling_factor = 1
+    """Derives resampling factor for registration.
+
+    Args:
+        pre_sampling_factor (float | str): 
+        max_size (int): 
+        pre_sampling_max_img_size (int | None): 
+
+    Returns:
+        tuple[float, float]: 
+    """
+    if pre_sampling_factor == 'auto':
+        if pre_sampling_max_img_size is not None:
+            if max_size > pre_sampling_max_img_size:
+                resampling_factor = pre_sampling_max_img_size / max_size
+                moving_resampling_factor = resampling_factor
+                fixed_resampling_factor = resampling_factor
             else:
                 moving_resampling_factor = 1
                 fixed_resampling_factor = 1
         else:
             moving_resampling_factor = 1
             fixed_resampling_factor = 1
-        return moving_resampling_factor, fixed_resampling_factor 
+    else:
+        moving_resampling_factor = 1
+        fixed_resampling_factor = 1
+    return moving_resampling_factor, fixed_resampling_factor 
