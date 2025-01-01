@@ -73,7 +73,7 @@ from greedyfhist.utils.utils import (
 )
 
 from greedyfhist.segmentation import load_yolo_segmentation
-from greedyfhist.options import RegistrationOptions, PreprocessingOptions
+from greedyfhist.options import RegistrationOptions, PreprocessingOptions, build_nrpt_opts
 from greedyfhist.utils.tiling import (
     reassemble_sitk_displacement_field, 
     ImageTile, 
@@ -335,18 +335,15 @@ class GreedyFHist:
         """
         fw_displ_tiles = []
         bw_displ_tiles = []
-        tile_transforms = []
         for idx, (moving_image_tile_, fixed_image_tile_) in tqdm.tqdm(enumerate(zip(moving_image_tiles, fixed_image_tiles)), disable=not verbose):
             if tile_reg_opts is None:
-                nrrt_options = RegistrationOptions()
-                nrrt_options.do_affine_registration = False
-                # nrrt_options.remove_temporary_directory = False
-                # nrrt_options.temporary_directory = f'tmp_{idx}'
+                if verbose:
+                    print('No options for registering tiles supplied. Using default.')
+                nrrt_options = RegistrationOptions.nrpt_only_options()
+                # nrrt_options.do_affine_registration = False
             else:
                 nrrt_options = tile_reg_opts
 
-            if verbose:
-                print(nrrt_options)
             moving_image_ = moving_image_tile_.image
             fixed_image_ = fixed_image_tile_.image
             mask = np.ones(moving_image_.shape[:2])
@@ -497,7 +494,7 @@ class GreedyFHist:
         temp_image = moving_image.copy()
 
         # Should it start with 0 or not. 
-        loop_counter = 1
+        loop_counter = 0
 
         reg_results = []
         temp_images = [temp_image]
@@ -519,13 +516,19 @@ class GreedyFHist:
             if max_pyramid_depth == np.inf:
                 raise Exception('Passed arguments are incompatible.')
         idx = 0
+        
+        if verbose:
+            print('Stop conditions:')
+            print(f'stop_condiction_tile_resolution: {stop_condition_tile_resolution}')
+            print(f'stop_condition_pyramid_counter: {stop_condition_pyramid_counter}')
+            print(f'Max pyramid depth: {max_pyramid_depth}')
         while True:
             if verbose:
                 print(f'Next loop: {loop_counter}')
             
             if stop_condition_pyramid_counter and loop_counter > max_pyramid_depth:
                 if verbose:
-                    print('Aborting loop because maximum pyramid depth has been reached.')
+                    print(f'Aborting loop because maximum pyramid depth ({max_pyramid_depth}) has been reached.')
                 break
 
             ptnr_opts = deepcopy(nrpt_tile_options)
@@ -601,6 +604,16 @@ class GreedyFHist:
                                     moving_img_mask,
                                     fixed_img_mask,
                                     options)
+        if options.do_nrpt_registration:
+            if verbose:
+                print('Performing nrpt registration.')
+            nrpt_opts = build_nrpt_opts(options)
+            warped_image = self.transform_image(moving_img, reg_result.registration.forward_transform)
+            nrpt_reg_result = self.nrpt_registration(warped_image, 
+                                                     fixed_img, 
+                                                     nrpt_opts, 
+                                                     verbose)
+            reg_result = compose_registration_results([reg_result, nrpt_reg_result])
         return reg_result 
 
     def register_(self,
@@ -613,8 +626,8 @@ class GreedyFHist:
         """Computes registration from moving image to fixed image.
 
         Args:
-            moving_img (numpy.ndarray):
-            fixed_img (numpy.ndarray): 
+            moving_img (numpy.ndarray): Moving (or source) image.
+            fixed_img (numpy.ndarray): Fixed (or target) image.
             moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise dervied automatically. Defaults to None.
             fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
             options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
@@ -664,16 +677,25 @@ class GreedyFHist:
         moving_img = resample_image_sitk(moving_img, moving_resampling_factor)
         fixed_img = resample_image_sitk(fixed_img, fixed_resampling_factor)
         yolo_segmentation_min_size = options.affine_registration_options.preprocessing_options.yolo_segmentation_min_size if options.do_affine_registration else options.nonrigid_registration_options.preprocessing_options.yolo_segmentation_min_size
-        if moving_img_mask is None:
+
+        # Take care of masks.
+        if options.disable_mask_generation and moving_img_mask is None:
+            moving_img_mask = np.ones(moving_img.shape[:2], dtype=np.uint8)
+        elif moving_img_mask is None:
             moving_img_mask = self.segmentation_function(moving_img, yolo_segmentation_min_size)
         else:
             moving_img_mask = resample_image_sitk(moving_img_mask, moving_resampling_factor)
-        if fixed_img_mask is None:
+
+        if options.disable_mask_generation and fixed_img_mask is None:            
+            fixed_img_mask = np.ones(fixed_img.shape[:2], dtype=np.uint8)
+        elif fixed_img_mask is None:
             fixed_img_mask = self.segmentation_function(fixed_img, yolo_segmentation_min_size)
         else:
             fixed_img_mask = resample_image_sitk(fixed_img_mask, fixed_resampling_factor)
+
         moving_preprocessing_params['moving_img_mask'] = moving_img_mask
         fixed_preprocessing_params['fixed_img_mask'] = fixed_img_mask
+        
         # Cropping and Padding
         cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
         cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)

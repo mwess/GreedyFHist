@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -319,6 +320,17 @@ class NonrigidGreedyOptions:
             GreedyOptions:
         """
         return NonrigidGreedyOptions()
+    
+    @staticmethod
+    def default_nrpt_options() -> 'NonrigidGreedyOptions':
+        """Returns suitable default options for nrpt registration.
+
+        Returns:
+            NonrigidGreedyOptions:
+        """
+        opts = NonrigidGreedyOptions()
+        opts.resolution = (1024, 1024)
+        return opts
 
 
 @dataclass
@@ -332,6 +344,7 @@ class NrptOptions:
     pyramid_resolutions: list[int] | None = None
     pyramid_tiles_per_axis: list[int] | None = None
     tile_overlap: float = 0.75
+    nrpt_tile_reg_opts: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_nrpt_options)
     
     @staticmethod
     def default_options() -> 'NrptOptions':
@@ -402,6 +415,10 @@ class RegistrationOptions:
     yolo_segmentation_min_size: int
         Threshold for recognition of tissue. Everything smaller is removed from masks.        
         
+    disable_mask_generation: bool = False
+        If True, does not generation masks. Internally, the whole image area is declared
+        as a mask. Does nothing if masks are provided.
+        
     nrpt_options: NrptOptions
         Options for defining tiling options in nrpt registration.
     """
@@ -417,6 +434,7 @@ class RegistrationOptions:
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
     yolo_segmentation_min_size: int = 5000
+    disable_mask_generation: bool = False
     nrpt_options: NrptOptions = field(default_factory=NrptOptions.default_options)
     
     def __assign_if_present(self, key, args_dict):
@@ -451,10 +469,10 @@ class RegistrationOptions:
         string, e.g. '1024x1024'.
 
         Args:
-            args_dict (Dict): _description_
+            args_dict (Dict): 
 
         Returns:
-            RegistrationOptions: _description_
+            RegistrationOptions: 
         """
         opts = RegistrationOptions()
         for key in args_dict:
@@ -469,5 +487,67 @@ class RegistrationOptions:
         return opts
 
     @staticmethod
-    def default_options():
+    def default_options() -> RegistrationOptions:
+        """Get default registration options.
+
+        Returns:
+            RegistrationOptions:
+        """
         return RegistrationOptions()
+    
+    @staticmethod
+    def affine_only_options() -> RegistrationOptions:
+        """Default options for affine registration only.
+        
+        Returns:
+            Registration Options:
+        """
+        opts = RegistrationOptions()
+        opts.nonrigid_registration_options = False
+        return opts
+    
+    @staticmethod
+    def nonrigid_only_options() -> RegistrationOptions:
+        """Default options for nonrigid registration only.
+
+        Returns:
+            RegistrationOptions: 
+        """
+        opts = RegistrationOptions()
+        opts.do_affine_registration = False
+        opts.disable_mask_generation = True
+        return opts
+    
+    @staticmethod
+    def nrpt_only_options() -> RegistrationOptions:
+        """Default options for nrpt registration only.
+
+        Returns:
+            RegistrationOptions: 
+        """
+        opts = RegistrationOptions()
+        opts.do_affine_registration = False
+        opts.do_nrpt_registration = True
+        return opts
+
+
+def build_nrpt_opts(reg_opts: RegistrationOptions) -> RegistrationOptions | None:
+    """Utility function that creates a new RegistrationOptions object used internally for registration of tiles
+    nrpt registration. Mainly sets affine registration to None and sets nonrigid registration options to the 
+    registration options specified in `reg_opts.nrpt_options.nrpt_tile_reg_opts`.
+
+    Args:
+        reg_opts (RegistrationOptions):
+            Registration options for whole registration.
+
+    Returns:
+        RegistrationOptions | None: Updated internal registration options. Returns None, if `do_nrpt_registration` is set to False.
+    """
+    if not reg_opts.do_nrpt_registration:
+        return None
+    new_reg_opts = RegistrationOptions()
+    new_reg_opts.do_affine_registration = False
+    # This needs to be set to False, otherwise it will create an endless loop.
+    new_reg_opts.do_nrpt_registration = False
+    new_reg_opts.nonrigid_registration_options = reg_opts.nrpt_options.nrpt_tile_reg_opts
+    return new_reg_opts
