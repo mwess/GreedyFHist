@@ -616,11 +616,13 @@ class GreedyFHist:
         """
         if options is None:
             options = RegistrationOptions()
+        # TODO: Refactor code here. First function is only supposed to be used for affine registration.
         reg_result = self.register_(moving_img,
                                     fixed_img,
                                     moving_img_mask,
                                     fixed_img_mask,
                                     options)
+        # TODO: This should be used for nonrigid registration now.
         if options.do_nrpt_registration:
             if verbose:
                 print('Performing nrpt registration.')
@@ -749,6 +751,7 @@ class GreedyFHist:
         paths['path_metrics_small_resolution'] = path_metrics_small_resolution
         paths['path_metrics_full_resolution'] = path_metrics_full_resolution
 
+        paths['path_temp'] = path_temp
         if options.do_affine_registration:
             moving_affine_path = join(path_temp, 'affine_moving_preprocessing')
             fixed_affine_path = join(path_temp, 'affine_fixed_preprocessing')
