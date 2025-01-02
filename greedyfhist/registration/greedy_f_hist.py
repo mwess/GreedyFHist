@@ -74,7 +74,7 @@ from greedyfhist.utils.utils import (
 )
 
 from greedyfhist.segmentation import load_yolo_segmentation
-from greedyfhist.options import RegistrationOptions, PreprocessingOptions, build_nrpt_opts
+from greedyfhist.options import RegistrationOptions, PreprocessingOptions
 from greedyfhist.utils.tiling import (
     reassemble_sitk_displacement_field, 
     ImageTile, 
@@ -347,10 +347,8 @@ class GreedyFHist:
                 if verbose:
                     print('No options for registering tiles supplied. Using default.')
                 nrrt_options = RegistrationOptions.nrpt_only_options()
-                nrrt_options.do_nrpt_registration = False
-                # nrrt_options.do_affine_registration = False
             else:
-                nrrt_options = tile_reg_opts
+                nrrt_options = deepcopy(tile_reg_opts)
                 
             if verbose:
                 print(nrrt_options)
@@ -362,7 +360,8 @@ class GreedyFHist:
             try:
                 if verbose:
                     start = time.time()
-                registration_result_ = self.register(moving_img=moving_image_,
+                # Call internatl `register_` to avoid wrapping context.
+                registration_result_ = self.register_(moving_img=moving_image_,
                                                      fixed_img=fixed_image_,
                                                      moving_img_mask=mask,
                                                      fixed_img_mask=mask,
@@ -442,7 +441,6 @@ class GreedyFHist:
         Returns:
             RegistrationResult:
         """
-        registration_options.do_affine_registration = False
         nrpt_opts = registration_options.nrpt_options
         return self.nrpt_registration_(
             moving_image,
@@ -505,6 +503,7 @@ class GreedyFHist:
         if nrpt_tile_options is None: 
             nrpt_tile_options = RegistrationOptions()
         
+        # We set this to False skip affine registration when we call `register_`
         nrpt_tile_options.do_affine_registration = False
         
         temp_image = moving_image.copy()
@@ -520,8 +519,11 @@ class GreedyFHist:
         downsampling_size = nrpt_tile_options.nonrigid_registration_options.resolution[0]
 
         if stop_condition_pyramid_counter and stop_condition_tile_resolution:
-            stop_condition_tile_resolution = True
-            stop_condition_pyramid_counter = False
+            stop_condition_tile_resolution = False
+            stop_condition_pyramid_counter = True
+            
+            if max_pyramid_depth is None:
+                max_pyramid_depth = 0
 
         if stop_condition_pyramid_counter and max_pyramid_depth is None:
             max_pyramid_depth = np.inf
@@ -548,7 +550,6 @@ class GreedyFHist:
                 break
 
             ptnr_opts = deepcopy(nrpt_tile_options)
-            ptnr_opts.do_nrpt_registration = False
             
             if pyramid_resolutions is not None:
                 res = pyramid_resolutions[idx]
@@ -612,27 +613,43 @@ class GreedyFHist:
             verbose (bool): Prints out more information. Defaults to False.
 
         Returns:
-            RegistrationResult: Contains computed registration result.
+            RegistrationResult: Computed registration result.
         """
+        # TODO: This function works, but should be cleaned up a bit more in the next update.
         if options is None:
             options = RegistrationOptions()
-        # TODO: Refactor code here. First function is only supposed to be used for affine registration.
-        reg_result = self.register_(moving_img,
-                                    fixed_img,
-                                    moving_img_mask,
-                                    fixed_img_mask,
-                                    options)
+        reg_results = []
+        do_nrpt_reg = False
+        if options.do_nonrigid_registration:
+            if not (options.nrpt_options.stop_condition_pyramid_counter and options.nrpt_options.max_pyramid_depth == 0):
+                # We set this to False now, since we are waiting to use tiling.
+                options.do_nonrigid_registration = False
+                do_nrpt_reg = True
+        if options.do_affine_registration or options.do_nonrigid_registration:
+            reg_result = self.register_(moving_img,
+                                        fixed_img,
+                                        moving_img_mask,
+                                        fixed_img_mask,
+                                        options)
+            reg_results.append(reg_result)
         # TODO: This should be used for nonrigid registration now.
-        if options.do_nrpt_registration:
+        if do_nrpt_reg:
+            options.do_nonrigid_registration = True
             if verbose:
                 print('Performing nrpt registration.')
-            nrpt_opts = build_nrpt_opts(options)
-            warped_image = self.transform_image(moving_img, reg_result.registration.forward_transform)
+            # nrpt_opts = build_nrpt_opts(options)
+            if len(reg_results) > 0:
+                warped_image = self.transform_image(moving_img, reg_results[0].registration.forward_transform)
+            else:
+                warped_image = moving_img.copy()
             nrpt_reg_result = self.nrpt_registration(warped_image, 
                                                      fixed_img, 
-                                                     nrpt_opts, 
+                                                     options, 
                                                      verbose)
-            reg_result = compose_registration_results([reg_result, nrpt_reg_result])
+            reg_results.append(nrpt_reg_result)
+            reg_result = compose_registration_results(reg_results)
+        else:
+            reg_result = reg_results[0]
         return reg_result 
 
     def register_(self,
@@ -641,7 +658,7 @@ class GreedyFHist:
                  moving_img_mask: numpy.ndarray | None = None,
                  fixed_img_mask: numpy.ndarray | None = None,
                  options: RegistrationOptions | None = None,                  
-                 **kwargs: dict) -> tuple['RegistrationTransforms', Optional['RegistrationTransforms']]:
+                 **kwargs: dict) -> RegistrationResult:
         """Computes registration from moving image to fixed image.
 
         Args:
@@ -652,7 +669,7 @@ class GreedyFHist:
             options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
 
         Returns:
-            RegistrationTransforms: _description_
+            RegistrationTransforms: 
         """
         if options is None:
             options = RegistrationOptions()

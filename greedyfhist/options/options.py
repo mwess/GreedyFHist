@@ -336,15 +336,23 @@ class NonrigidGreedyOptions:
 @dataclass
 class NrptOptions:
     """Options for performing nonrigid-pyramid tiling registration.
+    
+    Attributes:
+    
+        stop_condition_tile_resolution: bool = False
+            One condition for stopping pyramid. If the size of a tile (without overlapping) if smaller than 
+            the downscaling resolution during registration, the pyramid is stopped.
+            
+        stop_condition_pyramid_counter: bool = True
+            One condition for stopping pyramid. Stops as soon as the pyramid depth reaches `max_pyramid_depth`.
     """
     
-    stop_condition_tile_resolution: bool = True
-    stop_condition_pyramid_counter: bool = False
-    max_pyramid_depth: int | None = None
+    stop_condition_tile_resolution: bool = False
+    stop_condition_pyramid_counter: bool = True
+    max_pyramid_depth: int | None = 0
     pyramid_resolutions: list[int] | None = None
     pyramid_tiles_per_axis: list[int] | None = None
     tile_overlap: float = 0.75
-    nrpt_tile_reg_opts: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_nrpt_options)
     
     @staticmethod
     def default_options() -> 'NrptOptions':
@@ -429,7 +437,6 @@ class RegistrationOptions:
     pre_sampling_max_img_size: int | None = 2000    
     do_affine_registration: bool = True
     do_nonrigid_registration: bool = True
-    do_nrpt_registration: bool = False
     compute_reverse_nonrigid_registration: bool = False
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
@@ -527,27 +534,4 @@ class RegistrationOptions:
         """
         opts = RegistrationOptions()
         opts.do_affine_registration = False
-        opts.do_nrpt_registration = True
         return opts
-
-
-def build_nrpt_opts(reg_opts: RegistrationOptions) -> RegistrationOptions | None:
-    """Utility function that creates a new RegistrationOptions object used internally for registration of tiles
-    nrpt registration. Mainly sets affine registration to None and sets nonrigid registration options to the 
-    registration options specified in `reg_opts.nrpt_options.nrpt_tile_reg_opts`.
-
-    Args:
-        reg_opts (RegistrationOptions):
-            Registration options for whole registration.
-
-    Returns:
-        RegistrationOptions | None: Updated internal registration options. Returns None, if `do_nrpt_registration` is set to False.
-    """
-    if not reg_opts.do_nrpt_registration:
-        return None
-    new_reg_opts = RegistrationOptions()
-    new_reg_opts.do_affine_registration = False
-    # This needs to be set to False, otherwise it will create an endless loop.
-    new_reg_opts.do_nrpt_registration = False
-    new_reg_opts.nonrigid_registration_options = reg_opts.nrpt_options.nrpt_tile_reg_opts
-    return new_reg_opts
