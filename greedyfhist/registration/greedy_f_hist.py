@@ -8,12 +8,13 @@ RegistrationTransforms.
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, field
-import json
+import logging
 import os
 from os.path import join, exists
 from pathlib import Path
 import shutil
 import subprocess
+import time
 from typing import Any, Optional
 
 import geojson
@@ -80,6 +81,10 @@ from greedyfhist.utils.tiling import (
     extract_image_tiles, 
     get_tile_params
 )
+
+
+logger = logging.getLogger(__name__)
+
 
 def preprocessing(image: numpy.ndarray,
                   preprocessing_options: PreprocessingOptions,
@@ -335,25 +340,36 @@ class GreedyFHist:
         """
         fw_displ_tiles = []
         bw_displ_tiles = []
+        if verbose:
+            print('Starting registration of tiles.')
         for idx, (moving_image_tile_, fixed_image_tile_) in tqdm.tqdm(enumerate(zip(moving_image_tiles, fixed_image_tiles)), disable=not verbose):
             if tile_reg_opts is None:
                 if verbose:
                     print('No options for registering tiles supplied. Using default.')
                 nrrt_options = RegistrationOptions.nrpt_only_options()
+                nrrt_options.do_nrpt_registration = False
                 # nrrt_options.do_affine_registration = False
             else:
                 nrrt_options = tile_reg_opts
+                
+            if verbose:
+                print(nrrt_options)
 
             moving_image_ = moving_image_tile_.image
             fixed_image_ = fixed_image_tile_.image
-            mask = np.ones(moving_image_.shape[:2])
+            mask = np.ones(moving_image_.shape[:2], dtype=np.uint8)
 
             try:
+                if verbose:
+                    start = time.time()
                 registration_result_ = self.register(moving_img=moving_image_,
-                                                            fixed_img=fixed_image_,
-                                                            moving_img_mask=mask,
-                                                            fixed_img_mask=mask,
-                                                            options=nrrt_options)
+                                                     fixed_img=fixed_image_,
+                                                     moving_img_mask=mask,
+                                                     fixed_img_mask=mask,
+                                                     options=nrrt_options)
+                if verbose:
+                    end = time.time()
+                    print(f'Duration of register function: {end - start}')
                 # Foward transform
                 transform_to_displacementfield = sitk.TransformToDisplacementField(
                     registration_result_.registration.forward_transform.transform,
@@ -532,6 +548,7 @@ class GreedyFHist:
                 break
 
             ptnr_opts = deepcopy(nrpt_tile_options)
+            ptnr_opts.do_nrpt_registration = False
             
             if pyramid_resolutions is not None:
                 res = pyramid_resolutions[idx]
@@ -777,15 +794,15 @@ class GreedyFHist:
             reg_params['affine_iteration_vec'] = options.affine_registration_options.iteration_pyramid
             path_small_affine = os.path.join(path_metrics_small_resolution, 'small_affine.mat')
             aff_ret = affine_registration(self.path_to_greedy,
-                                            fixed_img_preprocessed.image_path,
-                                            moving_img_preprocessed.image_path,
-                                            path_small_affine,
-                                            offset,
-                                            ia_init,
-                                            options.affine_registration_options,
-                                            self.use_docker_container,
-                                            path_temp
-                                            )
+                                          fixed_img_preprocessed.image_path,
+                                          moving_img_preprocessed.image_path,
+                                          path_small_affine,
+                                          offset,
+                                          ia_init,
+                                          options.affine_registration_options,
+                                          self.use_docker_container,
+                                          path_temp
+                                          )
             self.cmdln_returns.append(aff_ret)    
         else:
             path_small_affine = None  
@@ -845,7 +862,6 @@ class GreedyFHist:
             moving_img, fixed_img = fixed_img, moving_img
             moving_img_mask, fixed_img_mask = fixed_img_mask, moving_img_mask
             moving_preprocessing_params, fixed_preprocessing_params = fixed_preprocessing_params, moving_preprocessing_params
-
 
             if options.do_affine_registration:
                 affine_transform = read_affine_transform(paths['path_small_affine'])
