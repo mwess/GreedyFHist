@@ -494,9 +494,9 @@ def compose_registration_results(reg_results: list['RegistrationResult']) -> 'Re
         RegistrationResult:
     """
     reg_fw = compose_transforms([x.registration.forward_transform for x in reg_results])
-    reg_bw = compose_transforms([x.registration.backward_transform for x in reg_results])
+    reg_bw = compose_transforms([x.registration.backward_transform for x in reg_results[::-1]])
     rev_reg_fw = compose_transforms([x.reverse_registration.forward_transform for x in reg_results])
-    rev_reg_bw = compose_transforms([x.reverse_registration.backward_transform for x in reg_results])
+    rev_reg_bw = compose_transforms([x.reverse_registration.backward_transform for x in reg_results[::-1]])
 
     reg_transforms = RegistrationTransforms(forward_transform=reg_fw,
                                             backward_transform=reg_bw)

@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+
 def get_3_step_pyramid_iterations() -> list[int]:
     """Returns a default 3 step pyramid with iterations 100, 50 and 10.
 
@@ -12,12 +13,21 @@ def get_3_step_pyramid_iterations() -> list[int]:
 
 
 def get_4_step_pyramid_iterations() -> list[int]:
-    """Returns a default 3 step pyramid with iterations 100, 100, 50 and 10.
+    """Returns a default 4 step pyramid with iterations 100, 100, 50 and 10.
 
     Returns:
         list[int]:
     """
     return [100, 100, 50, 10]
+
+
+def get_5_step_pyramid_iterations() -> list[int]:
+    """Returns a default 5 step pyramid with iterations 100, 100, 50, 50 and 10.
+
+    Returns:
+        list[int]:
+    """
+    return [100, 100, 50, 50, 10]
 
 
 def load_default_resolution() -> tuple[int, int]:
@@ -27,6 +37,16 @@ def load_default_resolution() -> tuple[int, int]:
         tuple[int, int]:
     """
     return (1024, 1024)
+
+    
+def load_default_nr_resolution() -> tuple[int, int]:
+    """Loads the default resolution of 2048 x 2048 
+    for nonrigid registration.
+
+    Returns:
+        tuple[int, int]: 
+    """
+    return (2048, 2048)
 
 
 @dataclass
@@ -88,8 +108,21 @@ class PreprocessingOptions:
             self.__assign_if_present(key, args_dict)    
 
     @staticmethod
-    def default_options():
+    def default_options() -> PreprocessingOptions:
         return PreprocessingOptions()
+
+    @staticmethod
+    def default_options_nr() -> PreprocessingOptions:
+        """Default options for nonrigid registration.
+
+        Returns:
+            PreprocessingOptions: 
+        """
+        options = PreprocessingOptions()
+        options.enable_denoising = False
+        # options.disable_denoising_fixed = True
+        # options.disable_denoising_moving = True
+        return options
     
 
 @dataclass
@@ -148,7 +181,7 @@ class AffineGreedyOptions:
     cost_function: str = 'ncc'
     rigid_iterations: int | str = 10000
     ia: str = 'ia-com-init'
-    iteration_pyramid: list[int] = field(default_factory=get_3_step_pyramid_iterations)
+    iteration_pyramid: list[int] = field(default_factory=get_4_step_pyramid_iterations)
     n_threads: int = 1
     keep_affine_transform_unbounded: bool = True
     dof: int = 12
@@ -256,10 +289,10 @@ class NonrigidGreedyOptions:
     """
 
     dim: int = 2
-    resolution: tuple[int, int] = field(default_factory=load_default_resolution)
-    preprocessing_options: PreprocessingOptions = field(default_factory=PreprocessingOptions.default_options)    
-    s1: float = 5.0
-    s2: float = 5.0
+    resolution: tuple[int, int] = field(default_factory=load_default_nr_resolution)
+    preprocessing_options: PreprocessingOptions = field(default_factory=PreprocessingOptions.default_options_nr)    
+    s1: float = 8.0
+    s2: float = 6.0
     kernel_size: int = 10
     cost_function: str = 'ncc'
     ia: str = 'ia-com-init'
@@ -345,14 +378,20 @@ class NrptOptions:
             
         stop_condition_pyramid_counter: bool = True
             One condition for stopping pyramid. Stops as soon as the pyramid depth reaches `max_pyramid_depth`.
+            
+        tiling_mode is eith 'simple' or 'pyramid'
     """
     
+    enable_tiling: bool = False
     stop_condition_tile_resolution: bool = False
     stop_condition_pyramid_counter: bool = True
+    tiling_mode: str = 'simple'
     max_pyramid_depth: int | None = 0
     pyramid_resolutions: list[int] | None = None
     pyramid_tiles_per_axis: list[int] | None = None
-    tile_overlap: float = 0.75
+    tile_overlap: list[float] | float = 0.75
+    tile_size: int | tuple[int, int] = 1024
+    min_overlap: float = 0.1
     
     @staticmethod
     def default_options() -> 'NrptOptions':
