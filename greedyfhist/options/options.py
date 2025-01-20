@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 
 def get_3_step_pyramid_iterations() -> list[int]:
@@ -181,7 +181,7 @@ class AffineGreedyOptions:
     cost_function: str = 'ncc'
     rigid_iterations: int | str = 10000
     ia: str = 'ia-com-init'
-    iteration_pyramid: list[int] = field(default_factory=get_4_step_pyramid_iterations)
+    iteration_pyramid: list[int] = field(default_factory=get_3_step_pyramid_iterations)
     n_threads: int = 1
     keep_affine_transform_unbounded: bool = True
     dof: int = 12
@@ -291,8 +291,8 @@ class NonrigidGreedyOptions:
     dim: int = 2
     resolution: tuple[int, int] = field(default_factory=load_default_nr_resolution)
     preprocessing_options: PreprocessingOptions = field(default_factory=PreprocessingOptions.default_options_nr)    
-    s1: float = 8.0
-    s2: float = 6.0
+    s1: float = 5
+    s2: float = 4
     kernel_size: int = 10
     cost_function: str = 'ncc'
     ia: str = 'ia-com-init'
@@ -367,7 +367,7 @@ class NonrigidGreedyOptions:
 
 
 @dataclass
-class NrptOptions:
+class TilingOptions:
     """Options for performing nonrigid-pyramid tiling registration.
     
     Attributes:
@@ -392,15 +392,16 @@ class NrptOptions:
     tile_overlap: list[float] | float = 0.75
     tile_size: int | tuple[int, int] = 1024
     min_overlap: float = 0.1
+    n_procs: int | None = None
     
     @staticmethod
-    def default_options() -> 'NrptOptions':
+    def default_options() -> 'TilingOptions':
         """Returns default options.
 
         Returns:
-            NrptOptions: 
+            TilingOptions: 
         """
-        return NrptOptions()
+        return TilingOptions()
     
 
 @dataclass
@@ -466,10 +467,13 @@ class RegistrationOptions:
         If True, does not generation masks. Internally, the whole image area is declared
         as a mask. Does nothing if masks are provided.
         
-    nrpt_options: NrptOptions
+    tiling_options: TilingOptions
         Options for defining tiling options in nrpt registration.
     """
 
+    path_to_greedy: str | None = None
+    segmentation_function: Callable | None = None
+    use_docker_container: bool = False
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
     nonrigid_registration_options: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_options)
     pre_sampling_factor: float | str = 'auto'
@@ -481,7 +485,7 @@ class RegistrationOptions:
     remove_temporary_directory: bool = True
     yolo_segmentation_min_size: int = 5000
     disable_mask_generation: bool = False
-    nrpt_options: NrptOptions = field(default_factory=NrptOptions.default_options)
+    tiling_options: TilingOptions = field(default_factory=TilingOptions.default_options)
     
     def __assign_if_present(self, key, args_dict):
         """Assigns value of given key in args_dict if key in class's __annotations__.

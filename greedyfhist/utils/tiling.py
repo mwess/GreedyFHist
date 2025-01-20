@@ -337,6 +337,14 @@ def get_tile_params_by_tile_size(size: int,
     ends_rel = []    
     ends_int = []
     min_overlap_px = min_overlap_px // 2
+    if size <= tile_size:
+        starts.append(0)
+        starts_rel.append(0)
+        starts_int.append(0)
+        ends.append(size)
+        ends_rel.append(size)
+        ends_int.append(size)
+        return starts, starts_int, starts_rel, ends, ends_int, ends_rel
     while start + tile_size < size:
         starts.append(start)
         # Relative start/end points within tile.

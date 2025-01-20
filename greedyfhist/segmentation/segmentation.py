@@ -90,10 +90,13 @@ def load_yolo_segmentation() -> callable:
             numpy.ndarray: Segmented image.
         """
         preprocessed_image = preprocess_for_segmentation(image)
+        downscaled_shape = preprocessed_image.shape[:2]
         preprocessed_image = (np.expand_dims(np.moveaxis(preprocessed_image, 2, 0), 0) / 255.).astype(np.float32)
 
         outputs = ort_session.run(output_names, {'images': preprocessed_image}, None)
         _, _, prediction = postprocess(outputs, shape=IMAGE_SHAPE)
+        if isinstance(prediction, list):
+            prediction = np.ones(downscaled_shape).astype(np.uint8)
         prediction = prediction.astype(np.uint8)
         mask = prediction[0]
         if len(mask.shape) > 2:
