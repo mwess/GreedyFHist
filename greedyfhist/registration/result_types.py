@@ -1,3 +1,8 @@
+"""
+This module contains various dataclasses used for internal and external processing of registration results.
+"""
+
+
 from dataclasses import dataclass
 import json
 import os

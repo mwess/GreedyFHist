@@ -174,6 +174,8 @@ def deformable_registration(path_to_greedy: str,
     def_args['-s'] = [f'{options.s1}vox', f'{options.s2}vox']
     def_args['-o'] = output_warp
     def_args['-oinv'] = output_inv_warp
+    if options.use_gm_trim:
+        def_args['-gm-trim'] = f'{options.kernel_size}x{options.kernel_size}'
     if options.use_sv:
         def_args['-sv'] = ''
         if options.exp is not None:
@@ -182,6 +184,8 @@ def deformable_registration(path_to_greedy: str,
         def_args['-svlb'] = ''
         if options.exp is not None:
             def_args['-exp'] = options.exp
+    if options.tscale is not None:
+        def_args['-tscale'] = options.tscale
     if affine_pre_transform is None:
         def_args[ia[0]] = ia[1]
 
@@ -307,57 +311,6 @@ def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     all_transforms.AddTransform(aff_trans4)
     all_transforms.AddTransform(post_upscale_transform)
     return all_transforms
-
-
-# def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
-#                                moving_preprocessing_params: dict,
-#                                fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
-#     """Pre- and appends preprocessing steps from moving and fixed image as transforms to backward affine/nonrigid registration.  
-
-#     Args:
-#         transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
-#         internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
-
-#     Returns:
-#         SimpleITK.SimpleITK.Transform: Composited end-to-end transform.
-#     """
-#     moving_padding = moving_preprocessing_params['padding']
-#     moving_cropping = moving_preprocessing_params['cropping_params']
-#     fixed_padding = fixed_preprocessing_params['padding']
-#     fixed_cropping = fixed_preprocessing_params['cropping_params']
-#     mov_ds_factor = moving_preprocessing_params['resampling_factor']
-#     fix_ds_factor = fixed_preprocessing_params['resampling_factor']
-    
-#     all_transforms = sitk.CompositeTransform(2)
-
-#     pre_downscale_transform = sitk.ScaleTransform(2, (1/fix_ds_factor, 1/fix_ds_factor))
-#     post_upscale_transform = sitk.ScaleTransform(2, (mov_ds_factor, mov_ds_factor))
-
-#     aff_trans1 = sitk.TranslationTransform(2)
-#     offset_x = moving_cropping[2]
-#     offset_y = moving_cropping[0]
-#     aff_trans1.SetOffset((offset_x, offset_y))
-
-#     aff_trans2 = sitk.TranslationTransform(2)
-#     offset_x = -moving_padding[0]
-#     offset_y = -moving_padding[2]
-#     aff_trans2.SetOffset((offset_x, offset_y))
-    
-
-#     aff_trans3 = sitk.TranslationTransform(2)
-#     aff_trans3.SetOffset((fixed_padding[0], fixed_padding[2]))
-    
-#     aff_trans4 = sitk.TranslationTransform(2)
-#     aff_trans4.SetOffset((-fixed_cropping[2], -fixed_cropping[0]))
-
-#     all_transforms.AddTransform(pre_downscale_transform)
-#     all_transforms.AddTransform(aff_trans4)
-#     all_transforms.AddTransform(aff_trans3)
-#     all_transforms.AddTransform(transform)
-#     all_transforms.AddTransform(aff_trans2)
-#     all_transforms.AddTransform(aff_trans1)
-#     all_transforms.AddTransform(post_upscale_transform)
-#     return all_transforms
 
 
 # TODO: There is probably a better way to ensure the dtype of the image.

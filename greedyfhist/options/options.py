@@ -50,6 +50,38 @@ def load_default_nr_resolution() -> tuple[int, int]:
 
 
 @dataclass
+class SegmentationOptions:
+    
+    segmentation_function: Callable | None = None
+    yolo_segmentation_min_size: int = 10000
+    use_tv_chambolle_denoising: bool = True
+    use_clahe_denoising: bool = False
+    fill_holes: bool = True
+    use_fallback: str | None = None
+    
+    @staticmethod
+    def default_options() -> SegmentationOptions:
+        return SegmentationOptions()
+    
+    def __assign_if_present(self, key, args_dict):
+        """Assigns value of given key in args_dict if key in class's __annotations__.
+
+        Args:
+            key (_type_):
+            args_dict (_type_):
+        """
+        if key in args_dict:
+            value = args_dict[key]
+            if key in self.__annotations__:
+                self.__setattr__(key, value)
+    
+    def to_dict(self):
+        d = {}
+        for key in self.__annotations__:
+            d[key] = self.__getattribute__(key)
+        return d    
+
+@dataclass
 class PreprocessingOptions:
     """
     Contains all the options that can be used to register a moving to a fixed image.
@@ -74,7 +106,6 @@ class PreprocessingOptions:
     moving_sp: int = 25
     fixed_sr: int = 30
     fixed_sp: int = 25
-    yolo_segmentation_min_size: int = 5000
     enable_denoising: bool = True
     disable_denoising_moving: bool = False
     disable_denoising_fixed: bool = False
@@ -301,6 +332,8 @@ class NonrigidGreedyOptions:
     use_sv: bool = False
     use_svlb: bool = False
     exp: int | None = None
+    use_gm_trim: bool = True
+    tscale: str | None = None
 
     def __post_init__(self):
         self.preprocessing_options.enable_denoising = False
@@ -472,7 +505,7 @@ class RegistrationOptions:
     """
 
     path_to_greedy: str | None = None
-    segmentation_function: Callable | None = None
+    segmentation_options: SegmentationOptions = field(default_factory=SegmentationOptions.default_options)
     use_docker_container: bool = False
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
     nonrigid_registration_options: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_options)
@@ -486,6 +519,7 @@ class RegistrationOptions:
     yolo_segmentation_min_size: int = 5000
     disable_mask_generation: bool = False
     tiling_options: TilingOptions = field(default_factory=TilingOptions.default_options)
+    grp_n_proc: int | None = None
     
     def __assign_if_present(self, key, args_dict):
         """Assigns value of given key in args_dict if key in class's __annotations__.
