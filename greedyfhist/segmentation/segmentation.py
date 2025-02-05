@@ -1,4 +1,9 @@
+"""
+This module handles the 
+"""
+
 from os.path import join, split
+from typing import Callable
 
 import cv2
 import numpy, numpy as np
@@ -27,7 +32,7 @@ def fill_hole(mask: numpy.ndarray) -> numpy.ndarray:
     return filled
 
 
-def preprocess_for_segmentation(image: numpy.ndarray,
+def _preprocess_for_segmentation(image: numpy.ndarray,
                                 use_tv_chambolle: bool = True,
                                 use_clahe: bool = False) -> numpy.ndarray:
     """Applies preprocessing steps to image before segmentation:
@@ -54,14 +59,11 @@ def preprocess_for_segmentation(image: numpy.ndarray,
     if use_clahe:
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         img2 = clahe.apply(img2)
-    # img2 = (img2 * 255).astype(np.uint8)x
     preprocessed_image = cv2.cvtColor(img2, cv2.COLOR_GRAY2BGR)
-    # preprocessed_image = np.stack((img2, img2, img2))
-    # preprocessed_image = np.moveaxis(preprocessed_image, 0, 2)
     return preprocessed_image
 
 
-def resolve_path_to_model() -> str:
+def _resolve_path_to_model() -> str:
     """Returns path to YOLO8 segmentation model.
 
     Returns:
@@ -76,15 +78,25 @@ def resolve_path_to_model() -> str:
 def load_yolo_segmentation(min_area_size: int = 10000,
                            fill_holes: bool = True,
                            use_tv_chambolle: bool = True,
-                           use_clahe: bool = True,
-                           use_fallback: str | None = 'otsu') -> callable:
-    """Loads YOLO8 based segmentation function.
+                           use_clahe: bool = False,
+                           use_fallback: str | None = 'otsu') -> Callable[[numpy.ndarray], numpy.ndarray]:
+    """Loads YOLO8 based segmentation function. We use a closure to initialize the function
+    because we cannot parse any additional arguments during the registration itself. All
+    arguments are set as constants in the generated prediction function.
+
+    Args:
+        min_area_size (int): Threshold for removing artifacts after tissue prediction. Defaults to 10000.
+        fill_holes (bool): If True, fill any holes after prediction.
+        use_tv_chambolle (bool): If True, uses total variation denoising. Defaults to True.
+        use_clahe (bool): If True, uses Contrast Limited Adaptive Histogram Equalization. Defaults to False.
+        use_fallback (str, optional): If use_fallback == 'otsu', uses Otsu thresholding on the preprocessed image
+            if the YOLO model cannot identify any tissue.
 
     Returns:
         Callable: Segmentation function.
     """
 
-    model_path = resolve_path_to_model()
+    model_path = _resolve_path_to_model()
     ort_session = ort.InferenceSession(model_path)
     output_names = [x.name for x in ort_session.get_outputs()]
     input_name = [x.name for x in ort_session.get_inputs()]
@@ -102,7 +114,7 @@ def load_yolo_segmentation(min_area_size: int = 10000,
         Returns:
             numpy.ndarray: Segmented image.
         """
-        preprocessed_image = preprocess_for_segmentation(image,
+        preprocessed_image = _preprocess_for_segmentation(image,
                                                          use_tv_chambolle=use_tv_chambolle,
                                                          use_clahe=use_clahe)
         downscaled_shape = preprocessed_image.shape[:2]
@@ -118,6 +130,8 @@ def load_yolo_segmentation(min_area_size: int = 10000,
                                           use_tv_chambolle=use_tv_chambolle,
                                           use_clahe=use_clahe)
                 prediction = np.expand_dims(prediction, 0).astype(np.uint8)
+            else:
+                raise Exception(f'Fallback method unknown: {use_fallback}.')
         prediction = prediction.astype(np.uint8)
         mask = prediction[0]
         if len(mask.shape) > 2:
@@ -138,7 +152,7 @@ def load_yolo_segmentation(min_area_size: int = 10000,
     return _predict
 
 
-def otsu_thresholding(img):
+def _otsu_thresholding(img: numpy.ndarray):
     blur = cv2.GaussianBlur(img,(5,5),0)
     # find normalized_histogram, and its cumulative distribution function
     hist = cv2.calcHist([blur],[0],None,[256],[0,256])
@@ -161,16 +175,17 @@ def otsu_thresholding(img):
         if fn < fn_min:
             fn_min = fn
             thresh = i
-    # find otsu's threshold value with OpenCV function
-    # return blur
-    ret, otsu = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU) 
-    # return ret, otsu
+    _, otsu = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU) 
     return otsu
+
 
 def predict_otsu(image, 
                  use_tv_chambolle: bool = True,
                  use_clahe: bool = False,
                  ):
+    """
+    Implementation of Otsu tresholding method. Typically not used, but might be useful as a fallback.
+    """
     if len(image.shape) == 2:
         gray_image = image
     else:
@@ -181,25 +196,21 @@ def predict_otsu(image,
     if use_clahe:
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         gray_image = clahe.apply(gray_image)
-    mask = otsu_thresholding(gray_image)
-    mask = invert_image(mask)
+    mask = _otsu_thresholding(gray_image)
+    mask = _invert_mask(mask)
     return mask
-    # filtered_mask = np.zeros_like(mask)
-    # filtered_mask_false = np.zeros_like(mask)
-    # # return mask
-    # # Filter out small regions.
-    # regions = regionprops(label(mask))
-    # for region in regions:
-    #     if region.area > min_area_size:
-    #         # print(region.area, min_area_size)
-    #         minr, minc, maxr, maxc = region.bbox
-    #         filtered_mask[minr:maxr, minc:maxc] = region.image.astype(np.uint8)
-    # if fill_holes:
-    #     filtered_mask = fill_hole(filtered_mask)
-    # return filtered_mask
 
 
-def invert_image(img):
+def _invert_mask(img: numpy.ndarray) -> numpy.ndarray:
+    """
+    Inverts the mask.
+    
+    Args:
+        img (numpy.ndarray)
+        
+    Returns:
+        numpy.ndarray
+    """
     img_new = np.zeros_like(img)
     img_new[img == 0] = 1
     return img_new

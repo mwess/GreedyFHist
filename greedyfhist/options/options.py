@@ -1,9 +1,14 @@
+"""This module contains all the options classes for configuring the registration.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+import numpy
 
-def get_3_step_pyramid_iterations() -> list[int]:
+
+def _get_3_step_pyramid_iterations() -> list[int]:
     """Returns a default 3 step pyramid with iterations 100, 50 and 10.
 
     Returns:
@@ -12,7 +17,7 @@ def get_3_step_pyramid_iterations() -> list[int]:
     return [100, 50, 10]
 
 
-def get_4_step_pyramid_iterations() -> list[int]:
+def _get_4_step_pyramid_iterations() -> list[int]:
     """Returns a default 4 step pyramid with iterations 100, 100, 50 and 10.
 
     Returns:
@@ -21,7 +26,7 @@ def get_4_step_pyramid_iterations() -> list[int]:
     return [100, 100, 50, 10]
 
 
-def get_5_step_pyramid_iterations() -> list[int]:
+def _get_5_step_pyramid_iterations() -> list[int]:
     """Returns a default 5 step pyramid with iterations 100, 100, 50, 50 and 10.
 
     Returns:
@@ -30,7 +35,7 @@ def get_5_step_pyramid_iterations() -> list[int]:
     return [100, 100, 50, 50, 10]
 
 
-def load_default_resolution() -> tuple[int, int]:
+def _load_default_resolution() -> tuple[int, int]:
     """Loads the default resolution of 1024 x 1024.
 
     Returns:
@@ -39,7 +44,7 @@ def load_default_resolution() -> tuple[int, int]:
     return (1024, 1024)
 
     
-def load_default_nr_resolution() -> tuple[int, int]:
+def _load_default_nr_resolution() -> tuple[int, int]:
     """Loads the default resolution of 2048 x 2048 
     for nonrigid registration.
 
@@ -51,6 +56,9 @@ def load_default_nr_resolution() -> tuple[int, int]:
 
 @dataclass
 class SegmentationOptions:
+    """
+    Options for configuring YOLO8 based tissue segmentation.
+    """
     
     segmentation_function: Callable | None = None
     yolo_segmentation_min_size: int = 10000
@@ -98,8 +106,14 @@ class PreprocessingOptions:
     fixed_sp: int = 25
         Pixel window radius for mean shift filtering in fixed image.
 
-    yolo_segmentation_min_size: int
-        Threshold for recognition of tissue. Everything smaller is removed from masks.        
+    enable_denoising: bool = True
+        Toggle for enabling denoising.
+        
+    disable_denoising_moving: bool = False
+        Can be used to disable denoising in moving image.
+        
+    disable_denoising_fixed: bool = False
+        Can be used to disable denoising in fixed image.       
     """
 
     moving_sr: int = 30
@@ -165,6 +179,7 @@ class AffineGreedyOptions:
     Some options are extended/overwritten.
 
     Attributes:
+    
         dim: int 
             Should always be set to 2.
 
@@ -185,7 +200,7 @@ class AffineGreedyOptions:
             If set to 'auto', the number of iterations for rigid matching
             is computed relative to the size of the offset from the 
             center-of-mass initialization. Otherwise, uses the provided
-            numer. 
+            number. 
             
         ia: str
             Initial image alignment. 'ia-com-init' is a custom option for using the center-of-mass of image masks. Other options can be taken from Greedy. 
@@ -206,13 +221,13 @@ class AffineGreedyOptions:
     """
 
     dim: int = 2
-    resolution: tuple[int, int] = field(default_factory=load_default_resolution)
+    resolution: tuple[int, int] = field(default_factory=_load_default_resolution)
     preprocessing_options: 'PreprocessingOptions' = field(default_factory=PreprocessingOptions.default_options)
     kernel_size: int = 10
     cost_function: str = 'ncc'
     rigid_iterations: int | str = 10000
     ia: str = 'ia-com-init'
-    iteration_pyramid: list[int] = field(default_factory=get_3_step_pyramid_iterations)
+    iteration_pyramid: list[int] = field(default_factory=_get_4_step_pyramid_iterations)
     n_threads: int = 1
     keep_affine_transform_unbounded: bool = True
     dof: int = 12
@@ -279,6 +294,7 @@ class NonrigidGreedyOptions:
     Some options are extended/overwritten.
 
     Attributes:
+    
         dim: int 
             Should always be set to 2.
 
@@ -317,17 +333,23 @@ class NonrigidGreedyOptions:
             
         exp: Optional[int]
             Additional value used in conjunction with use_svlb.
+            
+        use_gm_trim: bool = True
+            Passes the gm_trim param to greedy.
+            
+        tscale: str | None = None
+            If not None, passes tscale to greedy.
     """
 
     dim: int = 2
-    resolution: tuple[int, int] = field(default_factory=load_default_nr_resolution)
+    resolution: tuple[int, int] = field(default_factory=_load_default_nr_resolution)
     preprocessing_options: PreprocessingOptions = field(default_factory=PreprocessingOptions.default_options_nr)    
     s1: float = 5
     s2: float = 4
     kernel_size: int = 10
     cost_function: str = 'ncc'
     ia: str = 'ia-com-init'
-    iteration_pyramid: list[int] = field(default_factory=get_4_step_pyramid_iterations)
+    iteration_pyramid: list[int] = field(default_factory=_get_4_step_pyramid_iterations)
     n_threads: int = 1
     use_sv: bool = False
     use_svlb: bool = False
@@ -401,24 +423,54 @@ class NonrigidGreedyOptions:
 
 @dataclass
 class TilingOptions:
-    """Options for performing nonrigid-pyramid tiling registration.
+    """Options for performing nonrigid tiling registration.
     
     Attributes:
     
+        enable_tiling: bool = False
+            Enables tiling. If False, standard non-rigid registration is used.
+            
+        tiling_mode: str = 'simple'
+            Tiling mode. Can either be 'simple' or 'pyramid'. 
+            
         stop_condition_tile_resolution: bool = False
-            One condition for stopping pyramid. If the size of a tile (without overlapping) if smaller than 
-            the downscaling resolution during registration, the pyramid is stopped.
+            Relevant for pyramid tiling. One condition for stopping pyramid. If the size of 
+            a tile (without overlapping) if smaller than the downscaling resolution during 
+            registration, the pyramid is stopped. Ignored if `tiling_mode=='simple'`.
             
         stop_condition_pyramid_counter: bool = True
-            One condition for stopping pyramid. Stops as soon as the pyramid depth reaches `max_pyramid_depth`.
+            Relevant for pyramid tiling. One condition for stopping pyramid. Stops as soon 
+            as the pyramid depth reaches `max_pyramid_depth`. Ignored if `tiling_mode=='simple'`.
             
-        tiling_mode is eith 'simple' or 'pyramid'
+        max_pyramid_depth: int | None = 0
+            Relevant for pyramid tiling. Defines stop condition for `stop_condition_pyramid_counter`.
+            
+        pyramid_resolutions: list[int] | None = None
+            Relevant for pyramid tiling. Defines the resolution of the tiles at each step of the pyramid.
+        
+        pyramid_tiles_per_axis: list[int] | None = None
+            Relevant for pyramid tiling. Defines how many tiles are generated per axis. The number of tiles
+            is then always the number of tiles on the x-axis * number of tiles on the y-axis.
+        
+        tile_overlap: list[float] | float = 0.75
+            Relevant for pyramid tiling. Gives the overlap of two neighboring tiles.
+            
+        tiles_size: int | tuple[int, int] = 1024
+            Relevant for simple tiling. Size of each tile extracted. 
+            
+        min_overlap: float = 0.1
+            Relevant for simple tiling. Minimum overlap between two neighboring tiles. Might be larger depending of how 
+            tiles fit into the images resolution. Last tile is likely to be affected if the tiles can not be evenly 
+            extracted from the image.
+            
+        n_procs: int | None = None
+            Number of concurrent processes for tile registration. If None, tiles are registered sequentially.
     """
     
     enable_tiling: bool = False
+    tiling_mode: str = 'simple'    
     stop_condition_tile_resolution: bool = False
     stop_condition_pyramid_counter: bool = True
-    tiling_mode: str = 'simple'
     max_pyramid_depth: int | None = 0
     pyramid_resolutions: list[int] | None = None
     pyramid_tiles_per_axis: list[int] | None = None
@@ -442,6 +494,20 @@ class RegistrationOptions:
     """
     Contains all the options that can be used to register a moving to a fixed image.
     
+    path_to_greedy: str | None = None
+        Path to greedy executable. Only needed in the functional interface.
+        In the object-oriented interface this property is set to 
+        `GreedyFHist.path_to_greedy` if necessary.
+        
+    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray]
+        Either an options object containing configuration parameters for the standard
+        tissue segmentation or a segmentation function that takes an image an input
+        and returns a mask.
+        
+    use_docker_container: bool = False
+        If the greedy executable is called through a docker image, set this to True and 
+        set `path_to_greedy` to the name of the docker container with the greedy executable.
+        
     affine_registration_options: AffineRegistrationOptions
         Options for preprocessing and calling Greedy with affine
         registration otions.
@@ -502,10 +568,14 @@ class RegistrationOptions:
         
     tiling_options: TilingOptions
         Options for defining tiling options in nrpt registration.
+        
+    grp_n_proc: int | None = None
+        Number of concurrent processes used during groupwise registration. If None, performs
+        every registration sequentially.
     """
 
     path_to_greedy: str | None = None
-    segmentation_options: SegmentationOptions = field(default_factory=SegmentationOptions.default_options)
+    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] = field(default_factory=SegmentationOptions.default_options)
     use_docker_container: bool = False
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
     nonrigid_registration_options: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_options)

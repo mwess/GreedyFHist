@@ -67,7 +67,11 @@ def derive_output_path(directory: str, fname: str, limit: int = 1000) -> str:
             return new_target_path
     return target_path
         
+        
 def get_default_metadata():
+    """
+    Returns a dictionary with default metadata for ome.tiff files.
+    """
     metadata = {
         'PhysicalSizeX': 1,
         'PhysicalSizeXUnit': 'px',
@@ -105,7 +109,7 @@ def write_to_ometiffile(img: numpy.ndarray,
         is_annotation (bool): If True, assumes that image is C x W x H.
                               Otherwise assumes, W x H x C. 
         tile (bool): Use tiling. Defaults to True.
-        tile_size: Size of tile. Defaults to 512.
+        tile_size(int): Size of tile. Defaults to 512.
         pyramid (bool): Build pyramidical. Defaults to True.
         bigtiff (bool): Stores image as bigtiff. Experimental, should not be used.
         skip_channel (bool): Skips channel information, if set to True. Defaults to False.

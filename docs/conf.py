@@ -1,5 +1,6 @@
 import os
 import sphinx_rtd_theme
+import sys
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -16,6 +17,10 @@ release = '28/06/2024'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+
+
+sys.path.insert(0, os.path.abspath('../greedyfhist'))
+
 extensions = [
     "hoverxref.extension",
     "notfound.extension",
@@ -23,6 +28,7 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon"
 ]
 # extensions = ["myst_parser"]
 

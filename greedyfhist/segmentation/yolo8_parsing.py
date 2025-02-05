@@ -63,6 +63,7 @@ def postprocess(preds: tuple[numpy.ndarray, numpy.ndarray],
     else:
         return [], [], []
 
+
 def masks2segments(masks: numpy.ndarray) -> list[numpy.ndarray]:
     """
     It takes a list of masks(n,h,w) and returns a list of segments(n,xy) (Borrowed from
@@ -84,6 +85,7 @@ def masks2segments(masks: numpy.ndarray) -> list[numpy.ndarray]:
         segments.append(c.astype("float32"))
     return segments
 
+
 def crop_mask(masks: numpy.ndarray, boxes: numpy.ndarray) -> numpy.ndarray:
     """
     It takes a mask and a bounding box, and returns a mask that is cropped to the bounding box. (Borrowed from
@@ -101,6 +103,7 @@ def crop_mask(masks: numpy.ndarray, boxes: numpy.ndarray) -> numpy.ndarray:
     r = np.arange(w, dtype=x1.dtype)[None, None, :]
     c = np.arange(h, dtype=x1.dtype)[None, :, None]
     return masks * ((r >= x1) * (r < x2) * (c >= y1) * (c < y2))
+
 
 def process_mask(protos: numpy.ndarray, 
                  masks_in: numpy.ndarray, 
@@ -126,6 +129,7 @@ def process_mask(protos: numpy.ndarray,
     masks = np.einsum("HWN -> NHW", masks)  # HWN -> NHW
     masks = crop_mask(masks, bboxes)
     return np.greater(masks, 0.5)
+
 
 def scale_mask(masks: numpy.ndarray, 
                im0_shape: tuple[int, int, int], 
