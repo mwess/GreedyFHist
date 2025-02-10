@@ -15,12 +15,12 @@ def eucl(src: numpy.ndarray, dst: numpy.ndarray) -> float:
     return np.sqrt(np.square(src[:, 0] - dst[:, 0]) + np.square(src[:, 1] - dst[:, 1]))
 
 
-def compute_distance_for_lm(warped_df: pandas.core.frame.DataFrame, fixed_df: pandas.core.frame.DataFrame) -> pandas.DataFrame:
+def compute_distance_for_lm(warped_df: pandas.DataFrame, fixed_df: pandas.DataFrame) -> pandas.DataFrame:
     """Compute target registration error for each pair of matching landmarks. Lansmarks are matched with the 'label' column.
 
     Args:
-        warped_df (pandas.core.frame.DataFrame):
-        fixed_df (pandas.core.frame.DataFrame):
+        warped_df (pandas.DataFrame):
+        fixed_df (pandas.DataFrame):
 
     Returns:
         pandas.DataFrame: 

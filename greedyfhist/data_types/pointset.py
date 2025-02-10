@@ -19,7 +19,7 @@ class Pointset:
     Attributes
     ----------
     
-    data : pandas.core.frame.DataFrame 
+    data : pandas.DataFrame 
         Contains pointset valued data. 
 
     path: str
@@ -41,7 +41,7 @@ class Pointset:
     """
     
     
-    data : pandas.core.frame.DataFrame 
+    data : pandas.DataFrame 
     path: str
     x_axis: str = 'x'
     y_axis: str = 'y'

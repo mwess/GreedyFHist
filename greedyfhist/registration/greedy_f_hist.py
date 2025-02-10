@@ -6,10 +6,10 @@ RegistrationTransforms.
 """
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import multiprocess
 import os
-from os.path import join, exists
+from os.path import join
 from pathlib import Path
 import shutil
 import subprocess
@@ -58,7 +58,8 @@ from greedyfhist.utils.image import (
     resample_image_sitk,
     derive_resampling_factor,
     realign_displacement_field,
-    read_affine_transform
+    read_affine_transform,
+    get_corner_pixels
 )
 
 from greedyfhist.utils.utils import (
@@ -73,7 +74,7 @@ from greedyfhist.utils.utils import (
     derive_sampling_factors
 )
 
-from greedyfhist.segmentation import load_yolo_segmentation
+from greedyfhist.segmentation import load_segmentation_function, load_yolo_segmentation
 
 from greedyfhist.options import (
     RegistrationOptions, 
@@ -144,7 +145,7 @@ def _downsample_and_padding(image: numpy.ndarray,
                      resolution: tuple[int, int],
                      smoothing: int,
                      tmp_dir: str,
-                     padding_mode: str = 'mask') -> 'PreprocessedData':
+                     padding_for_mask: bool = True) -> 'PreprocessedData':
     """Performs final preprocessing steps of image and saves image for 
     greedy under the filename is 'new_small_image.nii.gz' in the 
     provided tmp_dir.
@@ -157,8 +158,8 @@ def _downsample_and_padding(image: numpy.ndarray,
         smoothing (int): Gaussian smoothing applied for preventing 
                          anti-aliasing.
         tmp_dir (str): Directory for storing.
-        padding_mode (str): Either 'mask' or 'nomask'. If 'mask' is used, the
-            padding value is 0. If 'nomask' is used, it is assumed that no
+        padding_for_mask (bool): If True is used, the
+            padding value is 0. If False is used, it is assumed that no
             background segmentation took place. In that case we use HistoReg's approach and 
             pad the image with a gaussian distribution.
 
@@ -170,20 +171,21 @@ def _downsample_and_padding(image: numpy.ndarray,
     height_image = image.shape[1]
     width_image = image.shape[0]
 
-    # 2. Preprocessing Step 2: Add padding for out of bounds. Estimate padded background by taking pixel information from background.
-
     height_small_image = small_image.shape[1]
     width_small_image = small_image.shape[0]
 
-    if padding_mode is not None and padding_mode == 'no_mask':
+    img_padded = pad_image(small_image, kernel * 4)
+    if not padding_for_mask:
+        corner_pixels = get_corner_pixels(image, kernel, kernel)
+        mean_c_ints = corner_pixels.mean()
+        var_c_ints = corner_pixels.var()
         img_outline = np.ones_like(image)
         padded_outline = pad_image(img_outline, kernel * 4)
         padded_outline_inv = np.abs(padded_outline.astype(int) - 1).astype(np.uint8)
         noisy_data = np.random.normal(mean_c_ints, var_c_ints, padded_outline_inv.shape)
         noised_padding = padded_outline_inv * noisy_data
-        img_padded = padded_img + noised_padding
-    else:        
-        img_padded = pad_image(small_image, kernel * 4)
+        img_padded = img_padded + noised_padding
+
     img_padded_sitk = sitk.GetImageFromArray(img_padded, isVector=True)
     img_padded_sitk.SetOrigin((4 * kernel, 4 * kernel))
     direction = tuple(map(lambda x: x * -1, img_padded_sitk.GetDirection()))
@@ -456,6 +458,8 @@ def _register_tiles_from_tile_size(
     Returns:
         RegistrationResult:
     """
+    if tile_reg_opts is None:
+        tile_reg_opts = RegistrationOptions()
     fw_displ_tiles = []
     bw_displ_tiles = []
     if tile_reg_opts.tiling_options.n_procs is None:
@@ -469,18 +473,21 @@ def _register_tiles_from_tile_size(
             fw_displ_tiles.append(fw_displ_tile)
             bw_displ_tiles.append(bw_displ_tile)
     else:
-        
-        
         if verbose:
             print(f'Number of pools used: {tile_reg_opts.tiling_options.n_procs}')
-        tile_reg_opts.segmentation_function = 'disable'
+        tile_reg_opts.segmentation = None
+        tile_reg_opts.disable_mask_generation = True
         mp_args = []
         for i in range(len(moving_image_tiles)):
             moving_image_tile = moving_image_tiles[i]
             fixed_image_tile = fixed_image_tiles[i]
             tile_reg_opts_ = deepcopy(tile_reg_opts)
-            tile_reg_opts_.temporary_directory = f'{tile_reg_opts_.temporary_directory}_{i}'
+            tile_reg_opts_.temporary_directory = f'{tile_reg_opts_.temporary_directory}/tiling_registration/{i}'
+            tile_reg_opts_.segmentation = None
+            tile_reg_opts_.disable_mask_generation = True
+            print(tile_reg_opts_)
             mp_args.append((moving_image_tile, fixed_image_tile, tile_reg_opts_, verbose))
+        print('Calling pool!...........')
         pool = multiprocess.Pool(tile_reg_opts.tiling_options.n_procs)
         displ_tiles = pool.starmap(_register_tiles_helper, mp_args)
         for (fw_displ_tile, bw_displ_tile) in displ_tiles:
@@ -498,7 +505,7 @@ def _register_tiles_from_tile_size(
 
 def _register_tiles_helper(moving_image_tile: ImageTile,
                           fixed_image_tile: ImageTile,
-                          tile_reg_opts: RegistrationOptions,
+                          tiling_options: RegistrationOptions,
                           verbose: bool = False):
     """
     Helper function for executing tiling registration concurrently.
@@ -515,12 +522,17 @@ def _register_tiles_helper(moving_image_tile: ImageTile,
     Returns: (ImageTile, ImageTile)
         Forward and backward transformation in tile context.
     """
-    if tile_reg_opts is None:
-        if verbose:
-            print('No options for registering tiles supplied. Using default.')
-        tiling_options = RegistrationOptions.nrpt_only_options()
-    else:
-        tiling_options = deepcopy(tile_reg_opts)
+    # if tile_reg_opts is None:
+    #     if verbose:
+    #         print('No options for registering tiles supplied. Using default.')
+    #     tiling_options = RegistrationOptions.nrpt_only_options()
+    # else:
+    # print('Inside helper function.')
+    # tiling_options = deepcopy(tile_reg_opts)
+    # print(tiling_options)
+    # Set a subdirectory to not spam the main folder too much.
+    # tiling_options.temporary_directory = join(tiling_options.temporary_directory, 'tiling_registration')
+    # Path(tiling_options.temporary_directory).mkdir(parents=True, exist_ok=True)
 
     moving_image_ = moving_image_tile.image
     fixed_image_ = fixed_image_tile.image
@@ -575,15 +587,12 @@ def simple_tiling_registration(moving_image: numpy.ndarray,
                         fixed_image: numpy.ndarray,
                         registration_options: RegistrationOptions,
                         verbose: bool = False) -> RegistrationResult:
-    """Tiling based registration. (Also sometimes referred to as patch-based). Tiling registration is an alternative to the standard
+    """Simple tiling based registration. (Also sometimes referred to as patch-based). Tiling registration is an alternative to the standard
     non-rigid registration. The advantage of tiling is that removal of features due to downsizing can be avoided at an increased runtime 
-    cost. Tiling comes in two modes: simple and pyramidical. 
+    cost. 
     
     In simple tiling moving and fixed image are separated into tiles with some user-defined minium overlap. After each pair of tiles
     has been registered, the tiled transformations are joined into one transform.
-    
-    In pyramid tiling, moving and fixed image on each level are separated into tiles, registered, and transformation matrices are put 
-    back together. On each new level, the tile size is reduced until a stop criteria is reached.
     
     Note: Images are expected to be of the same shape. Performing an affine or nonrigid registration beforehand guarantees that both
     input images have the same shape.
@@ -597,12 +606,10 @@ def simple_tiling_registration(moving_image: numpy.ndarray,
     Returns:
         RegistrationResult:
     """
-    tiling_opts = registration_options.tiling_options
+    # tiling_opts = registration_options.tiling_options
     return _simple_tiling_registration(
         moving_image,
         fixed_image,
-        tile_size=tiling_opts.tile_size,
-        min_overlap=tiling_opts.min_overlap,
         tile_options=registration_options,
         verbose=verbose
     )
@@ -885,12 +892,12 @@ def register(moving_img: numpy.ndarray,
     if options is None:
         options = RegistrationOptions()
     reg_results = []
-    do_nrpt_reg = False
+    do_tiling_reg = False
     if options.do_nonrigid_registration:
         if options.tiling_options.enable_tiling:
             # We set this to False now, since we are waiting to use tiling.
             options.do_nonrigid_registration = False
-            do_nrpt_reg = True
+            do_tiling_reg = True
     if options.do_affine_registration or options.do_nonrigid_registration:
         reg_result = _perform_registration(moving_img,
                                fixed_img,
@@ -899,7 +906,7 @@ def register(moving_img: numpy.ndarray,
                                options)
         reg_results.append(reg_result)
     # TODO: This should be used for nonrigid registration now.
-    if do_nrpt_reg:
+    if do_tiling_reg:
         options.do_nonrigid_registration = True
         if verbose:
             print('Performing tiling registration.')
@@ -910,21 +917,22 @@ def register(moving_img: numpy.ndarray,
         if verbose:
             print('Doing simple tiling registration.')
         if options.tiling_options.tiling_mode == 'simple':
-            nrpt_reg_result = simple_tiling_registration(warped_image, 
+            tiling_reg_result = simple_tiling_registration(warped_image, 
                                                     fixed_img, 
                                                     options, 
                                                     verbose)            
         elif options.tiling_options.tiling_mode == 'pyramid':
-            nrpt_reg_result = pyramid_tiling_registration(warped_image, 
+            tiling_reg_result = pyramid_tiling_registration(warped_image, 
                                                     fixed_img, 
                                                     options, 
                                                     verbose)     
         else:
             raise Exception(f'Unkown tiling option: {options.tiling_options.tiling_mode}')
-        reg_results.append(nrpt_reg_result)
+        reg_results.append(tiling_reg_result)
         reg_result = compose_registration_results(reg_results)
     else:
         reg_result = reg_results[0]
+    # TODO: Clean this bit up. Its a bit unpredictable.
     if verbose:
         if reg_result.registration.reg_params is None:
             reg_params = {}
@@ -934,14 +942,14 @@ def register(moving_img: numpy.ndarray,
         reg_result.registration.reg_params = reg_params
     return reg_result 
 
-
 def _perform_registration(moving_img: numpy.ndarray,
               fixed_img: numpy.ndarray,
               moving_img_mask: numpy.ndarray | None = None,
               fixed_img_mask: numpy.ndarray | None = None,
               options: RegistrationOptions | None = None,                  
               **kwargs: dict) -> RegistrationResult:
-    """Computes registration from moving image to fixed image.
+    """Computes registration from moving image to fixed image. Performs preprocessing, 
+    affine, deformable registration, and postprocessing.
     
 
     Args:
@@ -958,18 +966,22 @@ def _perform_registration(moving_img: numpy.ndarray,
         options = RegistrationOptions()
 
     # Setup tissue segmentation function.
-    if options.disable_mask_generation:
+    print('Getting into the function.')
+    if options.disable_mask_generation or (moving_img_mask is not None and fixed_img_mask is not None):
+        print('No seg fun requireed.')
         segmentation_function = None
-    elif isinstance(options.segmentation, SegmentationOptions):
-        segmentation_function = load_yolo_segmentation(use_clahe=options.segmentation.use_clahe_denoising,
-                                                use_tv_chambolle=options.segmentation.use_tv_chambolle_denoising,
-                                                fill_holes=options.segmentation.fill_holes,
-                                                min_area_size=options.segmentation.yolo_segmentation_min_size,
-                                                use_fallback=options.segmentation.use_fallback)
-    elif isinstance(options.segmentation, callable):
-        segmentation_function = options.segmentation
     else:
-        raise Exception('Could not parse segmentation. Either function or SegmentationOption is wrong.')
+        segmentation_function = load_segmentation_function(options.segmentation)
+    # elif isinstance(options.segmentation, SegmentationOptions):
+    #     segmentation_function = load_yolo_segmentation(use_clahe=options.segmentation.use_clahe_denoising,
+    #                                             use_tv_chambolle=options.segmentation.use_tv_chambolle_denoising,
+    #                                             fill_holes=options.segmentation.fill_holes,
+    #                                             min_area_size=options.segmentation.yolo_segmentation_min_size,
+    #                                             use_fallback=options.segmentation.use_fallback)
+    # elif isinstance(options.segmentation, callable):
+    #     segmentation_function = options.segmentation
+    # else:
+    #     raise Exception('Could not parse segmentation. Either function or SegmentationOption is wrong.')
     
     # Setting up temporary directories.
     path_temp = options.temporary_directory
@@ -979,20 +991,26 @@ def _perform_registration(moving_img: numpy.ndarray,
     path_output = join(path_temp, 'output', 'registrations')
     path_output, subdir_num = derive_subdir(path_output)
     create_if_not_exists(path_output)
+    
+    # We use the paths dictionary to keep track of some paths.
+    paths = {
+        'path_temp': path_temp,
+        'path_output': path_output,
+    }
+    
     path_metrics = os.path.join(path_output, 'metrics')
     path_metrics_small_resolution = os.path.join(path_metrics, 'small_resolution')
     path_metrics_full_resolution = os.path.join(path_metrics, 'full_resolution')
 
-    create_if_not_exists(path_metrics)
     create_if_not_exists(path_metrics_small_resolution)
     create_if_not_exists(path_metrics_full_resolution)
 
     paths['path_metrics'] = path_metrics
     paths['path_metrics_small_resolution'] = path_metrics_small_resolution
     paths['path_metrics_full_resolution'] = path_metrics_full_resolution
-
     paths['path_temp'] = path_temp    
     
+    # Compute resampling factor for first resampling.
     max_size = max(moving_img.shape[0], moving_img.shape[1], fixed_img.shape[0], fixed_img.shape[1])            
     moving_resampling_factor, fixed_resampling_factor = derive_sampling_factors(
         options.pre_sampling_factor,
@@ -1004,7 +1022,8 @@ def _perform_registration(moving_img: numpy.ndarray,
     original_fixed_image_size = fixed_img.shape[:2]
     cmdln_returns = []
 
-    # We collect some of the parameters used during registration for debugging.
+    # We collect some of the parameters used during registration for debugging. This should 
+    # be moved to a logging file.
     reg_params = {
                     'subdir_num': subdir_num
                 }
@@ -1015,10 +1034,6 @@ def _perform_registration(moving_img: numpy.ndarray,
     fixed_preprocessing_params = {
         'resampling_factor': fixed_resampling_factor,
         'original_image_size': original_fixed_image_size
-    }
-    paths = {
-        'path_temp': path_temp,
-        'path_output': path_output,
     }
 
     # Convert to correct format, if necessary
@@ -1262,7 +1277,7 @@ def _do_deformable_registration(moving_img: numpy.ndarray,
         tuple[subprocess.CompletedProcess, dict, PreprocessedData, PreprocessedData]: Return value from calling greedy, new paths, preprocessed data for moving and fixed image.
     """
     # If we use a different resolution during nonrigid registration,
-    # we rescale data and transformation here.
+    # we rescale images and transformation here.
     path_metrics_small_resolution = paths['path_metrics_small_resolution']
     if options.do_affine_registration:
         src_resolution = options.affine_registration_options.resolution[0]
@@ -1383,7 +1398,9 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
     sitk.WriteImage(empty_fixed_img, path_to_small_ref_image)
 
     # If no non-rigid registration is performed we keep the affine transform unbounded.
-    # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that affine keeps being unbounded.
+    # TODO: This needs some changing. There should be an option not to composite affine and nonrigid registrations, so that 
+    # affine keeps being unbounded. Some of the options could also be removed. No point in having the affine registration be 
+    # bounded anyway. 
     if options.do_nonrigid_registration:
         path_metrics_small_resolution = paths['path_metrics_small_resolution']
         path_metrics_full_resolution = paths['path_metrics_full_resolution']
@@ -1392,6 +1409,8 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
         no_2_orig_resample = (options.nonrigid_registration_options.resolution[0] / moving_img.shape[0]) * 100
         no_2_orig_factor = 100 / no_2_orig_resample            
         if options.do_affine_registration and not options.affine_registration_options.keep_affine_transform_unbounded:
+            # TODO: This option can be removed as there is no point in removing the unbounded properties of the affine
+            # transformation here.
             path_small_composite_warp = os.path.join(path_metrics_small_resolution, 'small_composite_warp.nii.gz')
             nonrigid_affine_trans_path = paths['nonrigid_affine_trans_path']
             composite_warps(
@@ -1640,19 +1659,16 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
     """
     if options is None:
         options = RegistrationOptions()
-    if options.segmentation.segmentation_function is None:
-        segmentation_function = load_yolo_segmentation(use_clahe=options.segmentation.use_clahe_denoising,
-                                                       use_tv_chambolle=options.segmentation.use_tv_chambolle_denoising,
-                                                       fill_holes=options.segmentation.fill_holes,
-                                                       min_area_size=options.segmentation.yolo_segmentation_min_size,
-                                                       use_fallback=options.segmentation.use_fallback)
-    else:
-        segmentation_function = options.segmentation.segmentation_function
+    segmentation_function = load_segmentation_function(options.segmentation)
     # Stage 1: Prepare masks if necessary.
     new_image_mask_list = []
     for tpl in image_mask_list:
         if isinstance(tpl, tuple):
-            img, mask = tpl
+            if len(tpl) == 2:
+                img, mask = tpl
+            else:
+                img = tpl[0]
+                mask = None
         else:
             img = tpl
             mask = None
@@ -1739,7 +1755,7 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
 
 
 def transform_image(image: numpy.ndarray,
-                    transform: 'GFHTransform',
+                    transform: GFHTransform | RegistrationTransforms | RegistrationResult,
                     interpolation_mode: str | int = 'LINEAR') -> numpy.ndarray:
     """Transforms image data from moving to fixed image space using computed transformation. Use forward_transform attribute.
 
@@ -1751,10 +1767,15 @@ def transform_image(image: numpy.ndarray,
     Returns:
         numpy.ndarray: 
     """
+    if isinstance(transform, RegistrationResult):
+        transform = transform.registration
+    if isinstance(transform, RegistrationTransforms):
+        transform = transform.forward_transform    
     return _transform_image(image,
                             transform.transform,
                             transform.size,
                             interpolation_mode)
+
 
 def _transform_image(image: numpy.ndarray, 
                      transform: SimpleITK.SimpleITK.Transform,
@@ -1790,7 +1811,7 @@ def _transform_image(image: numpy.ndarray,
 
 
 def transform_pointset(pointset: numpy.ndarray,
-                       transform: GFHTransform) -> numpy.ndarray:
+                       transform: GFHTransform | RegistrationTransforms | RegistrationResult | SimpleITK.Transform) -> numpy.ndarray:
     """Transforms pointset from moving to fixed image space. Use backward_transform attribute.
 
     Args:
@@ -1800,14 +1821,20 @@ def transform_pointset(pointset: numpy.ndarray,
     Returns:
         numpy.ndarray:
     """
+    if isinstance(transform, RegistrationResult):
+        transform = transform.registration
+    if isinstance(transform, RegistrationTransforms):
+        transform = transform.forward_transform
+    if isinstance(transform, GFHTransform):
+        transform = transform.transform
     return _transform_pointset(
         pointset,
-        transform.transform
+        transform
     )
 
 
 def _transform_pointset(pointset: numpy.ndarray,
-                        transform: SimpleITK.SimpleITK.Transform) -> numpy.ndarray:
+                        transform: SimpleITK.Transform) -> numpy.ndarray:
     """Transform pointset from moving to fixed image space.
 
     Args:
@@ -1829,7 +1856,7 @@ def _transform_pointset(pointset: numpy.ndarray,
 
 # TODO: Fix types for geojson.
 def transform_geojson(geojson_data: geojson.GeoJSON,
-                      transformation: SimpleITK.SimpleITK.Transform,
+                      transform: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform,
                       **kwards) -> list[geojson.GeoJSON] | geojson.GeoJSON:
     """Applies transformation to geojson data. Can be a feature collection ot a list of features.
 
@@ -1840,13 +1867,19 @@ def transform_geojson(geojson_data: geojson.GeoJSON,
     Returns:
         list[geojson.GeoJSON] | geojson.GeoJSON: 
     """
+    if isinstance(transform, RegistrationResult):
+        transform = transform.registration
+    if isinstance(transform, RegistrationTransforms):
+        transform = transform.forward_transform
+    if isinstance(transform, GFHTransform):
+        transform = transform.transform    
     if not isinstance(geojson_data, list):
         geometries = geojson_data['features']
     else:
         geometries = geojson_data
     warped_geometries = []
     for _, geometry in enumerate(geometries):
-        warped_geometry = geojson.utils.map_tuples(lambda coords: __warp_geojson_coord_tuple(coords, transformation), geometry)
+        warped_geometry = geojson.utils.map_tuples(lambda coords: __warp_geojson_coord_tuple(coords, transform), geometry)
         warped_geometries.append(warped_geometry)
     if not isinstance(geojson_data, list):
         geojson_data['features'] = warped_geometries
@@ -1855,7 +1888,7 @@ def transform_geojson(geojson_data: geojson.GeoJSON,
         return warped_geometries
 
 
-def __warp_geojson_coord_tuple(coord: tuple[float, float], transform: SimpleITK.SimpleITK.Transform) -> tuple[float, float]:
+def __warp_geojson_coord_tuple(coord: tuple[float, float], transform: SimpleITK.Transform) -> tuple[float, float]:
     """Transforms coordinates from geojson data from moving to fixed image space.
 
     Args:
@@ -1892,6 +1925,11 @@ class GreedyFHist:
 
     path_to_greedy: str
         Path to greedy executable. Not needed if Greedy is on PATH.
+        
+    use_docker_container: bool
+        If GreedyFHist is called from outside a docker container, but greedy is inside 
+        a docker container, set this option to True and set the image name with greedy
+        as `path_to_greedy`.
 
     segmentation_function: Optional[Callable]
         Segmentation function for foreground segmentation.
@@ -1905,7 +1943,7 @@ class GreedyFHist:
 
     def __post_init__(self):
         if self.segmentation_function is None:
-            self.segmentation_function = load_yolo_segmentation()
+            self.segmentation_function = load_segmentation_function('yolo-seg')
             
     def __update_options(self, options: RegistrationResult):
         if self.path_to_greedy is not None:
@@ -1937,6 +1975,8 @@ class GreedyFHist:
         Returns:
             RegistrationResult: Computed registration result.        
         """
+        if options is None:
+            options = RegistrationOptions()
         options = self.__update_options(options)
         return register_from_filepaths(
             moving_img_path=moving_img_path,
@@ -1945,9 +1985,8 @@ class GreedyFHist:
             moving_img_mask_path=moving_img_mask_path,
             fixed_img_mask_path=fixed_img_mask_path,
             options=options,
-            transform_path=transform_path,
-            segmentation_function=self.segmentation_function,            
-        )
+            transform_path=transform_path
+            )
 
     def groupwise_registration_from_filepaths(self,
                                image_mask_filepaths: list[tuple[str, str | None]],
@@ -2114,13 +2153,14 @@ class GreedyFHist:
 
     def transform_image(self,
                         image: numpy.ndarray,
-                        transform: 'GFHTransform',
+                        transform: GFHTransform | RegistrationTransforms | RegistrationResult,
                         interpolation_mode: str | int = 'LINEAR') -> numpy.ndarray:
         """Transforms image data from moving to fixed image space using computed transformation. Use forward_transform attribute.
 
         Args:
             image (numpy.ndarray): 
-            transform (GFHTransform): 
+            transform (GFHTransform | RegistrationTransforms | RegistrationResult): Transform to use. 
+                By default tries to look for the forward transformation. 
             interpolation_mode (str, optional): Defaults to 'LINEAR'.
 
         Returns:
@@ -2134,7 +2174,7 @@ class GreedyFHist:
 
     def transform_pointset(self,
                            pointset: numpy.ndarray,
-                           transform: GFHTransform) -> numpy.ndarray:
+                           transform: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform) -> numpy.ndarray:
         """Transforms pointset from moving to fixed image space. Use backward_transform attribute.
 
         Args:
@@ -2152,34 +2192,16 @@ class GreedyFHist:
     # TODO: Fix types for geojson.
     def transform_geojson(self,
                           geojson_data: geojson.GeoJSON,
-                          transformation: SimpleITK.SimpleITK.Transform,
+                          transformation: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform,
                           **kwards) -> list[geojson.GeoJSON] | geojson.GeoJSON:
         """Applies transformation to geojson data. Can be a feature collection ot a list of features.
 
         Args:
             geojson_data (geojson.GeoJSON): 
-            transformation (SimpleITK.SimpleITK.Image): 
+            transformation (RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform): 
 
         Returns:
             list[geojson.GeoJSON] | geojson.GeoJSON: 
         """
         return transform_geojson(geojson_data=geojson_data,
                                  transformation=transformation)
-
-    @classmethod
-    def load_from_config(cls, config: dict[str, Any] | None = None) -> 'GreedyFHist':
-        """Loads GreedyFHist registerer using additional arguments supplied in config.
-
-        Args:
-            config (Dict[str, Any]): _description_
-
-        Returns:
-            GreedyFHist: _description_
-        """
-        # Refers to greedy's directory. If not supplied, assumes that greedy is in PATH.
-        if config is None:
-            config = {}
-        path_to_greedy = config.get('path_to_greedy', '')
-        path_to_greedy = join(path_to_greedy, 'greedy')
-        seg_fun = load_yolo_segmentation()
-        return cls(path_to_greedy=path_to_greedy, segmentation_function=seg_fun)

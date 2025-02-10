@@ -8,7 +8,7 @@ line-length = 79
 [tool.poetry]
 name = "GreedyFHist"
 version = "0.0.2-rc2"
-description = "Registration for stained histology"
+description = "Registration for stained histology images"
 authors = ["Maximilian Wess <maximilian.wess@ntnu.no>"]
 
 include = [
@@ -37,6 +37,7 @@ onnxruntime = "1.17.0"
 toml = "0.10.2"
 # ultralytics = "^8.0.199"
 pyvips = "^2.2.3"
+multiprocess = "^0.70.17"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.812"

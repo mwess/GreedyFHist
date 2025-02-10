@@ -7,6 +7,13 @@ from typing import Any, Callable
 
 import numpy
 
+from .segmentation_options import (
+    SegmentationOptions,
+    YoloSegOptions,
+    TissueEntropySegOptions,
+    LuminosityAndAreaSegOptions
+)
+
 
 def _get_3_step_pyramid_iterations() -> list[int]:
     """Returns a default 3 step pyramid with iterations 100, 50 and 10.
@@ -53,41 +60,6 @@ def _load_default_nr_resolution() -> tuple[int, int]:
     """
     return (2048, 2048)
 
-
-@dataclass
-class SegmentationOptions:
-    """
-    Options for configuring YOLO8 based tissue segmentation.
-    """
-    
-    segmentation_function: Callable | None = None
-    yolo_segmentation_min_size: int = 10000
-    use_tv_chambolle_denoising: bool = True
-    use_clahe_denoising: bool = False
-    fill_holes: bool = True
-    use_fallback: str | None = None
-    
-    @staticmethod
-    def default_options() -> SegmentationOptions:
-        return SegmentationOptions()
-    
-    def __assign_if_present(self, key, args_dict):
-        """Assigns value of given key in args_dict if key in class's __annotations__.
-
-        Args:
-            key (_type_):
-            args_dict (_type_):
-        """
-        if key in args_dict:
-            value = args_dict[key]
-            if key in self.__annotations__:
-                self.__setattr__(key, value)
-    
-    def to_dict(self):
-        d = {}
-        for key in self.__annotations__:
-            d[key] = self.__getattribute__(key)
-        return d    
 
 @dataclass
 class PreprocessingOptions:
@@ -499,7 +471,26 @@ class RegistrationOptions:
         In the object-oriented interface this property is set to 
         `GreedyFHist.path_to_greedy` if necessary.
         
-    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray]
+    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] | str | None
+        Handles segmentation accordingly:
+        SegmentationOptions:
+            Contains configuration for YOLO8 based segmentations.
+        Callable:
+            Excepts a segmentation function that takes an input image and returns a mask where
+            1 denotes tissue area and 0 denotes background.
+        str:
+            One of 'yolo-seg', 'entropy-based-seg', 'lum-area-seg'.
+            If 'yolo-seg', the function `load_yolo_segmentation` is called to init a segmentation
+            function based on the yolo model.
+            
+            If 'entropy-based-seg', the function `load_tissue_entropy_detection` is called with default
+            parameters and `predict_tissue_from_entropy` function is loaded.
+            
+            If 'lum-area-seg', the function `load_tissue_luminosity_area_detection` is called with 
+            default values and `predict_tissue_from_luminosity_and_area` function is loaded.
+        None:
+            Loads yolo based segmentation with default options.
+            
         Either an options object containing configuration parameters for the standard
         tissue segmentation or a segmentation function that takes an image an input
         and returns a mask.
@@ -518,8 +509,8 @@ class RegistrationOptions:
 
     pre_sampling_factor: Union[float, str] = 'auto'
         Sampling factor prior to preprocessing. Does not
-        affect registration accuracy, but can help to speed up the 
-        registration considerable, especially for large images. If
+        affect registration accuracy, but can help to speed up the  
+        preprocessing considerable, especially for large images. If
         the factor is a float it is interpreted as a scaling factor
         that is applied on both images prior to preprocessing. If
         'auto', then the `pre_sampling_max_img_size` is used to
@@ -557,10 +548,7 @@ class RegistrationOptions:
         
     remove_temporary_directory: bool = True
         Sets whether the temporary directory is removed after
-        registration.
-
-    yolo_segmentation_min_size: int
-        Threshold for recognition of tissue. Everything smaller is removed from masks.        
+        registration.    
         
     disable_mask_generation: bool = False
         If True, does not generation masks. Internally, the whole image area is declared
@@ -575,7 +563,7 @@ class RegistrationOptions:
     """
 
     path_to_greedy: str | None = None
-    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] = field(default_factory=SegmentationOptions.default_options)
+    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] | str = field(default_factory=YoloSegOptions.default_options)
     use_docker_container: bool = False
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
     nonrigid_registration_options: NonrigidGreedyOptions = field(default_factory=NonrigidGreedyOptions.default_options)
@@ -586,7 +574,6 @@ class RegistrationOptions:
     compute_reverse_nonrigid_registration: bool = False
     temporary_directory: str = 'tmp'
     remove_temporary_directory: bool = True
-    yolo_segmentation_min_size: int = 5000
     disable_mask_generation: bool = False
     tiling_options: TilingOptions = field(default_factory=TilingOptions.default_options)
     grp_n_proc: int | None = None

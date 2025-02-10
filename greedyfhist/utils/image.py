@@ -393,3 +393,39 @@ def pad_image_square(img: numpy.ndarray) -> numpy.ndarray:
     max_dim = np.max(img.shape[:2])
     padding = get_padding_params(img, max_dim)
     return pad_asym(img, padding)
+
+
+def get_corner_pixels(image: numpy.ndarray, x_range: int, y_range: int) -> numpy.ndarray:
+    """Get pixels from the image corners.
+
+    Args:
+        image (numpy.ndarray):
+        x_range (int): range in x-axis
+        y_range (int): range in y-axis
+
+    Returns:
+        numpy.ndarray: Flattened array of pixels
+    """
+    c_dl = image[:x_range, :y_range].ravel()
+    c_dr = image[image.shape[0] - x_range: image.shape[0], :y_range].ravel()
+    c_ul = image[:x_range, image.shape[1] - y_range: image.shape[1]].ravel()
+    c_ur = image[image.shape[0] - x_range: image.shape[0], image.shape[1] - y_range: image.shape[1]].ravel()
+    pxs_arr = np.hstack((c_dl, c_dr, c_ul, c_ur))
+    return pxs_arr
+
+
+def scale_image_to_max_dim(img: numpy.ndarray, target_resolution: int = 640) -> numpy.ndarray:
+    """Scales an image such that its largest dimension corresponds to target_resolution.
+
+    Args:
+        img (numpy.ndarray): 
+        target_res (int, optional): Defaults to 640.
+
+    Returns:
+        numpy.ndarray: 
+    """
+    max_res = max(img.shape[0], img.shape[1])
+    factor = target_resolution / max_res
+    w, h = img.shape[:2]
+    wn, hn = int(w*factor), int(h*factor)
+    return cv2.resize(img, (hn, wn)) 

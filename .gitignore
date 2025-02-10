@@ -6,6 +6,7 @@ __pycache__
 .ipynb_checkpoints
 
 save_directories/
+save_directory/
 impl/
 impl2/
 impl3/
