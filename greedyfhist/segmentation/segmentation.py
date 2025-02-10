@@ -31,23 +31,6 @@ from greedyfhist.options import (
 from greedyfhist.utils.image import scale_image_to_max_dim
 
 
-# class WrapInferenceSession:
-
-#     def __init__(self, onnx_bytes):
-#         self.sess = ort.InferenceSession(onnx_bytes.SerializeToString())
-#         self.onnx_bytes = onnx_bytes
-
-#     def run(self, *args):
-#         return self.sess.run(*args)
-
-#     def __getstate__(self):
-#         return {'onnx_bytes': self.onnx_bytes}
-
-#     def __setstate__(self, values):
-#         self.onnx_bytes = values['onnx_bytes']
-#         self.sess = ort.InferenceSession(self.onnx_bytes.SerializeToString()) 
-
-
 def load_segmentation_function(options: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] | str | None = None) -> Callable[[numpy.ndarray], numpy.ndarray]:
     """Loads a segmentation function for detecting tissue segmentation. `options` can be the following: 
     
@@ -571,7 +554,6 @@ def load_tissue_entropy_detection(target_resolution: int = 640,
                    do_fill_hole=do_fill_hole)
     
 
-
 # TODO: Add option for ignoring black areas after transformation.
 def predict_tissue_from_entropy(image: numpy.ndarray, 
                            target_resolution: int = 640,
@@ -685,4 +667,4 @@ def predict_tissue_from_entropy(image: numpy.ndarray,
         mask_ent = fill_hole(mask_ent)
     mask = mask_ent.astype(np.uint8)
     mask = cv2.resize(mask, shape[::-1], cv2.INTER_NEAREST)
-    return mask_ent.astype(np.uint8)
+    return mask.astype(np.uint8)

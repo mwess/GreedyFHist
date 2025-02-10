@@ -310,6 +310,8 @@ def groupwise_registration_from_filepaths(
     Returns:
         tuple[GroupwiseRegResult, list[numpy.ndarray]]: Transformations and transformed images.
     """
+    if options is None:
+        options = RegistrationOptions()
     img_mask_list = []
     img_paths = []
     for paths in image_mask_filepaths:
@@ -485,9 +487,7 @@ def _register_tiles_from_tile_size(
             tile_reg_opts_.temporary_directory = f'{tile_reg_opts_.temporary_directory}/tiling_registration/{i}'
             tile_reg_opts_.segmentation = None
             tile_reg_opts_.disable_mask_generation = True
-            print(tile_reg_opts_)
             mp_args.append((moving_image_tile, fixed_image_tile, tile_reg_opts_, verbose))
-        print('Calling pool!...........')
         pool = multiprocess.Pool(tile_reg_opts.tiling_options.n_procs)
         displ_tiles = pool.starmap(_register_tiles_helper, mp_args)
         for (fw_displ_tile, bw_displ_tile) in displ_tiles:
@@ -522,24 +522,12 @@ def _register_tiles_helper(moving_image_tile: ImageTile,
     Returns: (ImageTile, ImageTile)
         Forward and backward transformation in tile context.
     """
-    # if tile_reg_opts is None:
-    #     if verbose:
-    #         print('No options for registering tiles supplied. Using default.')
-    #     tiling_options = RegistrationOptions.nrpt_only_options()
-    # else:
-    # print('Inside helper function.')
-    # tiling_options = deepcopy(tile_reg_opts)
-    # print(tiling_options)
-    # Set a subdirectory to not spam the main folder too much.
-    # tiling_options.temporary_directory = join(tiling_options.temporary_directory, 'tiling_registration')
-    # Path(tiling_options.temporary_directory).mkdir(parents=True, exist_ok=True)
-
     moving_image_ = moving_image_tile.image
     fixed_image_ = fixed_image_tile.image
     mask = np.ones(moving_image_.shape[:2], dtype=np.uint8)
 
     try:
-        # Call interma; `register_` to avoid wrapping context.
+        # Call interal `_perform_registration` to avoid wrapping context.
         registration_result_ = _perform_registration(moving_img=moving_image_,
                                                 fixed_img=fixed_image_,
                                                 moving_img_mask=mask,
@@ -606,7 +594,6 @@ def simple_tiling_registration(moving_image: numpy.ndarray,
     Returns:
         RegistrationResult:
     """
-    # tiling_opts = registration_options.tiling_options
     return _simple_tiling_registration(
         moving_image,
         fixed_image,
@@ -645,7 +632,7 @@ def _simple_tiling_registration(
     
     if tile_options is None: 
         tile_options = RegistrationOptions()
-    # We set this to False skip affine registration when we call `register_`
+    # We set this to False skip affine registration when we call `_perform_registration`
     tile_options.do_affine_registration = False
     
     tile_size = tile_options.tiling_options.tile_size
@@ -760,7 +747,7 @@ def _pyramid_tiling_registration(
     
     if nrpt_tile_options is None: 
         nrpt_tile_options = RegistrationOptions()
-    # We set this to False skip affine registration when we call `register_`
+    # We set this to False skip affine registration when we call `_perform_registration`
     nrpt_tile_options.do_affine_registration = False
     
     temp_image = moving_image.copy()
@@ -966,22 +953,10 @@ def _perform_registration(moving_img: numpy.ndarray,
         options = RegistrationOptions()
 
     # Setup tissue segmentation function.
-    print('Getting into the function.')
     if options.disable_mask_generation or (moving_img_mask is not None and fixed_img_mask is not None):
-        print('No seg fun requireed.')
         segmentation_function = None
     else:
         segmentation_function = load_segmentation_function(options.segmentation)
-    # elif isinstance(options.segmentation, SegmentationOptions):
-    #     segmentation_function = load_yolo_segmentation(use_clahe=options.segmentation.use_clahe_denoising,
-    #                                             use_tv_chambolle=options.segmentation.use_tv_chambolle_denoising,
-    #                                             fill_holes=options.segmentation.fill_holes,
-    #                                             min_area_size=options.segmentation.yolo_segmentation_min_size,
-    #                                             use_fallback=options.segmentation.use_fallback)
-    # elif isinstance(options.segmentation, callable):
-    #     segmentation_function = options.segmentation
-    # else:
-    #     raise Exception('Could not parse segmentation. Either function or SegmentationOption is wrong.')
     
     # Setting up temporary directories.
     path_temp = options.temporary_directory
@@ -1939,17 +1914,19 @@ class GreedyFHist:
     name: str = 'GreedyFHist'
     path_to_greedy: str = 'greedy'
     use_docker_container: bool = False
-    segmentation_function: Callable | None = None
+    segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] | str | None = None
 
     def __post_init__(self):
-        if self.segmentation_function is None:
-            self.segmentation_function = load_segmentation_function('yolo-seg')
+        if self.segmentation is None:
+            self.segmentation = load_segmentation_function('yolo-seg')
             
-    def __update_options(self, options: RegistrationResult):
+    def __update_options(self, 
+                         options: RegistrationOptions,
+                         skip_segmentation_assignment: bool = False):
         if self.path_to_greedy is not None:
             options.path_to_greedy = self.path_to_greedy
-        if self.segmentation_function is not None:
-            options.segmentation_function = self.segmentation_function
+        if self.segmentation is not None and not skip_segmentation_assignment:
+            options.segmentation = self.segmentation
         options.use_docker_container = self.use_docker_container
         return options        
 
@@ -2003,6 +1980,8 @@ class GreedyFHist:
         Returns:
             tuple[GroupwiseRegResult, list[numpy.ndarray]]: Transformations and transformed images.
         """
+        if options is None:
+            options = RegistrationOptions()
         options = self.__update_options(options)        
         return groupwise_registration_from_filepaths(
             image_mask_filepaths=image_mask_filepaths,
@@ -2036,7 +2015,7 @@ class GreedyFHist:
         Returns:
             RegistrationResult:
         """
-        registration_options = self.__update_options(registration_options)
+        registration_options = self.__update_options(registration_options, skip_segmentation_assignment=True)
         return simple_tiling_registration(
             moving_image=moving_image,
             fixed_image=fixed_image,
@@ -2070,7 +2049,7 @@ class GreedyFHist:
         Returns:
             RegistrationResult:
         """
-        registration_options = self.__update_options(registration_options)
+        registration_options = self.__update_options(registration_options, skip_segmentation_assignment=True)
         return pyramid_tiling_registration(
             moving_image=moving_image,
             fixed_image=fixed_image,

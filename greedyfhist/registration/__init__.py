@@ -11,5 +11,6 @@ from .greedy_f_hist import (
     transform_geojson,
     transform_image,
     transform_pointset,
-    compose_transforms
+    compose_transforms,
+    compose_registration_results
 )
