@@ -39,6 +39,12 @@ toml = "0.10.2"
 pyvips = "^2.2.3"
 multiprocess = "^0.70.17"
 
+# For documentation
+sphinx-hoverxref = "^1.4.2"
+sphinx-notfound-page = "^1.1.0"
+sphinx-rtd-theme = "^3.0.2"
+
+
 [tool.poetry.dev-dependencies]
 mypy = "^0.812"
 
