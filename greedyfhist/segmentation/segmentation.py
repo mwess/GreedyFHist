@@ -1,5 +1,5 @@
 """
-This module handles the 
+This module handles tissue segmentation functions.
 """
 
 from functools import partial
