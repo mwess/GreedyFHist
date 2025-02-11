@@ -16,7 +16,7 @@ configured in the ``example_registration.toml`` file. Additional
 data for transformations can be passed as ``imagew``, ``annotationw``, ``pointsets``, ``geojsons``. 
 GreedyFHist supports most common image formats, but if any are missing, feel free to post 
 an issue. `annotations` are annotation masks with the last image channel used to denote classes, e.g., W x H x C, 
-if a multichannel image is used.
+if a multichannel image is used. Note that in general, its recommended to use the interactive API via jupyter
 
 An example call could look like this:
 

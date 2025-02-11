@@ -1917,6 +1917,8 @@ class GreedyFHist:
     segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] | str | None = None
 
     def __post_init__(self):
+        if isinstance(self.segmentation, SegmentationOptions) or isinstance(self.segmentation, str):
+            self.segmentation = load_segmentation_function(self.segmentation)
         if self.segmentation is None:
             self.segmentation = load_segmentation_function('yolo-seg')
             
@@ -2123,8 +2125,9 @@ class GreedyFHist:
             Tuple[GroupwiseRegResult, List[numpy.ndarray]]: GroupwiseRegResult contains all computed transformations. 
                 List of images are either affine or nonrigid warped images.
         """
-        if options.path_to_greedy is None:
-            options.path_to_greedy = self.path_to_greedy
+        if options is None:
+            options = RegistrationOptions()
+        options = self.__update_options(options)
         return groupwise_registration(
             image_mask_list=image_mask_list,
             options=options
