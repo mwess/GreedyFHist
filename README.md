@@ -8,6 +8,8 @@ Documentation can be found at:
 
 https://greedyfhist.readthedocs.io/en/latest/
 
+Example notebook are palce in `examples`.
+
 
 If you use any of this code, please cite:
  

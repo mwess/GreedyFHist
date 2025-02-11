@@ -7,7 +7,7 @@ RUN apt install python3-pip -y
 RUN apt install libvips-dev -y
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 RUN pip --version
-RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.2-rc2
+RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3
 
 ENTRYPOINT ["greedyfhist"]
 

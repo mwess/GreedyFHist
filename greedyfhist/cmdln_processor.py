@@ -200,6 +200,7 @@ def register(moving_image_path: str | None = None,
              moving_mask_path: str | None = None,
              fixed_mask_path: str | None = None,
              path_to_greedy: str | None = None,
+             use_docker_executable: bool | None = None,
              config_path: str | None = None,
              images: list[str] | None = None,
              annotations: list[str] | None = None,
@@ -224,6 +225,7 @@ def register(moving_image_path: str | None = None,
         additional_pointsets (Optional[List[str]], optional): Defaults to None.
         additional_geojsons (Optional[List[str]], optional): Defaults to None.
     """
+    # Parse input parameters correctly.
     if images is None:
         images = []
     if annotations is None:
@@ -242,6 +244,8 @@ def register(moving_image_path: str | None = None,
         registration_options = RegistrationOptions.parse_cmdln_dict(config['gfh_options'])
     else:
         registration_options = RegistrationOptions.default_options()
+    if use_docker_executable:
+        registration_options.use_docker_container = use_docker_executable
     logging.info('Registration options are loaded.')
     if all_paths_are_none([moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path]):
         moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path = get_paths_from_config(config.get('input', None))
@@ -252,6 +256,7 @@ def register(moving_image_path: str | None = None,
     path_to_greedy = resolve_variable('path_to_greedy', path_to_greedy, config.get('options', None), '')
     save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)
 
+    # Load image data.
     moving_histology_section = load_base_histology_section(
         image_path=moving_image_path,
         mask_path=moving_mask_path
@@ -280,7 +285,8 @@ def register(moving_image_path: str | None = None,
 
     logging.info('Loaded images. Starting registration.')
     logging.info(f'Registration options: {registration_options}')
-    registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
+    registerer = GreedyFHist(path_to_greedy=path_to_greedy, use_docker_container=use_docker_executable)
+    # registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
 
     moving_mask = moving_histology_section.ref_mask.data if moving_histology_section.ref_mask is not None else None
     fixed_mask = fixed_mask.data if fixed_mask is not None else None
@@ -408,9 +414,10 @@ def groupwise_registration(config_path: str):
     options = RegistrationOptions.parse_cmdln_dict(reg_opts)
 
     path_to_greedy = resolve_variable('path_to_greedy', None, config.get('options', None), '')
+    use_docker_executable = resolve_variable('use_docker_container', None, config.get('options', None), False)
     save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)        
     output_directory = resolve_variable('output_directory', None, config.get('options', None), 'out')
-    registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
+    registerer = GreedyFHist(path_to_greedy=path_to_greedy, use_docker_container=use_docker_executable)
 
     sections = load_sections(config['input'])
 

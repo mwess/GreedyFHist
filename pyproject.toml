@@ -38,8 +38,9 @@ toml = "0.10.2"
 # ultralytics = "^8.0.199"
 pyvips = "^2.2.3"
 multiprocess = "^0.70.17"
+matplotlib = "^3.10.0"
 
-# For documentation
+# For documentation.... TODO: Can probably be removed again.
 sphinx-hoverxref = "^1.4.2"
 sphinx-notfound-page = "^1.1.0"
 sphinx-rtd-theme = "^3.0.2"
