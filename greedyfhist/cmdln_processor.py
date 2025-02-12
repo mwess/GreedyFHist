@@ -412,7 +412,7 @@ def groupwise_registration(config_path: str):
     reg_opts = config.get('gfh_options', {})
     options = RegistrationOptions.parse_cmdln_dict(reg_opts)
 
-    path_to_greedy = resolve_variable('path_to_greedy', None, config.get('options', None), '')
+    path_to_greedy = resolve_variable('path_to_greedy', None, config.get('options', None), 'greedy')
     use_docker_executable = resolve_variable('use_docker_container', None, config.get('options', None), False)
     save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)        
     output_directory = resolve_variable('output_directory', None, config.get('options', None), 'out')
