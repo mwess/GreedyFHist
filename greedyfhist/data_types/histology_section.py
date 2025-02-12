@@ -36,7 +36,7 @@ class HistologySection:
                           options: RegistrationOptions | None = None,
                           registerer: GreedyFHist | None = None) -> RegistrationTransforms:
         if registerer is None:
-            registerer = GreedyFHist.load_from_config({})
+            registerer = GreedyFHist()
 
         registration_result = registerer.register(
             self.ref_image.data,
@@ -51,7 +51,7 @@ class HistologySection:
                              registration_result: RegistrationTransforms,
                              registerer: GreedyFHist | None = None) -> 'HistologySection':
         if registerer is None:
-            registerer = GreedyFHist.load_from_config({})
+            registerer = GreedyFHist()
         if self.ref_image is not None:
             warped_ref_image = self.ref_image.transform_data(registerer, registration_result)
         else:
