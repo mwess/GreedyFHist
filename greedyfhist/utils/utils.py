@@ -98,23 +98,23 @@ def affine_registration(path_to_greedy: str,
         offset (int): _description_
         ia (str): _description_
         options (GreedyOptions): _description_
+        use_docker_container: bool: _description_. Defaults to False.
+        temp_directory (str, optional): _description_. Defaults to ''.
 
     Returns:
-        _type_: Return of command line execution.
+        subprocess.CompletedProcess: Return of command line execution.
     """
     if use_docker_container:
         abs_temp_directory = os.path.abspath(temp_directory)
-        # v_option = f'$(pwd)/{abs_temp_directory}:/{temp_directory}'
         v_option = f'{abs_temp_directory}:/{temp_directory}'
         path_to_greedy = f'docker run -v {v_option} {path_to_greedy}'
     cost_fun_params = options.cost_function
     if options.cost_function == 'ncc' or options.cost_function == 'wncc':
         cost_fun_params += f' {options.kernel_size}x{options.kernel_size}'
-    aff_rgs = {}
-    aff_rgs['-d'] = '2'
-    aff_rgs['-i'] = [path_to_fixed_image, path_to_moving_image]
-    aff_rgs['-o'] = path_output
-    aff_rgs['-m'] = cost_fun_params
+    aff_rgs = {'-d': '2',
+               '-i': [path_to_fixed_image, path_to_moving_image],
+               '-o': path_output,
+               '-m': cost_fun_params}
     pyramid_iterations = 'x'.join([str(x) for x in options.iteration_pyramid])
     # aff_rgs['-n'] = f'{options.pyramid_iterations[0]}x{options.pyramid_iterations[1]}x{options.pyramid_iterations[2]}'
     aff_rgs['-n'] = pyramid_iterations
@@ -151,6 +151,9 @@ def deformable_registration(path_to_greedy: str,
         output_warp (str, optional): Defaults to None.
         output_inv_warp (str, optional): Defaults to None.
         affine_pre_transform (_type_, optional): Contains path to affine_pre_transform. Necessary if ia is ia-com-init. Defaults to None.
+        ia (tuple[str, str]):
+        use_docker_container: bool. Defaults to False.
+        temp_directory (str, optional): Defaults to ''.
 
     Returns:
         subprocess.CompletedProcess: Return of command line execution.
@@ -209,15 +212,15 @@ def composite_sitk_transforms(transforms: list[SimpleITK.SimpleITK.Transform]) -
     return composited_transform
 
 
-def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
+def compose_reg_transforms(transform: SimpleITK.Transform,
                            moving_preprocessing_params: dict,
-                           fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
+                           fixed_preprocessing_params: dict) -> SimpleITK.Transform:
     """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward affine/nonrigid registration.  
 
     Args:
-        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
-        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
-        reverse (bool): Switches moving and fixed preprocessing params if True.
+        transform (SimpleITK.Transform): Computed affine/nonrigid registration
+        moving_preprocessing_params (dict):
+        fixed_preprocessing_params (dict):
 
     Returns:
         SimpleITK.SimpleITK.Transform: Composited end-to-end registration.
@@ -244,8 +247,6 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     offset_y = -moving_padding[2]
     aff_trans2.SetOffset((offset_x, offset_y))
     
-
-    
     aff_trans3 = sitk.TranslationTransform(2)
     aff_trans3.SetOffset((fixed_padding[0], fixed_padding[2]))
     
@@ -262,17 +263,18 @@ def compose_reg_transforms(transform: SimpleITK.SimpleITK.Transform,
     return all_transforms
 
 
-def compose_inv_reg_transforms(transform: SimpleITK.SimpleITK.Transform, 
+def compose_inv_reg_transforms(transform: SimpleITK.Transform,
                                moving_preprocessing_params: dict,
-                               fixed_preprocessing_params: dict) -> SimpleITK.SimpleITK.Transform:
+                               fixed_preprocessing_params: dict) -> SimpleITK.Transform:
     """Pre- and appends preprocessing steps from moving and fixed image as transforms to backward affine/nonrigid registration.  
 
     Args:
-        transform (SimpleITK.SimpleITK.Transform): Computed affine/nonrigid registration
-        internal_reg_params (InternalRegParams): Contains parameters of preprocessing steps.
+        transform (SimpleITK.Transform): Computed affine/nonrigid registration
+        moving_preprocessing_params (dict):
+        fixed_preprocessing_params (dict):
 
     Returns:
-        SimpleITK.SimpleITK.Transform: Composited end-to-end transform.
+        SimpleITK.Transform: Composited end-to-end transform.
     """
     moving_padding = moving_preprocessing_params['padding']
     moving_cropping = moving_preprocessing_params['cropping_params']

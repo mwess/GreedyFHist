@@ -219,11 +219,12 @@ def register(moving_image_path: str | None = None,
         moving_mask_path (Optional[str], optional): Defaults to None.
         fixed_mask_path (Optional[str], optional): Defaults to None.
         path_to_greedy (Optional[str], optional): Defaults to None.
+        use_docker_executable (bool, None): Defaults to None.
         config_path (Optional[str], optional): Defaults to None.
-        additional_images (Optional[List[str]], optional): Defaults to None.
-        additional_annotations (Optional[List[str]], optional): Defaults to None.
-        additional_pointsets (Optional[List[str]], optional): Defaults to None.
-        additional_geojsons (Optional[List[str]], optional): Defaults to None.
+        images (Optional[List[str]], optional): Defaults to None.
+        annotations (Optional[List[str]], optional): Defaults to None.
+        pointsets (Optional[List[str]], optional): Defaults to None.
+        geojsons (Optional[List[str]], optional): Defaults to None.
     """
     # Parse input parameters correctly.
     if images is None:
@@ -285,8 +286,9 @@ def register(moving_image_path: str | None = None,
 
     logging.info('Loaded images. Starting registration.')
     logging.info(f'Registration options: {registration_options}')
+    print('Registration Options:')
+    print(registration_options)
     registerer = GreedyFHist(path_to_greedy=path_to_greedy, use_docker_container=use_docker_executable)
-    # registerer = GreedyFHist.load_from_config({'path_to_greedy': path_to_greedy})
 
     moving_mask = moving_histology_section.ref_mask.data if moving_histology_section.ref_mask is not None else None
     fixed_mask = fixed_mask.data if fixed_mask is not None else None
@@ -306,8 +308,9 @@ def register(moving_image_path: str | None = None,
     output_directory_transformation_data = join(output_directory, 'transformed_data')
     create_if_not_exists(output_directory_transformation_data)
 
-    warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result.registration,
-                                                                             registerer=registerer)
+    warped_histology_section = moving_histology_section.apply_transformation(
+        registration_transforms=registration_result.registration,
+        registerer=registerer)
     warped_histology_section.to_directory(output_directory_transformation_data)
     output_directory_transformation_data_prep = join(output_directory_transformation_data, 'preprocessing_data')
     create_if_not_exists(output_directory_transformation_data_prep)
@@ -395,7 +398,8 @@ def apply_transformation(
     output_directory_transformation_data = join(output_directory, 'transformed_data')
     create_if_not_exists(output_directory_transformation_data)
 
-    warped_histology_section = moving_histology_section.apply_transformation(registration_result=registration_result)
+    warped_histology_section = moving_histology_section.apply_transformation(
+        registration_transforms=registration_result)
     warped_histology_section.to_directory(output_directory_transformation_data)
 
 

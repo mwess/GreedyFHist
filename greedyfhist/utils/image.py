@@ -8,7 +8,6 @@ import SimpleITK, SimpleITK as sitk
 from skimage.transform import resize
 from skimage.filters import gaussian
 from skimage.color import rgb2gray
-import tifffile
 
 from greedyfhist.custom_types import padding_type, image_shape
 
@@ -42,14 +41,14 @@ def get_com_offset(mat: numpy.ndarray) -> float:
     return np.sqrt(np.square(translation[0]) + np.square(translation[1]))
 
 
-def read_affine_transform(small_affine_path: str) -> SimpleITK.SimpleITK.Transform:
+def read_affine_transform(small_affine_path: str) -> SimpleITK.AffineTransform:
     """Reads affine transform from file.
 
     Args:
         small_affine_path (str): Source file path.
 
     Returns:
-        SimpleITK.SimpleITK.Transform:
+        SimpleITK.AffineTransform:
     """
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
@@ -61,7 +60,7 @@ def read_affine_transform(small_affine_path: str) -> SimpleITK.SimpleITK.Transfo
     return affine_transform
     
 
-def rescale_affine(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK.Transform:
+def rescale_affine(small_affine_path: str, factor: float) -> SimpleITK.AffineTransform:
     """Reads affine transformation matrix and scales it by factor.
 
     Args:
@@ -69,7 +68,7 @@ def rescale_affine(small_affine_path: str, factor: float) -> SimpleITK.SimpleITK
         factor (float): 
 
     Returns:
-        SimpleITK.SimpleITK.Transform: 
+        SimpleITK.AffineTransform:
     """
     with open(small_affine_path) as f:
         my_var = list(map(float, f.read().split()))
@@ -99,10 +98,8 @@ def rescale_warp(small_warp_path: str,
     """
     warp_sitk = sitk.ReadImage(small_warp_path)
     warp = sitk.GetArrayFromImage(warp_sitk)
-    mask = np.ones((small_resolution[0], small_resolution[1], 2), dtype=np.uint8)
     padding = (warp.shape[0] - small_resolution[0])//2
-    mask = np.pad(mask, ((padding, padding), (padding, padding), (0, 0)))
-    warp_no_pad = (warp)[padding:-padding, padding:-padding]
+    warp_no_pad = warp[padding:-padding, padding:-padding]
     big_warp = resize(warp_no_pad, (original_resolution[0], original_resolution[1])) * factor
     big_warp_sitk = sitk.GetImageFromArray(big_warp, isVector=True)
     big_warp_sitk.SetDirection(warp_sitk.GetDirection())
@@ -197,7 +194,7 @@ def denoise_image(image: numpy.ndarray,
 
 def resample_image_with_gaussian(image: numpy.ndarray, resolution: image_shape, sigma: float) -> numpy.ndarray:
     """Resamples image to target resolution. Gaussian smoothing is applied beforehand to 
-    help with anti-aliasing effects.
+    help with antialiasing effects.
 
     Args:
         image (numpy.ndarray): 
@@ -233,7 +230,7 @@ def pad_image(image: numpy.ndarray, padding: int, constant_values: float = 0) ->
     elif dims == 3:
         padded_image = np.pad(image, ((padding, padding), (padding, padding), (0,0)), constant_values=constant_values)
     else:
-        pass # Throw error instead
+        raise Exception(f'Cannot handle image padding for dimension {dims}.')
     return padded_image
 
 
@@ -291,12 +288,11 @@ def resample_by_factor(img: numpy.ndarray, factor: float) -> numpy.ndarray:
     return img2
 
 
-# TODO: Fix type for interpolator
-def resample_image_sitk(image: numpy.ndarray, 
+def resample_image_sitk(image: numpy.ndarray,
                         scaling_factor: float, 
                         ref_image_shape: tuple[int, int] | None = None,
                         interpolator: int = sitk.sitkLinear) -> numpy.ndarray:
-    """Resample an image by a given factor using SimpleITK functionality..
+    """Resample an image by a given factor using SimpleITK functionality.
 
     Args:
         image (numpy.ndarray): 
@@ -346,15 +342,15 @@ def derive_resampling_factor(image: numpy.ndarray,
     resample_factor = max_resample_dim / max_dim
     return resample_factor
 
-# TODO: Set return type to displacement field
-def realign_displacement_field(path: str) -> SimpleITK.SimpleITK.CompositeTransform:
+
+def realign_displacement_field(path: str) -> SimpleITK.DisplacementFieldTransform:
     """Reads and rotates the rotation field from "NIFTI" to "DICOM" orientation. Needed because Greedy outputs transforms in NIFTI orientation.
 
     Args:
         path (str):
 
     Returns:
-        SimpleITK.SimpleITK.CompositeTransform:
+        SimpleITK.CompositeTransform:
     """
     displacement_field = sitk.ReadImage(path, sitk.sitkVectorFloat64)
     rotated_displ_field = sitk.GetArrayFromImage(displacement_field)
@@ -419,7 +415,7 @@ def scale_image_to_max_dim(img: numpy.ndarray, target_resolution: int = 640) -> 
 
     Args:
         img (numpy.ndarray): 
-        target_res (int, optional): Defaults to 640.
+        target_resolution (int, optional): Defaults to 640.
 
     Returns:
         numpy.ndarray: 

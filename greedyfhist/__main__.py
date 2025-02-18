@@ -24,8 +24,8 @@ def groupwise_registration(config):
 @click.option('--moving-mask', '-mmask', type=click.Path())  # Make this optional
 @click.option('--fixed-mask', '-fmask', type=click.Path())  # Make this optional
 @click.option('--path-to-greedy', '-g', type=click.Path())
-@click.option('--use-docker-executable', '-d', type=click.BOOL, default=False)
 @click.option('--config', '-c', type=click.Path())
+@click.option('--use-docker-executable', '-d', type=click.BOOL, default=False)
 @click.option('--images', type=click.Path(), multiple=True)
 @click.option('--annotations', type=click.Path(), multiple=True)
 @click.option('--pointsets', type=click.Path(), multiple=True)
@@ -36,8 +36,8 @@ def register(moving_image=None,
              moving_mask=None,
              fixed_mask=None,
              path_to_greedy=None,
-             use_docker_executable=None,
              config=None,
+             use_docker_executable=None,             
              images=None,
              annotations=None,
              pointsets=None,

@@ -111,7 +111,7 @@ class LuminosityAndAreaSegOptions(SegmentationOptions):
             Threshold to distinguish small and big areas. Defaults to 100.
             
         distance_threshold: int = 30
-            Threshold for removign small distant areas. Defaults to 30.
+            Threshold for removing small distant areas. Defaults to 30.
             
         low_intensity_rem_threshold: int = 25
             Removes low intensity threshold. Defaults to 25.

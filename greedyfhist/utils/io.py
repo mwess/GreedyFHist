@@ -218,7 +218,9 @@ def read_image(path: str, is_annotation: bool = False) -> numpy.ndarray | Option
         image_description = img_vips.get('image-description')
         if is_tiff_file(suffix):
             metadata = get_metadata_from_tif(image_description)
-    elif path.endswith('.nii.gz') or path.endswith('.nii'):
+    # TODO: Add another image reader here.
+    else:
+        # Assumes the  case that:  path.endswith('.nii.gz') or path.endswith('.nii'):
         img = sitk.GetArrayFromImage(sitk.ReadImage(path))
     if is_annotation and len(img.shape) == 3:
         img = np.moveaxis(img, 0, 2)
@@ -254,7 +256,7 @@ def get_metadata_from_tif(xml_string: str) -> dict:
 
 
 def affine_transform_to_file(transform: SimpleITK.SimpleITK.AffineTransform, fpath: str):
-    """Save affube transform to file.
+    """Save affine transform to file.
 
     Args:
         transform (SimpleITK.SimpleITK.AffineTransform): Affine transform.
@@ -277,10 +279,10 @@ def derive_subdir(directory: str, limit=1000) -> tuple[str, int]:
     Returns:
         Tuple[str, int]: Subdir and final count.
     """
+    subdir = f'{directory}'
     for subdir_num in range(limit):
         subdir = f'{directory}/{subdir_num}'
         if not exists(subdir):
             return subdir, subdir_num
-    # TODO: Do better error handling here, but who has 1000 sections to register, really?!
     return subdir, subdir_num
         

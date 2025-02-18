@@ -39,3 +39,5 @@ examples/notebooks/out
 docs/build/
 
 doc_source/
+
+.idea/

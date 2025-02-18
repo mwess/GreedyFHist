@@ -48,21 +48,21 @@ class HistologySection:
         return registration_result
 
     def apply_transformation(self,
-                             registration_result: RegistrationTransforms,
+                             registration_transforms: RegistrationTransforms,
                              registerer: GreedyFHist | None = None) -> 'HistologySection':
         if registerer is None:
             registerer = GreedyFHist.load_from_config({})
         if self.ref_image is not None:
-            warped_ref_image = self.ref_image.transform_data(registerer, registration_result)
+            warped_ref_image = self.ref_image.transform_data(registerer, registration_transforms)
         else:
             warped_ref_image = None
         if self.ref_mask is not None:
-            warped_ref_mask = self.ref_mask.transform_data(registerer, registration_result)
+            warped_ref_mask = self.ref_mask.transform_data(registerer, registration_transforms)
         else:
             warped_ref_mask = None
         warped_additional_data = []
         for ad in self.additional_data:
-            warped_ad = ad.transform_data(registerer, registration_result)
+            warped_ad = ad.transform_data(registerer, registration_transforms)
             warped_additional_data.append(warped_ad)
         return HistologySection(ref_image=warped_ref_image,
                                 ref_mask=warped_ref_mask,

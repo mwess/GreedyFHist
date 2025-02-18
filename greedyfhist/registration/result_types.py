@@ -25,9 +25,13 @@ class GroupwiseRegResult:
     affine_transform: List[GFHTransform]
         List of affine transforms. Affine transforms contain transform from current index of the transform in the list to the next index. 
         Order of affine transforms is based on the order images supplied to affine registration.
-    
-    deformable_transform: List[GFHTransform]
-        List of nonrigid transforms. Each transform warps from an affinely transformed image to the fixed image.
+
+    reverse_affine_transform: List[GFHTransform]
+
+    nonrigid_transform: List[GFHTransform]
+        List of nonrigid transforms. Each transform warps from an affine transformed image to the fixed image.
+
+    reverse_nonrigid_transform: List[GFHTransform]
 
     Methods
     -------
@@ -72,6 +76,8 @@ class GroupwiseRegResult:
 
         Args:
             source (int): Index of moving image.
+            target (int): Index of reference image.
+            skip_nonrigid (bool): If True, skip registration from nonrigid transformation.
 
         Returns:
             RegistrationTransforms: transformation from source to reference image.
@@ -121,7 +127,7 @@ class GroupwiseRegResult:
             transform.to_directory(dir_i)
 
     @staticmethod
-    def __load_transforms_from_dir(path: str) -> list['GroupwiseRegResult']:
+    def __load_transforms_from_dir(path: str) -> list['RegistrationTransforms']:
         sub_dirs = os.listdir(path)
         sub_dirs = sorted(sub_dirs, lambda x: int(sub_dirs))
         transforms = []
@@ -160,7 +166,7 @@ class GFHTransform:
     size: Tuple[int, int]
         Resolution of target image space.
 
-    transform: SimpleITK.SimpleITK.Transform
+    transform: SimpleITK.Transform
         Transform from source to target image space.
 
     Methods
@@ -396,6 +402,7 @@ class InternalRegParams:
     displacement_field: SimpleITK.SimpleITK.Image
     inv_displacement_field: SimpleITK.SimpleITK.Image
 
+    # TODO: This method needs to be fixed.
     @classmethod
     def from_directory(cls, directory: str) -> 'InternalRegParams':
         """Load from directory.
@@ -485,7 +492,6 @@ def compose_transforms(gfh_transforms: list['GFHTransform']) -> 'GFHTransform':
     composited_transform = composite_sitk_transforms([x.transform for x in gfh_transforms])
     gfh_comp_trans = GFHTransform(gfh_transforms[-1].size, composited_transform)
     return gfh_comp_trans    
-
 
 
 def compose_registration_results(reg_results: list['RegistrationResult']) -> 'RegistrationResult':

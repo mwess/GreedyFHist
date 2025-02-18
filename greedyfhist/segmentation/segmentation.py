@@ -72,7 +72,7 @@ def load_segmentation_function(options: SegmentationOptions | Callable[[numpy.nd
         elif options == 'lum-area-seg':
             return load_tissue_luminosity_area_detection()
         else:
-            raise Exception(f'Uknown string command suuplied for segmentation function: {options}.')
+            raise Exception(f'Unknown string command supplied for segmentation function: {options}.')
     if isinstance(options, SegmentationOptions):
         if isinstance(options, YoloSegOptions):
             return load_yolo_segmentation(
@@ -105,7 +105,7 @@ def load_segmentation_function(options: SegmentationOptions | Callable[[numpy.nd
                 low_intensity_rem_threshold=options.low_intensity_rem_threshold
             )
         else:
-            raise Exception(f'Unkown segmentation option passed: {options}')
+            raise Exception(f'Unknown segmentation option passed: {options}')
     if options is None:
         return load_yolo_segmentation()
 
@@ -167,7 +167,6 @@ def _resolve_path_to_model() -> str:
     current_dir = split(__file__)[0]
     model_path = join(split(current_dir[:-1])[0], 'model_data/segmentation/default_yolo.onnx')
     return model_path
-    
 
 
 def load_yolo_segmentation(min_area_size: int = 10000,
@@ -193,10 +192,9 @@ def load_yolo_segmentation(min_area_size: int = 10000,
 
     model_path = _resolve_path_to_model()
     ort_session = ort.InferenceSession(model_path)
-    # ort_session = WrapInferenceSession(model_path)
     output_names = [x.name for x in ort_session.get_outputs()]
     input_name = [x.name for x in ort_session.get_inputs()]
-    IMAGE_SHAPE = (640, 640)
+    image_shape = (640, 640)
 
 
     def _predict(image: numpy.ndarray) -> numpy.ndarray:
@@ -204,8 +202,6 @@ def load_yolo_segmentation(min_area_size: int = 10000,
 
         Args:
             image (numpy.ndarray): Image to segment.
-            min_area_size (int, optional): Filters out all smaller patches of misclassified noise by removing every region smaller than limit. Defaults to 10000.
-            fill_holes (bool, optional): If True, fills all holes in mask.. Defaults to True.
 
         Returns:
             numpy.ndarray: Segmented image.
@@ -217,7 +213,7 @@ def load_yolo_segmentation(min_area_size: int = 10000,
         preprocessed_image2 = (np.expand_dims(np.moveaxis(preprocessed_image, 2, 0), 0) / 255.).astype(np.float32)
 
         outputs = ort_session.run(output_names, {'images': preprocessed_image2}, None)
-        _, _, prediction = postprocess(outputs, shape=IMAGE_SHAPE)
+        _, _, prediction = postprocess(outputs, shape=image_shape)
         if isinstance(prediction, list):
             if use_fallback is None:
                 prediction = np.expand_dims(np.ones(downscaled_shape).astype(np.uint8), 0)
@@ -280,7 +276,7 @@ def predict_otsu(image,
                  use_clahe: bool = False,
                  ):
     """
-    Implementation of Otsu tresholding method. Typically not used, but might be useful as a fallback.
+    Implementation of Otsu thresholding method. Typically not used, but might be useful as a fallback.
     """
     if len(image.shape) == 2:
         gray_image = image
@@ -360,7 +356,7 @@ def predict_tissue_from_luminosity_and_area(image: numpy.ndarray,
     In the next step, we divide images in small and large areas. Small areas that are close 
     to large areas typically belong to the tissue area.
     We then compute for each small area its distance to the closest large area. If the distance 
-    is below the given threshold, its characterized as tissue.
+    is below the given threshold, it's characterized as tissue.
             
     
     Args:
@@ -370,7 +366,7 @@ def predict_tissue_from_luminosity_and_area(image: numpy.ndarray,
         with_morphological_erosion (bool): Enable morphological erosion. Defaults to True.
         with_morphological_closing (bool): Enable morphological closing. Defaults to False.
         min_area_size (int, optional): Threshold to distinguish small and big areas. Defaults to 100.
-        distance_threshold (int, optional): Threshold for removign small distant areas. Defaults to 30.
+        distance_threshold (int, optional): Threshold for removing small distant areas. Defaults to 30.
         low_intensity_rem_threshold (int, optional): Removes low intensity threshold. Defaults to 25.
         with_hole_filling (bool): Fills holes.
 
@@ -400,7 +396,6 @@ def predict_tissue_from_luminosity_and_area(image: numpy.ndarray,
         for j in range(len(large_contours)):
             dist = compute_nearest_distance_between_contours(small_contours[i], large_contours[j])
             if dist < distance_threshold:
-                # remaining_contours.append(small_contours[i])
                 dists.append(dist)
         if dists:
             min_dists.append(np.array(dists).min())
@@ -408,7 +403,6 @@ def predict_tissue_from_luminosity_and_area(image: numpy.ndarray,
     min_dists = np.array(min_dists)
 
     final_contours = large_contours + remaining_contours
-    # print(min_dists)            
     template = np.zeros_like(mask)
     new_mask = cv2.fillPoly(template, final_contours, 1)
     new_mask = cv2.resize(new_mask, shape[::-1], cv2.INTER_NEAREST)
@@ -484,7 +478,7 @@ def preprocessing_for_l_segmentation(img: numpy.ndarray,
 
 
 def compute_nearest_distance_between_contours(cont_a, cont_b) -> float:
-    """Computes the nearest distance between two countours.
+    """Computes the nearest distance between two contours.
 
     Args:
         cont_a: 
@@ -581,12 +575,12 @@ def predict_tissue_from_entropy(image: numpy.ndarray,
         7. Apply Otsu's thresholding.
         8. Apply morphological opening to remove small artifacts.
         9. Perform Gaussian denoising on computed mask.
-        10. Perform morpholohigical closing to connect small open areas.
+        10. Perform morphological closing to connect small open areas.
         11. Fill holes.
         12. Rescale image.
 
     Args:
-        img (numpy.ndarray): 
+        image (numpy.ndarray):
         target_resolution (int): Scale image down so that maximum image dimension corresponds to target_resolution. 
             Defaults to 640.
         do_clahe (bool, optional): Uses clahe for contrast enhancement. Defaults to True.
@@ -615,7 +609,7 @@ def predict_tissue_from_entropy(image: numpy.ndarray,
     # Extract luminosity. TODO: Move that further down.
     img_lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
     lum = img_lab[:,:,2]
-    # Constrast enhancing of the luminosity channel.
+    # Contrast enhancing of the luminosity channel.
     if do_clahe:
         clahe = cv2.createCLAHE(2, (8,8))
         lum = clahe.apply(lum)

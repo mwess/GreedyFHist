@@ -14,7 +14,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
-from typing import Any, Callable
+from typing import Callable
 
 import geojson
 import numpy, numpy as np
@@ -32,7 +32,6 @@ from greedyfhist.registration.result_types import (
     compose_registration_results
 )
 
-
 from greedyfhist.utils.io import (
     create_if_not_exists, 
     write_mat_to_file, 
@@ -42,7 +41,6 @@ from greedyfhist.utils.io import (
     affine_transform_to_file,
     derive_subdir
 )
-
 
 from greedyfhist.utils.image import (
     rescale_warp,
@@ -56,16 +54,13 @@ from greedyfhist.utils.image import (
     get_symmetric_padding,
     cropping,
     resample_image_sitk,
-    derive_resampling_factor,
     realign_displacement_field,
     read_affine_transform,
     get_corner_pixels
 )
 
 from greedyfhist.utils.utils import (
-    deformable_registration, 
-    affine_registration, 
-    composite_warps, 
+    composite_warps,
     affine_registration, 
     deformable_registration,
     compose_reg_transforms,
@@ -74,7 +69,7 @@ from greedyfhist.utils.utils import (
     derive_sampling_factors
 )
 
-from greedyfhist.segmentation import load_segmentation_function, load_yolo_segmentation
+from greedyfhist.segmentation import load_segmentation_function
 
 from greedyfhist.options import (
     RegistrationOptions, 
@@ -94,13 +89,13 @@ from greedyfhist.utils.tiling import (
 
 
 def _preprocessing(image: numpy.ndarray,
-                  preprocessing_options: PreprocessingOptions,
-                  resolution: tuple[int, int],
-                  kernel_size: int,
-                  tmp_path: str,
-                  skip_denoising: bool = False,
-                  padding_mode: str = 'mask'
-                  ) -> 'PreprocessedData':
+                   preprocessing_options: PreprocessingOptions,
+                   resolution: tuple[int, int],
+                   kernel_size: int,
+                   tmp_path: str,
+                   skip_denoising: bool = False,
+                   padding_for_mask: bool = True
+                   ) -> 'PreprocessedData':
     """Image preprocessing applied after images have transformed to a uniform shape. 
     Preprocessing steps are: (1) Denoising, (2) Gaussian smoothing, (3) Downsampling, 
     (4) Grayscale conversion, (5) Padding.
@@ -112,8 +107,8 @@ def _preprocessing(image: numpy.ndarray,
         kernel_size (int): Size of kernel used for padding after downscaling
         tmp_path (str): Temporary directory used for storing the preprocessed image.
         skip_denoising (bool, optional): Another toggle to enable/disable mean shift filtering. Defaults to False.
-        padding_mode (str | None): Either 'mask' or 'nomask'. If 'mask' is used, it is assumed that background
-            segmentation took place and the value padding is 0. If 'nomask' is used, it is assumed that no background
+        padding_for_mask (bool): If True is used, it is assumed that background
+            segmentation took place and the value padding is 0. If False, it is assumed that no background
             segmentation has been performed and the padding strategy is the same for HistoReg: From the intensity values
             of the image corners a gaussian distribution is estimated and the padding values are sampled from that gaussian
             distribution.
@@ -132,11 +127,11 @@ def _preprocessing(image: numpy.ndarray,
     resample = resolution[0] / image.shape[0] * 100
     smoothing = max(int(100 / (2 * resample)), 1) + 1    
     image_preprocessed = _downsample_and_padding(image,
-                                                     kernel_size,
-                                                     resolution,
-                                                     smoothing,
-                                                     tmp_dir,
-                                                     padding_mode)
+                                                 kernel_size,
+                                                 resolution,
+                                                 smoothing,
+                                                 tmp_dir,
+                                                 padding_for_mask)
     return image_preprocessed
 
 
@@ -156,7 +151,7 @@ def _downsample_and_padding(image: numpy.ndarray,
         kernel (int): kernel size
         resolution (Tuple[int, int]): resolution after downscaling
         smoothing (int): Gaussian smoothing applied for preventing 
-                         anti-aliasing.
+                         antialiasing.
         tmp_dir (str): Directory for storing.
         padding_for_mask (bool): If True is used, the
             padding value is 0. If False is used, it is assumed that no
@@ -256,7 +251,7 @@ def register_from_filepaths(moving_img_path: str,
                             options: RegistrationOptions | None = None,
                             transform_path: str | None = False,
                             ) -> tuple['RegistrationResult', numpy.ndarray | None]:
-    """Registers two iamges based on their filepath. 
+    """Registers two images based on their filepath.
     
     Args:
         moving_img_path (str): Path to moving image.
@@ -265,7 +260,7 @@ def register_from_filepaths(moving_img_path: str,
         moving_img_mask_path (str|None): Path to moving image mask. Defaults to None.
         fixed_img_mask_path (str|None): Path to fixed image mask. Defaults to None.
         options (RegistrationOptions|None): Contains all registration options. If None, uses default options.
-        transform_path (str|None): Path to strogin transformation. Defaults to None.
+        transform_path (str|None): Path for storing transformation. Defaults to None.
 
     Returns:
         tuple[RegistrationResult, numpy.ndarray | None]: Computed transformation and transformed image.
@@ -333,13 +328,13 @@ def groupwise_registration_from_filepaths(
     image_target_directory = join(target_directory, 'images')
     Path(image_target_directory).mkdir(parents=True, exist_ok=True)
     for img, img_path in zip(warped_images, img_paths):
-        fname = os.path.basename(img_path)
-        if fname.endswith('.ome.tif'):
-            fname = fname.replace('.ome.tif', '')
+        file_name = os.path.basename(img_path)
+        if file_name.endswith('.ome.tif'):
+            file_name = file_name.replace('.ome.tif', '')
         else:
-            fname = os.path.splitext(fname)[0]
-        fname = os.path.join(image_target_directory, f'{fname}.ome.tif')
-        write_to_ometiffile(img, fname)
+            file_name = os.path.splitext(file_name)[0]
+        file_name = os.path.join(image_target_directory, f'{file_name}.ome.tif')
+        write_to_ometiffile(img, file_name)
     groupwise_registration_result.to_file(join(target_directory, 'transform'))
     return groupwise_registration_result, warped_images
 
@@ -384,7 +379,7 @@ def register_tiles(moving_image_tiles: list[ImageTile],
         try:
             if verbose:
                 start = time.time()
-            # Call internatl `register_` to avoid wrapping context.
+            # Call internal `register_` to avoid wrapping context.
             registration_result_ = _perform_registration(moving_img=moving_image_,
                                                     fixed_img=fixed_image_,
                                                     moving_img_mask=mask,
@@ -393,7 +388,7 @@ def register_tiles(moving_image_tiles: list[ImageTile],
             if verbose:
                 end = time.time()
                 print(f'Duration of register function: {end - start}')
-            # Foward transform
+            # Forward transform
             transform_to_displacementfield = sitk.TransformToDisplacementField(
                 registration_result_.registration.forward_transform.transform,
                 outputPixelType=sitk.sitkVectorFloat64,
@@ -515,7 +510,7 @@ def _register_tiles_helper(moving_image_tile: ImageTile,
             Image tiles of moving image.
         fixed_image_tile (ImageTile):
             Image tiles of fixed image.
-        tile_reg_opts (RegistrationOptions):
+        tiling_options (RegistrationOptions):
             Options for registration of tiles.
         verbose (bool) = False
     
@@ -527,7 +522,7 @@ def _register_tiles_helper(moving_image_tile: ImageTile,
     mask = np.ones(moving_image_.shape[:2], dtype=np.uint8)
 
     try:
-        # Call interal `_perform_registration` to avoid wrapping context.
+        # Call internal `_perform_registration` to avoid wrapping context.
         registration_result_ = _perform_registration(moving_img=moving_image_,
                                                 fixed_img=fixed_image_,
                                                 moving_img_mask=mask,
@@ -623,7 +618,7 @@ def _simple_tiling_registration(
     Args:
         moving_image (numpy.ndarray): Source image.
         fixed_image (numpy.ndarray): Target image.
-        tile_size: 
+        tile_options:
         verbose (bool, optional): Prints more information. Defaults to False.
 
     Returns:
@@ -1216,7 +1211,7 @@ def _perform_registration(moving_img: numpy.ndarray,
                     paths_rev,
                     True)
     else:
-        # Overwise just invert the transform.
+        # Otherwise just invert the transform.
         rev_registration_transform = RegistrationTransforms(
             forward_transform=registration_transform.backward_transform,
             backward_transform=registration_transform.forward_transform,
@@ -1342,8 +1337,8 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
                     moving_img: numpy.ndarray,
                     reg_params: dict,
                     paths: dict,
-                    reverse: bool = False) -> RegistrationResult:
-    """Post processing of registration. Rescales and/or composes affine and
+                    reverse: bool = False) -> RegistrationTransforms:
+    """Post-processing of registration. Rescales and/or composes affine and
     nonrigid registration.
 
     Args:
@@ -1358,7 +1353,7 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
         reverse (bool, optional): Defaults to False.
 
     Returns:
-        RegistrationResult: 
+        RegistrationTransforms:
     """
     path_output = paths['path_output']
     path_small_affine = paths['path_small_affine']
@@ -1393,7 +1388,7 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
                 nonrigid_affine_trans_path,
                 path_small_warp,
                 path_to_small_ref_image,
-                path_small_composite_warp            
+                path_small_composite_warp
             )
             path_big_composite_warp = os.path.join(path_metrics_full_resolution, 'big_composite_warp.nii.gz')
             rescale_warp(
@@ -1410,7 +1405,7 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
                 path_small_warp_inv,
                 path_to_small_ref_image,
                 path_small_inverted_composite_warp,
-                invert=True 
+                invert=True
             )
             path_big_composite_warp_inv = os.path.join(path_metrics_full_resolution, 'big_inv_composite_warp.nii.gz')
             rescale_warp(
@@ -1539,9 +1534,9 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
                                                                 fixed_preprocessing_params)
     fixed_transform = GFHTransform(original_fixed_image_size, composited_forward_transform)
     moving_transform = GFHTransform(original_moving_image_size, composited_backward_transform)
-    registration_result = RegistrationTransforms(forward_transform=fixed_transform, backward_transform=moving_transform, reg_params=reg_result)
+    registration_transforms = RegistrationTransforms(forward_transform=fixed_transform, backward_transform=moving_transform, reg_params=reg_result)
     # Return this!
-    return registration_result
+    return registration_transforms
 
 
 def _reg_aff_grp_wrapper(fixed_tuple: tuple[numpy.ndarray, numpy.ndarray | None], 
@@ -1652,7 +1647,7 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
         new_image_mask_list.append((img, mask))
     image_mask_list = new_image_mask_list
     do_nr_registration = options.do_nonrigid_registration
-    # Stage1: Affine register along the the sequence.
+    # Stage1: Affine register along the sequence.
     moving_image, moving_mask = image_mask_list[0]
     # We set this to false for the affine part and set it back to the original value afterwards.
     options.do_nonrigid_registration = False
@@ -1814,7 +1809,7 @@ def _transform_pointset(pointset: numpy.ndarray,
 
     Args:
         pointset (numpy.ndarray): 
-        transformation (SimpleITK.SimpleITK.Transform): 
+        transform (SimpleITK.SimpleITK.Transform):
 
     Returns:
         numpy.ndarray: 
@@ -1832,12 +1827,12 @@ def _transform_pointset(pointset: numpy.ndarray,
 # TODO: Fix types for geojson.
 def transform_geojson(geojson_data: geojson.GeoJSON,
                       transform: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform,
-                      **kwards) -> list[geojson.GeoJSON] | geojson.GeoJSON:
+                      **kwargs) -> list[geojson.GeoJSON] | geojson.GeoJSON:
     """Applies transformation to geojson data. Can be a feature collection ot a list of features.
 
     Args:
         geojson_data (geojson.GeoJSON): 
-        transformation (SimpleITK.SimpleITK.Image): 
+        transform (SimpleITK.SimpleITK.Image):
 
     Returns:
         list[geojson.GeoJSON] | geojson.GeoJSON: 
@@ -1906,7 +1901,7 @@ class GreedyFHist:
         a docker container, set this option to True and set the image name with greedy
         as `path_to_greedy`.
 
-    segmentation_function: Optional[Callable]
+    segmentation: Optional[Callable]
         Segmentation function for foreground segmentation.
 
     """
@@ -1947,9 +1942,11 @@ class GreedyFHist:
         Args:
             moving_img_path (str): Path to source image.
             fixed_img_path (str): Path to target image.
-            moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
-            fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
-            options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+            target_img_path (str): Path to target image.
+            moving_img_mask_path (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
+            fixed_img_mask_path (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise derived automatically. Defaults to None.
+            options (Optional[Options], optional): Can be supplied. Otherwise, default arguments are used. Defaults to None.
+            transform_path (Optional[Transform], optional): Optional transform to apply to images. Defaults to None.
 
         Returns:
             RegistrationResult: Computed registration result.        
@@ -2077,7 +2074,7 @@ class GreedyFHist:
             fixed_img (numpy.ndarray): Target image.
             moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
             fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
-            options (Optional[Options], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+            options (Optional[Options], optional): Can be supplied. Otherwise, default arguments are used. Defaults to None.
             verbose (bool): Prints out more information. Defaults to False.
 
         Returns:
@@ -2108,7 +2105,7 @@ class GreedyFHist:
         
         1. Pairwise affine registration between all adjacent images
         is computed and applied such that each moving image is 
-        affinely registered onto the fixed image.
+        affine registered onto the fixed image.
         
         2. Nonrigid registration between each moving image and 
         the fixed image.
@@ -2116,7 +2113,7 @@ class GreedyFHist:
         Args:
             image_mask_list (List[Tuple[numpy.ndarray, Optional[numpy.ndarray]]]): 
                 List of input images. The last image is denoted as the fixed image. Every other image is treated
-                as a moving image. For each image, an optionsl mask can be supplied.
+                as a moving image. For each image, an optional mask can be supplied.
                 
             options (RegistrationOptions, optional) = None:
                 Registration options. If None, uses default options. Defaults to None.
@@ -2142,7 +2139,7 @@ class GreedyFHist:
         Args:
             image (numpy.ndarray): 
             transform (GFHTransform | RegistrationTransforms | RegistrationResult): Transform to use. 
-                By default tries to look for the forward transformation. 
+                By default, tries to look for the forward transformation.
             interpolation_mode (str, optional): Defaults to 'LINEAR'.
 
         Returns:
@@ -2175,7 +2172,7 @@ class GreedyFHist:
     def transform_geojson(self,
                           geojson_data: geojson.GeoJSON,
                           transformation: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform,
-                          **kwards) -> list[geojson.GeoJSON] | geojson.GeoJSON:
+                          **kwargs) -> list[geojson.GeoJSON] | geojson.GeoJSON:
         """Applies transformation to geojson data. Can be a feature collection ot a list of features.
 
         Args:

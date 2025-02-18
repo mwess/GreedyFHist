@@ -3,7 +3,7 @@ import pandas
 
 
 def eucl(src: numpy.ndarray, dst: numpy.ndarray) -> float:
-    """Computes euclidean distance between src and dst array.
+    """Computes Euclidean distance between src and dst array.
 
     Args:
         src (numpy.ndarray):
@@ -16,7 +16,7 @@ def eucl(src: numpy.ndarray, dst: numpy.ndarray) -> float:
 
 
 def compute_distance_for_lm(warped_df: pandas.DataFrame, fixed_df: pandas.DataFrame) -> pandas.DataFrame:
-    """Compute target registration error for each pair of matching landmarks. Lansmarks are matched with the 'label' column.
+    """Compute target registration error for each pair of matching landmarks. Landmarks are matched with the 'label' column.
 
     Args:
         warped_df (pandas.DataFrame):

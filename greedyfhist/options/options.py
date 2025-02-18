@@ -16,7 +16,7 @@ from .segmentation_options import (
 
 
 def _get_3_step_pyramid_iterations() -> list[int]:
-    """Returns a default 3 step pyramid with iterations 100, 50 and 10.
+    """Returns a default 3-step pyramid with iterations 100, 50 and 10.
 
     Returns:
         list[int]: pyramid with iterations
@@ -25,7 +25,7 @@ def _get_3_step_pyramid_iterations() -> list[int]:
 
 
 def _get_4_step_pyramid_iterations() -> list[int]:
-    """Returns a default 4 step pyramid with iterations 100, 100, 50 and 10.
+    """Returns a default 4-step pyramid with iterations 100, 100, 50 and 10.
 
     Returns:
         list[int]:
@@ -34,7 +34,7 @@ def _get_4_step_pyramid_iterations() -> list[int]:
 
 
 def _get_5_step_pyramid_iterations() -> list[int]:
-    """Returns a default 5 step pyramid with iterations 100, 100, 50, 50 and 10.
+    """Returns a default 5-step pyramid with iterations 100, 100, 50, 50 and 10.
 
     Returns:
         list[int]:
@@ -48,7 +48,7 @@ def _load_default_resolution() -> tuple[int, int]:
     Returns:
         tuple[int, int]:
     """
-    return (1024, 1024)
+    return 1024, 1024
 
     
 def _load_default_nr_resolution() -> tuple[int, int]:
@@ -58,7 +58,7 @@ def _load_default_nr_resolution() -> tuple[int, int]:
     Returns:
         tuple[int, int]: 
     """
-    return (2048, 2048)
+    return 2048, 2048
 
 
 @dataclass
@@ -70,7 +70,7 @@ class PreprocessingOptions:
         Color window radius for mean shift filtering in moving image.
 
     moving_sp: int = 25
-        Pixel window readius for mean shift filtering in moving image.
+        Pixel window radius for mean shift filtering in moving image.
         
     fixed_sr: int = 30
         Color window radius for mean shift filtering in fixed image.
@@ -137,8 +137,6 @@ class PreprocessingOptions:
         """
         options = PreprocessingOptions()
         options.enable_denoising = False
-        # options.disable_denoising_fixed = True
-        # options.disable_denoising_moving = True
         return options
     
 
@@ -427,7 +425,7 @@ class TilingOptions:
         tile_overlap: list[float] | float = 0.75
             Relevant for pyramid tiling. Gives the overlap of two neighboring tiles.
             
-        tiles_size: int | tuple[int, int] = 1024
+        tile_size: int | tuple[int, int] = 1024
             Relevant for simple tiling. Size of each tile extracted. 
             
         min_overlap: float = 0.1
@@ -644,7 +642,7 @@ class RegistrationOptions:
             Registration Options:
         """
         opts = RegistrationOptions()
-        opts.nonrigid_registration_options = False
+        opts.do_nonrigid_registration = False
         return opts
     
     @staticmethod
