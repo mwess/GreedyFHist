@@ -937,9 +937,9 @@ def _perform_registration(moving_img: numpy.ndarray,
     Args:
         moving_img (numpy.ndarray): Moving (or source) image.
         fixed_img (numpy.ndarray): Fixed (or target) image.
-        moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise dervied automatically. Defaults to None.
-        fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise dervied automatically. Defaults to None.
-        options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise default arguments are used. Defaults to None.
+        moving_img_mask (Optional[numpy.ndarray], optional): Optional moving mask. Is otherwise derived automatically. Defaults to None.
+        fixed_img_mask (Optional[numpy.ndarray], optional): Optional fixed mask. Is otherwise derived automatically. Defaults to None.
+        options (Optional[RegistrationOptions], optional): Can be supplied. Otherwise, default arguments are used. Defaults to None.
 
     Returns:
         RegistrationTransforms: 
@@ -1076,7 +1076,8 @@ def _perform_registration(moving_img: numpy.ndarray,
                                                 fixed_affine_path,
                                                 options.affine_registration_options.preprocessing_options.disable_denoising_fixed)
         height = fixed_img_preprocessed.height
-        
+
+        # TODO: Can all of this be put into the next function, since its actually options parsing?
         ia_init = ''
         if options.affine_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
             # Use Segmentation masks to compute center of mass initialization
