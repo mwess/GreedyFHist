@@ -4,10 +4,10 @@ This module handles the core registration functionality via the
 GreedyFHist class. Results are exported as GroupwiseRegResult or 
 RegistrationTransforms. 
 """
-
 from copy import deepcopy
 from dataclasses import dataclass
-import multiprocess
+from datetime import datetime
+import logging
 import os
 from os.path import join
 from pathlib import Path
@@ -17,6 +17,7 @@ import time
 from typing import Callable
 
 import geojson
+import multiprocess
 import numpy, numpy as np
 import SimpleITK, SimpleITK as sitk
 import tqdm
@@ -87,6 +88,12 @@ from greedyfhist.utils.tiling import (
     reassemble_sitk_displacement_field_from_tile_size
 )
 
+
+
+current_datetime = datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
+logger = logging.getLogger(__name__)
+file_handler = logging.FileHandler(f'greedyfhist_{current_datetime}.log', mode='a', encoding='utf-8')
+logger.addHandler(file_handler)
 
 def _preprocessing(image: numpy.ndarray,
                    preprocessing_options: PreprocessingOptions,
@@ -899,17 +906,20 @@ def register(moving_img: numpy.ndarray,
         if verbose:
             print('Doing simple tiling registration.')
         if options.tiling_options.tiling_mode == 'simple':
+            logger.debug('Doing simple tiling registration.')
             tiling_reg_result = simple_tiling_registration(warped_image, 
                                                     fixed_img, 
                                                     options, 
                                                     verbose)            
         elif options.tiling_options.tiling_mode == 'pyramid':
+            logger.debug('Doing pyramidical tiling registration.')
             tiling_reg_result = pyramid_tiling_registration(warped_image, 
                                                     fixed_img, 
                                                     options, 
                                                     verbose)     
         else:
-            raise Exception(f'Unkown tiling option: {options.tiling_options.tiling_mode}')
+            logging.error(f'Unknown tiling mode: {options.tiling_options.tiling_mode}.', exc_info=True)
+            raise Exception(f'Unknown tiling option: {options.tiling_options.tiling_mode}')
         reg_results.append(tiling_reg_result)
         reg_result = compose_registration_results(reg_results)
     else:
@@ -949,6 +959,7 @@ def _perform_registration(moving_img: numpy.ndarray,
 
     # Setup tissue segmentation function.
     if options.disable_mask_generation or (moving_img_mask is not None and fixed_img_mask is not None):
+        logger.debug('Disable mask generation.')
         segmentation_function = None
     else:
         segmentation_function = load_segmentation_function(options.segmentation)
@@ -1061,6 +1072,7 @@ def _perform_registration(moving_img: numpy.ndarray,
 
     # Do affine registration.
     if options.do_affine_registration:
+        logger.debug('Starting affine registration.')
         moving_affine_path = join(path_temp, 'affine_moving_preprocessing')
         fixed_affine_path = join(path_temp, 'affine_fixed_preprocessing')
         moving_img_preprocessed = _preprocessing(moving_img,
@@ -1098,7 +1110,8 @@ def _perform_registration(moving_img: numpy.ndarray,
             ia_init = ['-ia-image-centers', '']
             offset = int((height + (options.affine_registration_options.kernel_size * 4)) / 10)
         else:
-            print(f'Unknown ia option: {options.affine_registration_options.ia}.')
+            logger.warning(f'Affine registration options not recognized: {options.affine_registration_options.ia}.')
+            # print(f'Unknown ia option: {options.affine_registration_options.ia}.')
             offset = int((height + (options.affine_registration_options.kernel_size * 4)) / 10)
         reg_params['offset'] = offset
         reg_params['affine_iteration_vec'] = options.affine_registration_options.iteration_pyramid
@@ -1119,6 +1132,7 @@ def _perform_registration(moving_img: numpy.ndarray,
     paths['path_small_affine'] = path_small_affine
 
     if options.do_nonrigid_registration:
+        logger.debug('Starting nonrigid registration.')
         # Deformable registration is outsourced.
         # TODO: Clean this up. Either make the affine code like the deformable or the other way around.
         (def_reg_ret, 
@@ -1300,7 +1314,6 @@ def _do_deformable_registration(moving_img: numpy.ndarray,
                                         options.nonrigid_registration_options.kernel_size,
                                         fixed_nr_path,
                                         options.nonrigid_registration_options.preprocessing_options.disable_denoising_fixed)
-    height = fixed_img_preprocessed.height
 
     ia_init = ''
     if options.nonrigid_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:

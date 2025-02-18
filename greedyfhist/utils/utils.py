@@ -11,11 +11,14 @@ import SimpleITK, SimpleITK as sitk
 from greedyfhist.options import AffineGreedyOptions, NonrigidGreedyOptions
 
 
-def call_command(cmd: str):
+def call_command(cmd: str) -> subprocess.CompletedProcess:
     """
-    Simple wrapper function around a command.
-    :param cmd:
-    :return:
+    Call a command and return its output.
+
+    Args:
+        cmd (str): Command to execute.
+
+    Returns: CompletedProcess object.
     """
     ret = subprocess.run(shlex.split(cmd), capture_output=True)
     return ret
@@ -56,8 +59,7 @@ def composite_warps(path_to_greedy: str,
         subprocess.CompletedProcess: 
     """
     
-    args = {}
-    args['-rf'] = path_small_ref_img
+    args = {'-rf': path_small_ref_img}
     if invert:
         transform_paths = []
         if path_small_affine is not None:
@@ -215,7 +217,8 @@ def composite_sitk_transforms(transforms: list[SimpleITK.SimpleITK.Transform]) -
 def compose_reg_transforms(transform: SimpleITK.Transform,
                            moving_preprocessing_params: dict,
                            fixed_preprocessing_params: dict) -> SimpleITK.Transform:
-    """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward affine/nonrigid registration.  
+    """Pre- and appends preprocessing steps from moving and fixed image as transforms to forward
+    affine/nonrigid registration.
 
     Args:
         transform (SimpleITK.Transform): Computed affine/nonrigid registration
