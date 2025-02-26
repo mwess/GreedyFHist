@@ -25,6 +25,12 @@ Welcome to GreedyFHist's documentation.
 
   api
 
+.. toctree::
+  :caption: LICENSE
+  :hidden:
+
+  license
+
 GreedyFHist is a Python based tool for registration of stained images.
 
 For examples in using GreedyFHist's commandline interface, see ``examples``.
