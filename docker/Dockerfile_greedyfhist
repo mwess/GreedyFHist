@@ -6,7 +6,7 @@ RUN apt install -y python3.10
 RUN apt install python3-pip -y
 RUN pip install --upgrade pip
 RUN apt install libvips-dev -y
-RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3
+RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc1
 
 ENTRYPOINT ["greedyfhist"]
 

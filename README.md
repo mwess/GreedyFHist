@@ -2,13 +2,21 @@
 
 GreedyFHist - Registration of stained histology images.
 
+The latest version is `tags/v0.0.3-rc1`:
+
+`git checkout tags/v0.0.3-rc1`
+
 ### Documentation
 
 Documentation can be found at:
 
 https://greedyfhist.readthedocs.io/en/latest/
 
-Example notebook are palce in `examples`.
+### Examples
+
+Example notebook are placed in `examples`.
+
+
 
 
 If you use any of this code, please cite:
