@@ -1082,7 +1082,7 @@ def _perform_registration(moving_img: numpy.ndarray,
         if options.affine_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
             # Use Segmentation masks to compute center of mass initialization
             init_mat_path = os.path.join(path_temp, 'Affine_init.mat')
-            init_mat = com_affine_matrix(moving_img, fixed_img_mask)
+            init_mat = com_affine_matrix(fixed_img_mask, moving_img_mask)
             write_mat_to_file(init_mat, init_mat_path)
             ia_init = ['-ia', f'{init_mat_path}']
             reg_params['com_x'] = init_mat[0, 2]
