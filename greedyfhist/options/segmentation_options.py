@@ -1,10 +1,50 @@
 from dataclasses import dataclass
 
 
+def parse_segmentation_options(config: dict):
+    segmentation_class = config.get('segmentation_class', 'YoloSegOptions')
+    if segmentation_class == 'YoloSegOptions':
+        options = YoloSegOptions()
+    elif segmentation_class == 'TissueEntropySegOptions':
+        options = TissueEntropySegOptions()
+    elif segmentation_class == 'LuminosityAndAreaSegOptions':
+        options = LuminosityAndAreaSegOptions()
+    else:
+        raise Exception(f'Segmentation class unkown: {segmentation_class}')
+    options.parse_dict(config)
+    return options
+
+
 @dataclass
 class SegmentationOptions:
     pass
+    
+    def parse_dict(self, args_dict: dict):
+        """Function made to automatically parse attributes from dictionary. 
 
+        Args:
+            args_dict (Dict): 
+        """
+        for key in args_dict:
+            self.__assign_if_present(key, args_dict)
+
+    def __assign_if_present(self, key, args_dict):
+        """Assigns value of given key in args_dict if key in class's __annotations__.
+
+        Args:
+            key (_type_):
+            args_dict (_type_):
+        """
+        if key in args_dict:
+            value = args_dict[key]
+            if key in self.__annotations__:
+                self.__setattr__(key, value)
+    
+    def to_dict(self):
+        d = {}
+        for key in self.__annotations__:
+            d[key] = self.__getattribute__(key)
+        return d    
 
 @dataclass
 class TissueEntropySegOptions(SegmentationOptions):
@@ -71,24 +111,6 @@ class TissueEntropySegOptions(SegmentationOptions):
     def default_options() -> SegmentationOptions:
         return TissueEntropySegOptions()
     
-    def __assign_if_present(self, key, args_dict):
-        """Assigns value of given key in args_dict if key in class's __annotations__.
-
-        Args:
-            key (_type_):
-            args_dict (_type_):
-        """
-        if key in args_dict:
-            value = args_dict[key]
-            if key in self.__annotations__:
-                self.__setattr__(key, value)
-    
-    def to_dict(self):
-        d = {}
-        for key in self.__annotations__:
-            d[key] = self.__getattribute__(key)
-        return d    
-
 
 @dataclass
 class LuminosityAndAreaSegOptions(SegmentationOptions):
@@ -132,25 +154,6 @@ class LuminosityAndAreaSegOptions(SegmentationOptions):
     def default_options() -> SegmentationOptions:
         return LuminosityAndAreaSegOptions()
     
-    def __assign_if_present(self, key, args_dict):
-        """Assigns value of given key in args_dict if key in class's __annotations__.
-
-        Args:
-            key (_type_):
-            args_dict (_type_):
-        """
-        if key in args_dict:
-            value = args_dict[key]
-            if key in self.__annotations__:
-                self.__setattr__(key, value)
-    
-    def to_dict(self):
-        d = {}
-        for key in self.__annotations__:
-            d[key] = self.__getattribute__(key)
-        return d    
-    
-
 
 @dataclass
 class YoloSegOptions(SegmentationOptions):
@@ -184,21 +187,3 @@ class YoloSegOptions(SegmentationOptions):
     @staticmethod
     def default_options() -> SegmentationOptions:
         return YoloSegOptions()
-    
-    def __assign_if_present(self, key, args_dict):
-        """Assigns value of given key in args_dict if key in class's __annotations__.
-
-        Args:
-            key (_type_):
-            args_dict (_type_):
-        """
-        if key in args_dict:
-            value = args_dict[key]
-            if key in self.__annotations__:
-                self.__setattr__(key, value)
-    
-    def to_dict(self):
-        d = {}
-        for key in self.__annotations__:
-            d[key] = self.__getattribute__(key)
-        return d    
