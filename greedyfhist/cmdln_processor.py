@@ -286,8 +286,6 @@ def register(moving_image_path: str | None = None,
 
     logging.info('Loaded images. Starting registration.')
     logging.info(f'Registration options: {registration_options}')
-    print('Registration Options:')
-    print(registration_options)
     registerer = GreedyFHist(path_to_greedy=path_to_greedy, use_docker_container=use_docker_executable)
 
     moving_mask = moving_histology_section.ref_mask.data if moving_histology_section.ref_mask is not None else None

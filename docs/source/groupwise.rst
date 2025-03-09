@@ -28,15 +28,24 @@ A full example configuration might look like this:
 
     [gfh_options]
 
-    pre_sampling_factor = 0.25
-    pre_sampling_auto_factor = 3500
+    pre_sampling_factor = 'auto'
+    pre_sampling_auto_factor = 2000
     do_affine_registration = true
     do_nonrigid_registration = true
+    compute_reverse_nonrigid_registration = false
     temporary_directory = 'tmp'
     remove_temporary_directory = true
-    yolo_segmentation_min_size = 5000
+    disable_mask_generation = false
+
+    [gfh_options.segmentation]
+    segmentation_class = 'YoloSegOptions'
+    min_area_size = 10000
+    use_tv_chambolle = true
+    use_clahe = false
+    fill_holes = true
 
     [gfh_options.affine_registration_options]
+
     dim = 2
     resolution = [1024, 1024]
     kernel_size = 10
@@ -60,7 +69,7 @@ A full example configuration might look like this:
 
     [gfh_options.nonrigid_registration_options]
     dim = 2
-    resolution = '1024x1024'
+    resolution = [1024, 1024]
     s1 = 5.0
     s2 = 5.0
     kernel_size = 10
@@ -80,6 +89,16 @@ A full example configuration might look like this:
     remove_temporary_directory = true
     yolo_segmentation_min_size = 5000
     enable_denoising = false
+
+    [gfh_options.tiling_options]
+    enable_tiling = false
+    tiling_mode = 'simple'
+    stop_condition_tile_resolution = false
+    stop_condition_pyramid_counter = true
+    max_pyramid_depth = 0
+    tile_overlap = 0.75
+    tile_size = 1024
+    min_overlap = 0.1
 
 
     [input]
