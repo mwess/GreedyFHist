@@ -26,7 +26,7 @@ An example call could look like this:
       --moving-image ../pairwise_examples/images/moving_image.ome.tif \
       --fixed-image ../pairwise_examples/images/fixed_image.ome.tif \
       --config example_registration.toml \
-      --annotations ../pairwise_examples/annotations/moving_annotationmco.ome.tiff \
+      --annotations ../pairwise_examples/annotations/moving_annotation.ome.tiff \
       --pointsets ../pairwise_examples/annotations/moving_pointset.csv \
       --geojsons ../pairwise_examples/annotations/moving_annotation.geojson                            
 
