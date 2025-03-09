@@ -1601,6 +1601,22 @@ def _reg_nr_grp_wrapper(fixed_tuple: tuple[numpy.ndarray, numpy.ndarray | None],
     deformable_warped_image = transform_image(warped_image, nonrigid_reg_result.registration.forward_transform, 'LINEAR')
     return nonrigid_reg_result.registration, nonrigid_reg_result.reverse_registration, deformable_warped_image, idx
 
+def does_multiprocess_conflict_exist(options: RegistrationOptions) -> bool:
+    """Multiprocessing cannot be nested at the moment. This function checks whether groupwise registration and 
+    tiling registration use multiprocessing.
+
+    Args:
+        options (RegistrationOptions):
+
+    Returns:
+        bool: True if conlict exists, False otherwise.
+    """
+    if options.tiling_options is None or not options.tiling_options.enable_tiling:
+        return False
+    group_mp_enabled = options.grp_n_proc is not None and options.grp_n_proc > 0
+    tiling_mp_enabled = options.tiling_options.n_procs is not None and options.tiling_options.n_procs > 0
+    return group_mp_enabled and tiling_mp_enabled
+    
 
 # TODO: Add option for skipping affine registration.
 def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndarray | None]],
@@ -1624,12 +1640,17 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
         options (Optional[RegistrationOptions], optional): Registration options. At this moment, the affine registration is
         always executed. `options.do_affine_registration` is ignored, but the nonrigid registration can be disabled.
         Defaults to None.
+        
+    Raises:
+        Exception: Groupwise and tiling registration cannot use multiprocessing at the same time.
 
     Returns:
         Tuple[GroupwiseRegResult, List[numpy.ndarray]]: GroupwiseRegResult contains all computed transformations. List of images are either affine or nonrigid warped images.
     """
     if options is None:
         options = RegistrationOptions()
+    if does_multiprocess_conflict_exist(options):
+        raise Exception("Groupwise and tiling registration have enabled multiprocessing. This is not supported at the moment. Disable one option.")
     segmentation_function = load_segmentation_function(options.segmentation)
     # Stage 1: Prepare masks if necessary.
     new_image_mask_list = []
@@ -2125,7 +2146,7 @@ class GreedyFHist:
         """
         if options is None:
             options = RegistrationOptions()
-        options = self.__update_options(options)
+        options = self.__update_options(options, skip_segmentation_assignment=True)
         return groupwise_registration(
             image_mask_list=image_mask_list,
             options=options

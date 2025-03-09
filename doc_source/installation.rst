@@ -20,7 +20,7 @@ GreedyFHist can be installed by running the following command:
 
 .. code-block:: bash
 
-    pip install --user git+https://github.com/mwess/greedyfhist@v0.0.2-rc2
+    pip install --user git+https://github.com/mwess/greedyfhist@v0.0.3-rc2
 
 
 ----------------------------

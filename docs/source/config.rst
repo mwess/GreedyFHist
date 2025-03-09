@@ -19,13 +19,52 @@ This section is used to declare any parameters used during registration. Below i
 
     [gfh_options]
 
-    pre_sampling_factor = 0.25
-    pre_sampling_auto_factor = 3500
+    pre_sampling_factor = 'auto'
+    pre_sampling_auto_factor = 2000
     do_affine_registration = true
     do_nonrigid_registration = true
+    compute_reverse_nonrigid_registration = false
     temporary_directory = 'tmp'
     remove_temporary_directory = true
-    yolo_segmentation_min_size = 5000
+    disable_mask_generation = false
+
+    # Several options for segmentation can be tried out by commenting in one of the following
+    # three options.
+    [gfh_options.segmentation]
+
+    segmentation_class = 'YoloSegOptions'
+    min_area_size = 10000
+    use_tv_chambolle = true
+    use_clahe = false
+    fill_holes = true
+
+    #[gfh_options.segmentation]
+    #
+    #segmentation_class = 'TissueEntropySegOptions'
+    #target_resolution = 640
+    #do_clahe = true
+    #use_luminosity = false
+    #footprint_size = 10
+    #convert_to_xyz = false
+    #normalize_entropy = false
+    #pre_gaussian_sigma = 0.5
+    #area_opening_connectivity = 1
+    #area_opening_threshold = 100
+    #post_gaussian_sigma = 0.5
+    #with_morphological_closing = true
+    #do_fill_hole = true
+
+    #[gfh_options.segmentation]
+    #
+    #segmentation_class = 'LuminosityAndAreaSegOptions'
+    #target_resolution = 640
+    #disk_size = 1
+    #with_morphological_erosion = true
+    #with_morphological_closing = false
+    #min_area_size = 100
+    #distance_threshold = 30
+    #low_intensity_rem_threshold = 25
+    #with_hole_filling = true
 
     [gfh_options.affine_registration_options]
 
@@ -52,7 +91,7 @@ This section is used to declare any parameters used during registration. Below i
 
     [gfh_options.nonrigid_registration_options]
     dim = 2
-    resolution = '1024x1024'
+    resolution = [1024, 1024]
     s1 = 5.0
     s2 = 5.0
     kernel_size = 10
@@ -73,6 +112,18 @@ This section is used to declare any parameters used during registration. Below i
     yolo_segmentation_min_size = 5000
     enable_denoising = false
 
+    [gfh_options.tiling_options]
+    # Tiling can be enabled by setting this property to true
+    enable_tiling = false
+    tiling_mode = 'simple'
+    stop_condition_tile_resolution = false
+    stop_condition_pyramid_counter = true
+    max_pyramid_depth = 0
+    tile_overlap = 0.75
+    tile_size = 1024
+    min_overlap = 0.1
+    # Comment this option in if parallelization should be used.
+    #n_procs = 4
 
 -------
 Options

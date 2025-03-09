@@ -11,6 +11,24 @@ import SimpleITK, SimpleITK as sitk
 from greedyfhist.options import AffineGreedyOptions, NonrigidGreedyOptions
 
 
+def resolve_path_to_greedy(path: str) -> str:
+    """Utility function to ensure that the greedy executable is used.
+
+    Args:
+        path (str): _description_
+
+    Returns:
+        str: Resolved path
+    """
+    if path.endswith('greedy'):
+        return path
+    if path == '':
+        return 'greedy'
+    if os.path.isdir(path):
+        path = os.path.join(path, 'greedy')
+    return path
+
+
 def call_command(cmd: str):
     """
     Simple wrapper function around a command.
@@ -108,6 +126,8 @@ def affine_registration(path_to_greedy: str,
         abs_temp_directory = os.path.abspath(temp_directory)
         v_option = f'{abs_temp_directory}:/{temp_directory}'
         path_to_greedy = f'docker run -v {v_option} {path_to_greedy}'
+    else:
+        path_to_greedy = resolve_path_to_greedy(path_to_greedy)
     cost_fun_params = options.cost_function
     if options.cost_function == 'ncc' or options.cost_function == 'wncc':
         cost_fun_params += f' {options.kernel_size}x{options.kernel_size}'
@@ -162,6 +182,8 @@ def deformable_registration(path_to_greedy: str,
         abs_temp_directory = os.path.abspath(temp_directory)
         v_option = f'{abs_temp_directory}:/{temp_directory}'
         path_to_greedy = f'docker run -v {v_option} {path_to_greedy}'
+    else:
+        path_to_greedy = resolve_path_to_greedy(path_to_greedy)
     cost_fun_params = options.cost_function
     if options.cost_function == 'ncc' or options.cost_function == 'wncc':
         cost_fun_params += f' {options.kernel_size}x{options.kernel_size}'

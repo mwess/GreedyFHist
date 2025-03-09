@@ -11,7 +11,8 @@ from .segmentation_options import (
     SegmentationOptions,
     YoloSegOptions,
     TissueEntropySegOptions,
-    LuminosityAndAreaSegOptions
+    LuminosityAndAreaSegOptions,
+    parse_segmentation_options
 )
 
 
@@ -108,7 +109,7 @@ class PreprocessingOptions:
             value = args_dict[key]
             if key in self.__annotations__:
                 self.__setattr__(key, value)
-    
+
     def to_dict(self):
         d = {}
         for key in self.__annotations__:
@@ -457,7 +458,28 @@ class TilingOptions:
             TilingOptions: 
         """
         return TilingOptions()
+
+    def __assign_if_present(self, key, args_dict):
+        """Assigns value of given key in args_dict if key in class's __annotations__.
+
+        Args:
+            key (_type_):
+            args_dict (_type_):
+        """
+        if key in args_dict:
+            value = args_dict[key]
+            if key in self.__annotations__:
+                self.__setattr__(key, value)
     
+    def parse_dict(self, args_dict: dict):
+        """Function made to automatically parse attributes from dictionary. 
+
+        Args:
+            args_dict (Dict): 
+        """
+        for key in args_dict:
+            self.__assign_if_present(key, args_dict)
+
 
 @dataclass
 class RegistrationOptions:
@@ -615,7 +637,10 @@ class RegistrationOptions:
         """
         opts = RegistrationOptions()
         for key in args_dict:
-            if key in ['affine_registration_options', 'nonrigid_registration_options']:
+            if key in ['affine_registration_options', 
+                       'nonrigid_registration_options', 
+                       'segmentation',
+                       'tiling_options']:
                 continue
             opts.__assign_if_present(key, args_dict)
         # TODO: Remove that.
@@ -623,6 +648,11 @@ class RegistrationOptions:
             opts.affine_registration_options.parse_dict(args_dict['affine_registration_options'])
         if 'nonrigid_registration_options' in args_dict:
             opts.nonrigid_registration_options.parse_dict(args_dict['nonrigid_registration_options'])
+        if 'segmentation' in args_dict:
+            segmentation_options = parse_segmentation_options(args_dict['segmentation'])
+            opts.segmentation = segmentation_options
+        if 'tiling_options' in args_dict:
+            opts.tiling_options.parse_dict(args_dict['tiling_options'])
         return opts
 
     @staticmethod
