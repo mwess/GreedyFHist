@@ -20,6 +20,7 @@ release = '28/06/2024'
 
 
 sys.path.insert(0, os.path.abspath('../greedyfhist'))
+sys.path.insert(0, os.path.abspath('../greedyfhist'))
 
 extensions = [
     "hoverxref.extension",
