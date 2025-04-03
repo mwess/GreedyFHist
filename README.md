@@ -2,9 +2,9 @@
 
 GreedyFHist - Registration of stained histology images.
 
-The latest version is `tags/v0.0.3-rc1`:
+The latest version is `tags/v0.0.3-rc2`:
 
-`git checkout tags/v0.0.3-rc1`
+`git checkout tags/v0.0.3-rc2`
 
 ### Documentation
 
