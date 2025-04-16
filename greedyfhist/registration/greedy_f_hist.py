@@ -2193,7 +2193,7 @@ class GreedyFHist:
     # TODO: Fix types for geojson.
     def transform_geojson(self,
                           geojson_data: geojson.GeoJSON,
-                          transformation: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform,
+                          transform: RegistrationResult | RegistrationTransforms | GFHTransform | SimpleITK.Transform,
                           **kwargs) -> list[geojson.GeoJSON] | geojson.GeoJSON:
         """Applies transformation to geojson data. Can be a feature collection ot a list of features.
 
@@ -2205,4 +2205,4 @@ class GreedyFHist:
             list[geojson.GeoJSON] | geojson.GeoJSON: 
         """
         return transform_geojson(geojson_data=geojson_data,
-                                 transformation=transformation)
+                                 transform=transform)
