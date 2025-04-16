@@ -1,12 +1,13 @@
 FROM mwess89/greedy:1.3.0-alpha
 
 RUN apt update && apt-get install -y software-properties-common
+RUN apt update --fix-missing
 RUN add-apt-repository -y ppa:deadsnakes/ppa
 RUN apt install -y python3.10
 RUN apt install python3-pip -y
 RUN pip install --upgrade pip
 RUN apt install libvips-dev -y
-RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc2
+RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc3
 
 ENTRYPOINT ["greedyfhist"]
 
