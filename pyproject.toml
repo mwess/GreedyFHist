@@ -24,13 +24,12 @@ include = [
     { path = "greedyfhist/model_data/segmentation/default_yolo.onnx", format = ["sdist", "wheel"] }
 ]
 
-
 dependencies = [
     "click (>=8.1.7)",
     "geojson (>=3.1.0)",
     "imagecodecs (>=2024.6.1)",
     "imageio (>=2.31.5)",
-    "numpy (>=1.24.4)",
+    "numpy (>=2.0.0)",
     "opencv-python (>=4.8.1.78)",
     "pandas (>=2.0.3)",
     "Pillow (>=10.1.0)",
@@ -41,37 +40,12 @@ dependencies = [
     "stack-data (>=0.6.2)",
     "tifffile (>=2023.7.10)",
     "tqdm (>=4.66.1)",
-    "onnxruntime (>=1.17.0)",
+    "onnxruntime (>=1.22.1)",
     "toml (>=0.10.2)",
     "pyvips (>=2.2.3)",
     "multiprocess (>=0.70.17)",
     "matplotlib (>=3.10.0)" 
 ]
-
-#[tool.poetry.dependencies]
-#
-#click = "^8.1.6"
-#geojson = "^3.1.0"
-#imagecodecs = "^2024.6.1"
-#imageio = "^2.31.5"
-#numpy = "^1.24.4"
-#opencv-python = "^4.8.1.78"
-#pandas = "^2.0.3"
-#Pillow = "^10.1.0"
-#scikit-image = "^0.21.0"
-#scipy = "^1.10.1"
-#setuptools = "^70.0.0"
-#SimpleITK = "^2.2.1"
-#stack-data = "^0.6.2"
-#tifffile = "^2023.7.10"
-#tqdm = "^4.66.1"
-## Remove ultralytics dependency, since we only need opencv for reading the segmentation model
-#onnxruntime = "1.17.0"
-#toml = "0.10.2"
-## ultralytics = "^8.0.199"
-#pyvips = "^2.2.3"
-#multiprocess = "^0.70.17"
-#matplotlib = "^3.10.0"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.812"
