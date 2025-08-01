@@ -30,15 +30,20 @@ class ImageTile:
     x_props: tuple[int, int, int, int, int, int]
     y_props: tuple[int, int, int, int, int, int]
     original_shape: tuple[int, int] | None = None
+
+    def get_numpy_image(self) -> numpy.ndarray:
+        if isinstance(self.image, SimpleITK.Image):
+            return sitk.GetArrayFromImage(self.image)
+        return self.image
     
 
 def get_tile_params(size: int, n_tiles: int = 2, overlap: float = 0.1) \
-    -> tuple[numpy.ndarray, \
-             numpy.ndarray, \
-             numpy.ndarray, \
-             numpy.ndarray, \
-             numpy.ndarray, \
-             numpy.ndarray]:
+    -> tuple[list[int], \
+             list[int], \
+             list[int], \
+             list[int], \
+             list[int], \
+             list[int]]:
     """Gets indices for tiling in one dimension. Indices include start index in image,
     start index in image with overlap, start index in tile (considering overlap), end
     index in image, end index in image with overlap, end index in tile.
@@ -95,6 +100,7 @@ def get_tile_params(size: int, n_tiles: int = 2, overlap: float = 0.1) \
     return starts, starts_rel, starts_ov, ends, ends_rel, ends_ov
 
 
+# TODO: This one might be good to go.
 def extract_image_tiles(img: numpy.ndarray, 
                         x_props: tuple[int, int, int, int, int, int],
                         y_props: tuple[int, int, int, int, int, int]) -> list['ImageTile']:
@@ -169,7 +175,10 @@ def reassemble_sitk_displacement_field(image_tiles: list['ImageTile'],
         
         displ = img_tile.image
         displ = displ[start_y_rel:end_y_rel, start_x_rel:end_x_rel]
-        displ_np = sitk.GetArrayFromImage(displ)
+        if isinstance(displ, SimpleITK.Image):
+            displ_np = sitk.GetArrayFromImage(displ)
+        else:
+            displ_np = displ
         template[start_x:end_x, start_y:end_y] = displ_np
     return template
 
@@ -201,13 +210,13 @@ def reassemble_sitk_displacement_field(image_tiles: list['ImageTile'],
 def reassemble_np_from_tile_size(image_tiles: list[ImageTile],
                                  outputshape: tuple[int, int] | tuple[int, int, int]) \
                                      -> numpy.ndarray:
-    template = np.zeros(outputshape)
+    template = np.zeros(outputshape, image_tiles[0].get_numpy_image().dtype)
     for idx, img_tile in enumerate(image_tiles):
         start_x = img_tile.x_props[0]
         end_x = img_tile.x_props[2]
         start_y = img_tile.y_props[0]
         end_y = img_tile.y_props[2]
-        img = img_tile.image        
+        img = img_tile.get_numpy_image()  
         template[start_x:end_x, start_y:end_y] = img
     return template
 
@@ -237,8 +246,7 @@ def reassemble_sitk_displacement_field_from_tile_size(image_tiles: list['ImageTi
         end_rel_x = img_tile.x_props[5]
         start_rel_y = img_tile.y_props[2]
         end_rel_y = img_tile.y_props[5]
-        displ = img_tile.image
-        displ_np = sitk.GetArrayFromImage(displ)
+        displ_np = img_tile.get_numpy_image()
         template[start_rel_x:end_rel_x, start_rel_y:end_rel_y] = displ_np[start_int_x:end_int_x, start_int_y:end_int_y]
     return template
 
@@ -272,6 +280,12 @@ def get_tile_params_by_tile_size(size: int,
         ends.append(size)
         ends_rel.append(size)
         ends_int.append(size)
+        starts = np.array(starts)
+        starts_rel = np.array(starts_rel)
+        starts_int = np.array(starts_int)
+        ends = np.array(ends)
+        ends_int = np.array(ends_int)
+        ends_rel = np.array(ends_rel)
         return starts, starts_int, starts_rel, ends, ends_int, ends_rel
     while start + tile_size < size:
         starts.append(start)
@@ -326,9 +340,13 @@ def extract_image_tiles_from_tile_sizes(img: numpy.ndarray,
                                             numpy.ndarray, \
                                             numpy.ndarray, \
                                             numpy.ndarray, \
+                                            numpy.ndarray, \
+                                            numpy.ndarray, \
                                             numpy.ndarray
                                             ],
                                         y_props: tuple[\
+                                            numpy.ndarray, \
+                                            numpy.ndarray, \
                                             numpy.ndarray, \
                                             numpy.ndarray, \
                                             numpy.ndarray, \

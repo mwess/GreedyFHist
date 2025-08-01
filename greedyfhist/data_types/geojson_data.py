@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+from os import PathLike
 from os.path import join
 
 import geojson
@@ -21,8 +22,8 @@ class GeoJsonData:
         original_file_path
     """
     
-    data: geojson.feature.FeatureCollection | list[geojson.feature.Feature]
-    path: str
+    data: geojson.GeoJSON | list[geojson.GeoJSON]
+    path: str | PathLike
 
     def to_file(self, path: str):
         with open(path, 'w') as f:
@@ -35,7 +36,7 @@ class GeoJsonData:
 
     def transform_data(self, registerer: GreedyFHist, transformation: RegistrationTransforms) -> 'GeoJsonData':
         data = self.data.copy()
-        warped_data = registerer.transform_geojson(data, transformation.backward_transform)
+        warped_data = registerer.transform_geojson(data, transformation.backward_transform) # type: ignore
         return GeoJsonData(warped_data, self.path)
     
     @classmethod
@@ -46,7 +47,7 @@ class GeoJsonData:
         return cls(data, path)
     
     @classmethod
-    def load_from_path(cls, path: str) -> 'GeoJsonData':
+    def load_from_path(cls, path: str | PathLike) -> 'GeoJsonData':
         with open(path, 'rb') as f:
             data = geojson.load(f)
         return cls(data, path)

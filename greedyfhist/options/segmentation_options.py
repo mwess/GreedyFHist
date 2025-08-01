@@ -94,17 +94,17 @@ class TissueEntropySegOptions(SegmentationOptions):
             Fills holes. Defaults to True.
     """
     
-    target_resolution: int = 640,
-    do_clahe: bool = True,    
-    use_luminosity: bool = False,                                              
-    footprint_size: int = 10, 
-    convert_to_xyz: bool = False,
-    normalize_entropy: bool = False,                         
-    pre_gaussian_sigma: float = 0.5,
-    area_opening_connectivity: int = 1,
-    area_opening_threshold: int = 100,
-    post_gaussian_sigma: float = 0.5,
-    with_morphological_closing: bool = True,
+    target_resolution: int = 640
+    do_clahe: bool = True    
+    use_luminosity: bool = False
+    footprint_size: int = 10
+    convert_to_xyz: bool = False
+    normalize_entropy: bool = False                         
+    pre_gaussian_sigma: float = 0.5
+    area_opening_connectivity: int = 1
+    area_opening_threshold: int = 100
+    post_gaussian_sigma: float = 0.5
+    with_morphological_closing: bool = True
     do_fill_hole: bool = True
 
     @staticmethod

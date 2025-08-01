@@ -55,7 +55,7 @@ def postprocess(preds: tuple[numpy.ndarray, numpy.ndarray],
         x[..., [1, 3]] = x[:, [1, 3]].clip(0, shape[0])
 
         # Process masks
-        masks = process_mask(protos[0], x[:, 6:], x[:, :4], shape)
+        masks = process_mask(protos[0], x[:, 6:], x[:, :4], shape) # type: ignore
 
         # Masks -> Segments(contours)
         segments = masks2segments(masks)
@@ -154,8 +154,8 @@ def scale_mask(masks: numpy.ndarray,
         pad = ratio_pad[1]
 
     # Calculate tlbr of mask
-    top, left = int(round(pad[1] - 0.1)), int(round(pad[0] - 0.1))  # y, x
-    bottom, right = int(round(im1_shape[0] - pad[1] + 0.1)), int(round(im1_shape[1] - pad[0] + 0.1))
+    top, left = int(round(pad[1] - 0.1)), int(round(pad[0] - 0.1))  # type: ignore
+    bottom, right = int(round(im1_shape[0] - pad[1] + 0.1)), int(round(im1_shape[1] - pad[0] + 0.1)) # type: ignore
     if len(masks.shape) < 2:
         raise ValueError(f'"len of masks shape" should be 2 or 3, but got {len(masks.shape)}')
     masks = masks[top:bottom, left:right]

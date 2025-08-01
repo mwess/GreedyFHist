@@ -6,7 +6,7 @@ build-backend = "poetry.masonry.api"
 line-length = 79
 
 [tool.poetry]
-version = "0.0.3-rc2"
+version = "0.0.3-rc5"
 readme = "README.md"
 
 [project]
@@ -44,7 +44,11 @@ dependencies = [
     "toml (>=0.10.2)",
     "pyvips (>=2.2.3)",
     "multiprocess (>=0.70.17)",
-    "matplotlib (>=3.10.0)" 
+    "matplotlib (>=3.10.0)",
+    "bioio",
+    "bioio-imageio",
+    "bioio-ome-tiff",
+    "bioio-bioformats"
 ]
 
 [tool.poetry.dev-dependencies]

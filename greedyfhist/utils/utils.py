@@ -100,8 +100,8 @@ def affine_registration(path_to_greedy: str,
                         path_to_fixed_image: str,
                         path_to_moving_image: str,
                         path_output: str,
-                        offset:int,
-                        ia:str,
+                        offset: int,
+                        ia: list[str],
                         options: AffineGreedyOptions,
                         use_docker_container: bool = False,
                         temp_directory: str = ''
@@ -157,7 +157,7 @@ def deformable_registration(path_to_greedy: str,
                             output_warp: str | None = None,
                             output_inv_warp: str | None = None,
                             affine_pre_transform: str | None = None,
-                            ia: tuple[str, str] = None,
+                            ia: tuple[str, str] | None = None,
                             use_docker_container: bool = False,
                             temp_directory: str = ''
                             ) -> subprocess.CompletedProcess:
@@ -211,7 +211,7 @@ def deformable_registration(path_to_greedy: str,
             def_args['-exp'] = options.exp
     if options.tscale is not None:
         def_args['-tscale'] = options.tscale
-    if affine_pre_transform is None:
+    if affine_pre_transform is None and ia is not None:
         def_args[ia[0]] = ia[1]
 
     def_cmd = build_cmd_string(path_to_greedy, def_args)
@@ -219,7 +219,7 @@ def deformable_registration(path_to_greedy: str,
     return def_ret
 
 
-def composite_sitk_transforms(transforms: list[SimpleITK.SimpleITK.Transform]) -> SimpleITK.SimpleITK.Transform:
+def composite_sitk_transforms(transforms: list[SimpleITK.Transform]) -> SimpleITK.Transform:
     """Composites all Transforms into one composite transform.
 
     Args:

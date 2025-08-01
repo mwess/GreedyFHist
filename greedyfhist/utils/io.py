@@ -1,7 +1,9 @@
 """
 Contains io helper functions
 """
+import abc
 import os
+from os import PathLike
 from os.path import join, exists
 from pathlib import Path
 import shutil
@@ -9,10 +11,76 @@ from typing import Optional
 import xml.etree.ElementTree as ET
 
 
+from bioio import BioImage
+from bioio_base.exceptions import UnsupportedFileFormatError
+
+# Load optional bioio plugins.
+# TODO: Add others that arent installed yet.
+available_plugins = []
+
+try:
+    import bioio_ome_tiff
+    available_plugins.append(bioio_ome_tiff)
+except:
+    pass
+
+try:
+    import bioio_imageio
+    available_plugins.append(bioio_imageio)
+except:
+    pass
+
+try: 
+    import bioio_bioformats
+    available_plugins.append(bioio_bioformats)
+    # Disable logging
+    from scyjava import jimport
+    DebugTools = jimport('loci.common.DebugTools')
+    DebugTools.setRootLevel("OFF"); # Bio-Formats
+except:
+    pass
+
 import numpy, numpy as np
 import pyvips
 import SimpleITK, SimpleITK as sitk
 import tifffile
+
+
+class ImageReadingException(Exception):
+    """
+    Exception to be thrown, if image cannot be read with any of the installed Bioio reader plugins.
+    """
+    pass
+
+
+def read_bioio_image(path: str | PathLike, reader_plugin: str | abc.ABCMeta | None = None) -> BioImage:
+    """Read image as a BioIo Image. Tries readers in the following order:
+    bioio-ome-tiff, bioio-imageio, bioio-bioformats.
+    bioformats can parse most formats, but is slower compared to bioio-ome-tiff, so we try that first.
+
+    Args:
+        path (str | PathLike): Path to image
+        reader_plugin (str | None) = None: One of the available BioIo reader plugins. If None, tries all plugins until something works.
+         
+    """
+    # Check that file is supported by ome-tiff-image.
+    plugins = available_plugins.copy()
+    if reader_plugin is not None:
+        if isinstance(reader_plugin, str):
+            plugin_name = reader_plugin
+        elif isinstance(reader_plugin, abc.ABCMeta):
+            plugin_name = reader_plugin.__name__
+        plugins = [x for x in plugins if x.__name__ == plugin_name]
+    caught_exceptions = []
+    for plugin in plugins:
+        try:
+            image = BioImage(path, reader=plugin.Reader)
+            return image
+        except UnsupportedFileFormatError as e:
+            err_msg = f'{plugin.__name__}: {e}'
+            caught_exceptions.append(err_msg)
+    err_msg = f'File: {path} could not be loaded with plugin: {reader_plugin}. Caught exceptions during reading: {caught_exceptions}'
+    raise ImageReadingException(err_msg)
 
 
 def create_if_not_exists(path: str) -> None:
@@ -255,7 +323,7 @@ def get_metadata_from_tif(xml_string: str) -> dict:
     return metadata
 
 
-def affine_transform_to_file(transform: SimpleITK.SimpleITK.AffineTransform, fpath: str):
+def affine_transform_to_file(transform: SimpleITK.AffineTransform, fpath: str):
     """Save affine transform to file.
 
     Args:
@@ -280,6 +348,7 @@ def derive_subdir(directory: str, limit=1000) -> tuple[str, int]:
         Tuple[str, int]: Subdir and final count.
     """
     subdir = f'{directory}'
+    subdir_num = 0
     for subdir_num in range(limit):
         subdir = f'{directory}/{subdir_num}'
         if not exists(subdir):

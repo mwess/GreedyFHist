@@ -213,7 +213,7 @@ def load_yolo_segmentation(min_area_size: int = 10000,
         preprocessed_image2 = (np.expand_dims(np.moveaxis(preprocessed_image, 2, 0), 0) / 255.).astype(np.float32)
 
         outputs = ort_session.run(output_names, {'images': preprocessed_image2}, None)
-        _, _, prediction = postprocess(outputs, shape=image_shape)
+        _, _, prediction = postprocess(outputs, shape=image_shape) # type: ignore
         if isinstance(prediction, list):
             if use_fallback is None:
                 prediction = np.expand_dims(np.ones(downscaled_shape).astype(np.uint8), 0)
@@ -404,8 +404,8 @@ def predict_tissue_from_luminosity_and_area(image: numpy.ndarray,
 
     final_contours = large_contours + remaining_contours
     template = np.zeros_like(mask)
-    new_mask = cv2.fillPoly(template, final_contours, 1)
-    new_mask = cv2.resize(new_mask, shape[::-1], cv2.INTER_NEAREST)
+    new_mask = cv2.fillPoly(template, final_contours, 1) # type: ignore
+    new_mask = cv2.resize(new_mask, shape[::-1], cv2.INTER_NEAREST) # type: ignore
     return new_mask
 
 
@@ -414,7 +414,7 @@ def preprocessing_for_l_segmentation(img: numpy.ndarray,
                   with_erosion: bool = True,
                   with_closing: bool = False,
                   with_hole_filling: bool = True,
-                  low_intensity_rem_threshold: int = None) -> numpy.ndarray:
+                  low_intensity_rem_threshold: int | None = None) -> numpy.ndarray:
     """Preprocessing for luminosity segmentation.
     
     1. Extract luminosity from LAB image space.
@@ -556,10 +556,10 @@ def predict_tissue_from_entropy(image: numpy.ndarray,
                          footprint_size: int = 10, 
                          convert_to_xyz: bool = False,
                          normalize_entropy: bool = False,                         
-                         pre_gaussian_sigma: float = 0.5,
+                         pre_gaussian_sigma: int = 1,
                          area_opening_connectivity: int = 1,
                          area_opening_threshold: int = 100,
-                         post_gaussian_sigma: float = 0.5,
+                         post_gaussian_sigma: int = 1,
                          with_morphological_closing: bool = True,
                          do_fill_hole: bool = True) -> numpy.ndarray:
     """Entropy based tissue segmentation. The base assumption is that tissue areas
@@ -639,7 +639,7 @@ def predict_tissue_from_entropy(image: numpy.ndarray,
             channel_axis = None
         else:
             channel_axis = -1
-        ent = gaussian(ent, sigma=pre_gaussian_sigma, channel_axis=channel_axis)
+        ent = gaussian(ent, sigma=pre_gaussian_sigma, channel_axis=channel_axis) # type: ignore
     # Otsu thresholding.
     thresh = threshold_otsu(ent)
     mask_ent = (ent > thresh).astype(np.uint8)
@@ -660,5 +660,5 @@ def predict_tissue_from_entropy(image: numpy.ndarray,
     if do_fill_hole:
         mask_ent = fill_hole(mask_ent)
     mask = mask_ent.astype(np.uint8)
-    mask = cv2.resize(mask, shape[::-1], cv2.INTER_NEAREST)
+    mask = cv2.resize(mask, shape[::-1], cv2.INTER_NEAREST) # type: ignore
     return mask.astype(np.uint8)

@@ -47,7 +47,7 @@ class GroupwiseRegResult:
     reverse_nonrigid_transform: list['RegistrationTransforms']
 
     def __get_transform_to_fixed_image(self,
-                                       source:int) -> 'RegistrationTransforms':
+                                       source:int) -> 'RegistrationResult':
         """Retrieves registration from one moving image indexed by 'source'.
 
         Args:
@@ -71,7 +71,7 @@ class GroupwiseRegResult:
     def get_transforms(self,
                        source: int,
                        target: int | None = None,
-                       skip_nonrigid: bool = False) -> 'RegistrationTransforms':
+                       skip_nonrigid: bool = False) -> 'RegistrationResult':
         """Retrieves registration from one moving image indexed by 'source'.
 
         Args:
@@ -129,7 +129,7 @@ class GroupwiseRegResult:
     @staticmethod
     def __load_transforms_from_dir(path: str) -> list['RegistrationTransforms']:
         sub_dirs = os.listdir(path)
-        sub_dirs = sorted(sub_dirs, lambda x: int(sub_dirs))
+        sub_dirs = sorted(sub_dirs, lambda x: int(sub_dirs)) # type: ignore
         transforms = []
         for sub_dir in sub_dirs:
             path = join(path, sub_dir)
@@ -179,8 +179,8 @@ class GFHTransform:
         Loads transform from file.
     """
     
-    size: tuple[int, int]
-    transform: SimpleITK.SimpleITK.Transform
+    size: tuple[int, int] | tuple[int, int, int]
+    transform: SimpleITK.Transform
 
     # TODO: Check that path is directory and change name since we are storing to a directory and not to one file.
     def to_file(self, path: str):
@@ -198,7 +198,7 @@ class GFHTransform:
         with open(attributes_path, 'w') as f:
             json.dump(attributes, f)
         transform_path = join(path, 'transform.txt')
-        self.transform.FlattenTransform()
+        self.transform.FlattenTransform() # type: ignore
         sitk.WriteTransform(self.transform, transform_path)
 
 
@@ -235,7 +235,7 @@ class RegistrationResult:
         Transformation from moving to fixed image space.
         
     reverse_registration: Optional[RegistrationTransforms]
-        Transformatino from fixed to moving image space.
+        Transformation from fixed to moving image space.
         
     Methods
     -------
@@ -315,7 +315,7 @@ class RegistrationTransforms:
     forward_transform: 'GFHTransform'
     backward_transform: 'GFHTransform'
     cmdln_returns: list[subprocess.CompletedProcess] | None = None
-    reg_params: dict | None = None
+    reg_params: dict | list | None = None
     
     # TODO: Can I add cmdln_returns and reg_params somehow
     def to_directory(self, path: str):
@@ -399,10 +399,10 @@ class InternalRegParams:
     fixed_preprocessing_params: dict
     path_to_small_ref_image: str
     sub_dir_key: int
-    displacement_field: SimpleITK.SimpleITK.Image
-    inv_displacement_field: SimpleITK.SimpleITK.Image
+    displacement_field: SimpleITK.Image
+    inv_displacement_field: SimpleITK.Image
 
-    # TODO: This method needs to be fixed.
+    # TODO: This method needs to be fixed. Doesnt seem to belong here at all.
     @classmethod
     def from_directory(cls, directory: str) -> 'InternalRegParams':
         """Load from directory.
@@ -494,6 +494,7 @@ def compose_transforms(gfh_transforms: list['GFHTransform']) -> 'GFHTransform':
     return gfh_comp_trans    
 
 
+# TODO: Check types here.
 def compose_registration_results(reg_results: list['RegistrationResult']) -> 'RegistrationResult':
     """Composites all registrations in a list of RegistrationResults into one RegistrationResult.
     Target size are taken from the last RegistrationResult in the list.

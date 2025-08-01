@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 import numpy
 
 from greedyfhist.options import RegistrationOptions
-from greedyfhist.registration import GreedyFHist, RegistrationTransforms
+from greedyfhist.registration import GreedyFHist, RegistrationTransforms, RegistrationResult
 from greedyfhist.utils.io import create_if_not_exists
-from greedyfhist.data_types.image import Image
+from greedyfhist.data_types import Image
 
 
 @dataclass
@@ -34,14 +34,20 @@ class HistologySection:
                           fixed_image: numpy.ndarray, 
                           fixed_mask: numpy.ndarray | None = None, 
                           options: RegistrationOptions | None = None,
-                          registerer: GreedyFHist | None = None) -> RegistrationTransforms:
+                          registerer: GreedyFHist | None = None) -> RegistrationResult:
+        if not self.ref_image:
+            raise Exception('Moving image is empty.')
         if registerer is None:
             registerer = GreedyFHist()
 
+        if self.ref_mask is None:
+            ref_mask = None
+        else:
+            ref_mask = self.ref_mask.data
         registration_result = registerer.register(
             self.ref_image.data,
-            fixed_image.data,
-            self.ref_mask,
+            fixed_image,
+            ref_mask,
             fixed_mask,
             options=options
         )

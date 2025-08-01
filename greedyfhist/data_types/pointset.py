@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+from os import PathLike
 from os.path import join
 
 import numpy, numpy as np
@@ -42,9 +43,9 @@ class Pointset:
     
     
     data : pandas.DataFrame 
-    path: str
-    x_axis: str = 'x'
-    y_axis: str = 'y'
+    path: str | PathLike
+    x_axis: str | int = 'x'
+    y_axis: str | int = 'y'
     index_col: int | None = None
     header: int | None = None
 
@@ -89,7 +90,12 @@ class Pointset:
         return cls(data, path, x_axis, y_axis, index_col, header)
 
     @classmethod
-    def load_from_path(cls, path: str, x_axis='x', y_axis='y', index_col=None, header=0) -> 'Pointset':
+    def load_from_path(cls, 
+                       path: str | PathLike, 
+                       x_axis: str | int = 'x', 
+                       y_axis: str | int = 'y', 
+                       index_col=None, 
+                       header: int | None = None) -> 'Pointset':
         data = pd.read_csv(path, index_col=index_col, header=header)
         if header is None:
             data.rename(columns={0: x_axis, 1: y_axis}, inplace=True)

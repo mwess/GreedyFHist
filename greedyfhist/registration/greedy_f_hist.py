@@ -243,13 +243,14 @@ def _reassemble_to_gfh_transform(displ_tiles: list[ImageTile],
 
 
 # TODO: Set paths
+# TODO: This function doesnt work anymore, because we have kicked out pyvips. Fix!
 def register_from_filepaths(moving_img_path: str,
                             fixed_img_path: str,
                             target_img_path: str,
                             moving_img_mask_path: str | None = None,
                             fixed_img_mask_path: str | None = None,
                             options: RegistrationOptions | None = None,
-                            transform_path: str | None = False,
+                            transform_path: str | None = None,
                             ) -> tuple['RegistrationResult', numpy.ndarray | None]:
     """Registers two images based on their filepath.
     
@@ -372,8 +373,8 @@ def register_tiles(moving_image_tiles: list[ImageTile],
         if verbose:
             print(nrrt_options)
 
-        moving_image_ = moving_image_tile_.image
-        fixed_image_ = fixed_image_tile_.image
+        moving_image_ = moving_image_tile_.get_numpy_image()
+        fixed_image_ = fixed_image_tile_.get_numpy_image()
         mask = np.ones(moving_image_.shape[:2], dtype=np.uint8)
 
         try:
@@ -387,7 +388,7 @@ def register_tiles(moving_image_tiles: list[ImageTile],
                                                     options=nrrt_options)
             if verbose:
                 end = time.time()
-                print(f'Duration of register function: {end - start}')
+                print(f'Duration of register function: {end - start}') # type: ignore
             # Forward transform
             transform_to_displacementfield = sitk.TransformToDisplacementField(
                 registration_result_.registration.forward_transform.transform,
@@ -433,7 +434,7 @@ def register_tiles(moving_image_tiles: list[ImageTile],
     rev_registration_transforms = RegistrationTransforms(forward_transform=moving_transform, backward_transform=fixed_transform)
     reg_result = RegistrationResult(registration_transforms, rev_registration_transforms)
     if verbose:
-        reg_result.reg_params = [fw_displ_tiles, bw_displ_tile]
+        reg_result.reg_params = [fw_displ_tiles, bw_displ_tiles]
     return RegistrationResult(registration_transforms, rev_registration_transforms)  
 
 
@@ -472,6 +473,7 @@ def _register_tiles_from_tile_size(
     else:
         if verbose:
             print(f'Number of pools used: {tile_reg_opts.tiling_options.n_procs}')
+        # TODO: Should this be replace by "disable_mask_generation"?
         tile_reg_opts.segmentation = None
         tile_reg_opts.disable_mask_generation = True
         mp_args = []
@@ -483,18 +485,18 @@ def _register_tiles_from_tile_size(
             tile_reg_opts_.segmentation = None
             tile_reg_opts_.disable_mask_generation = True
             mp_args.append((moving_image_tile, fixed_image_tile, tile_reg_opts_, verbose))
-        pool = multiprocess.Pool(tile_reg_opts.tiling_options.n_procs)
+        pool = multiprocess.Pool(tile_reg_opts.tiling_options.n_procs) # type: ignore
         displ_tiles = pool.starmap(_register_tiles_helper, mp_args)
         for (fw_displ_tile, bw_displ_tile) in displ_tiles:
             fw_displ_tiles.append(fw_displ_tile)
             bw_displ_tiles.append(bw_displ_tile)
-    fixed_transform = _reassemble_to_gfh_transform_from_tile_size(fw_displ_tiles, fixed_image_tiles[0].original_shape)
-    moving_transform = _reassemble_to_gfh_transform_from_tile_size(bw_displ_tiles, moving_image_tiles[0].original_shape)
+    fixed_transform = _reassemble_to_gfh_transform_from_tile_size(fw_displ_tiles, fixed_image_tiles[0].original_shape) # type: ignore
+    moving_transform = _reassemble_to_gfh_transform_from_tile_size(bw_displ_tiles, moving_image_tiles[0].original_shape) # type: ignore
     registration_transforms = RegistrationTransforms(forward_transform=fixed_transform, backward_transform=moving_transform)
     rev_registration_transforms = RegistrationTransforms(forward_transform=moving_transform, backward_transform=fixed_transform)
     reg_result = RegistrationResult(registration_transforms, rev_registration_transforms)
     if verbose:
-        reg_result.registration.reg_params = [fw_displ_tiles, bw_displ_tile]
+        reg_result.registration.reg_params = [fw_displ_tiles, bw_displ_tiles]
     return RegistrationResult(registration_transforms, rev_registration_transforms)  
 
 
@@ -517,8 +519,8 @@ def _register_tiles_helper(moving_image_tile: ImageTile,
     Returns: (ImageTile, ImageTile)
         Forward and backward transformation in tile context.
     """
-    moving_image_ = moving_image_tile.image
-    fixed_image_ = fixed_image_tile.image
+    moving_image_ = moving_image_tile.get_numpy_image()
+    fixed_image_ = fixed_image_tile.get_numpy_image()
     mask = np.ones(moving_image_.shape[:2], dtype=np.uint8)
 
     try:
@@ -765,11 +767,11 @@ def _pyramid_tiling_registration(
             max_pyramid_depth = 0
 
     if stop_condition_pyramid_counter and not max_pyramid_depth:
-        max_pyramid_depth = np.inf
+        max_pyramid_depth = np.inf # type: ignore
         if pyramid_tiles_per_axis is not None:
             max_pyramid_depth = len(pyramid_tiles_per_axis)
         if pyramid_resolutions is not None:
-            max_pyramid_depth = min(max_pyramid_depth, len(pyramid_resolutions))
+            max_pyramid_depth = min(max_pyramid_depth, len(pyramid_resolutions)) # type: ignore
         if max_pyramid_depth == np.inf:
             raise Exception('Passed arguments are incompatible.')
         if verbose:
@@ -785,7 +787,7 @@ def _pyramid_tiling_registration(
         if verbose:
             print(f'Next loop: {loop_counter}')
         
-        if stop_condition_pyramid_counter and loop_counter > max_pyramid_depth:
+        if stop_condition_pyramid_counter and loop_counter > max_pyramid_depth: # type: ignore
             if verbose:
                 print(f'Aborting loop because maximum pyramid depth ({max_pyramid_depth}) has been reached.')
             break
@@ -1018,25 +1020,25 @@ def _perform_registration(moving_img: numpy.ndarray,
     # Apply segmentation.
     if options.disable_mask_generation and moving_img_mask is None:
         moving_img_mask = np.ones(moving_img.shape[:2], dtype=np.uint8)
-    elif moving_img_mask is None:
+    elif moving_img_mask is None and segmentation_function is not None:
         moving_img_mask = segmentation_function(moving_img)
     else:
-        moving_img_mask = resample_image_sitk(moving_img_mask, moving_resampling_factor)
+        moving_img_mask = resample_image_sitk(moving_img_mask, moving_resampling_factor) # type: ignore
 
     if options.disable_mask_generation and fixed_img_mask is None:            
         fixed_img_mask = np.ones(fixed_img.shape[:2], dtype=np.uint8)
-    elif fixed_img_mask is None:
+    elif fixed_img_mask is None and segmentation_function is not None:
         fixed_img_mask = segmentation_function(fixed_img)
     else:
-        fixed_img_mask = resample_image_sitk(fixed_img_mask, fixed_resampling_factor)
+        fixed_img_mask = resample_image_sitk(fixed_img_mask, fixed_resampling_factor) # type: ignore
 
     moving_preprocessing_params['moving_img_mask'] = moving_img_mask
     fixed_preprocessing_params['fixed_img_mask'] = fixed_img_mask
     
     # Cropping and Padding of image and masks to make moving and fixed image/mask
     # have the same uniform shame.
-    cropped_moving_mask, crop_params_mov = cropping(moving_img_mask)
-    cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask)
+    cropped_moving_mask, crop_params_mov = cropping(moving_img_mask) # type: ignore
+    cropped_fixed_mask, crop_params_fix = cropping(fixed_img_mask) # type: ignore
     moving_preprocessing_params['cropping_params'] = crop_params_mov
     moving_preprocessing_params['original_shape_image'] = moving_img.shape
     fixed_preprocessing_params['cropping_params'] = crop_params_fix
@@ -1078,7 +1080,7 @@ def _perform_registration(moving_img: numpy.ndarray,
         height = fixed_img_preprocessed.height
 
         # TODO: Can all of this be put into the next function, since its actually options parsing?
-        ia_init = ''
+        ia_init = []
         if options.affine_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
             # Use Segmentation masks to compute center of mass initialization
             init_mat_path = os.path.join(path_temp, 'Affine_init.mat')
@@ -1140,8 +1142,8 @@ def _perform_registration(moving_img: numpy.ndarray,
         paths['path_small_warp_inv'] = None      
 
     # Postprocessing. Takes care of rescaling and compositing transformations.
-    registration_transform = _reg_postprocess(moving_img_preprocessed,
-                            fixed_img_preprocessed,
+    registration_transform = _reg_postprocess(moving_img_preprocessed, # type: ignore
+                            fixed_img_preprocessed, # type: ignore
                             moving_preprocessing_params,
                             fixed_preprocessing_params,
                             options,
@@ -1202,8 +1204,8 @@ def _perform_registration(moving_img: numpy.ndarray,
             cmdln_returns.append(def_reg_ret)      
             for key in new_paths:
                 paths_rev[key] = new_paths[key]                  
-        rev_registration_transform = _reg_postprocess(moving_img_preprocessed,
-                    fixed_img_preprocessed,
+        rev_registration_transform = _reg_postprocess(moving_img_preprocessed, # type: ignore
+                    fixed_img_preprocessed, # type: ignore
                     moving_preprocessing_params,
                     fixed_preprocessing_params,
                     options,
@@ -1302,18 +1304,18 @@ def _do_deformable_registration(moving_img: numpy.ndarray,
                                         options.nonrigid_registration_options.preprocessing_options.disable_denoising_fixed)
     height = fixed_img_preprocessed.height
 
-    ia_init = ''
+    ia_init = None
     if options.nonrigid_registration_options.ia == 'ia-com-init' and fixed_img_mask is not None and moving_img_mask is not None:
         # Use Segmentation masks to compute center of mass initialization
         # Check that masks are np.arrays
         init_mat_path = os.path.join(path_temp, 'Affine_init.mat')
         init_mat = com_affine_matrix(fixed_img_mask, moving_img_mask)
         write_mat_to_file(init_mat, init_mat_path)
-        ia_init = ['-ia', f'{init_mat_path}']
+        ia_init = ('-ia', f'{init_mat_path}')
         reg_params['com_x'] = init_mat[0, 2]
         reg_params['com_y'] = init_mat[1, 2]
     elif options.nonrigid_registration_options.ia == 'ia-image-centers':
-        ia_init = ['-ia-image-centers', '']
+        ia_init = ('-ia-image-centers', '')
     else:
         print(f'Unknown ia option: {options.nonrigid_registration_options.ia}.')
 
@@ -1417,8 +1419,8 @@ def _reg_postprocess(moving_img_preprocessed: PreprocessedData,
                     moving_img_preprocessed.height_original),
                 no_2_orig_factor)
 
-            forward_deformable_transform = realign_displacement_field(path_big_warp)
-            backward_deformable_transform = realign_displacement_field(path_big_warp_inv)
+            forward_deformable_transform = realign_displacement_field(path_big_composite_warp)
+            backward_deformable_transform = realign_displacement_field(path_big_composite_warp_inv)
         elif options.do_affine_registration and options.affine_registration_options.keep_affine_transform_unbounded:
             # First rescale affine transforms
             aff_2_orig_resample = options.affine_registration_options.resolution[0] / moving_img.shape[0] * 100
@@ -1621,7 +1623,7 @@ def does_multiprocess_conflict_exist(options: RegistrationOptions) -> bool:
 # TODO: Add option for skipping affine registration.
 def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndarray | None]],
                            options: RegistrationOptions | None = None,
-                           ) -> tuple[GroupwiseRegResult, list[numpy.ndarray]]:
+                           ) -> tuple[GroupwiseRegResult, list[numpy.ndarray] | None]:
     """Performs groupwise registration on a provided image list. 
     For each image, an optional mask can be provided. Fixed 
     image is last image in image_mask_list.
@@ -1692,7 +1694,7 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
             options_ = deepcopy(options)
             options_.temporary_directory = join(options_.temporary_directory, f'gfh_grp_{idx}')
             pargs.append((imf, imm, options_, idx))
-        pool = multiprocess.Pool(options.grp_n_proc)
+        pool = multiprocess.Pool(options.grp_n_proc) # type: ignore
         ret = pool.starmap(_reg_aff_grp_wrapper, pargs)
         ret.sort(key=lambda x: x[2])
         for ret_ in ret:
@@ -1715,7 +1717,7 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
             moving_image, moving_mask = moving_tuple
             composited_fixed_transform = compose_transforms([x.forward_transform for x in affine_transform_lists][idx:])
             warped_image = transform_image(moving_image, composited_fixed_transform, 'LINEAR')
-            warped_mask = transform_image(moving_mask, composited_fixed_transform, 'NN')
+            warped_mask = transform_image(moving_mask, composited_fixed_transform, 'NN') # type: ignore
             nonrigid_reg_result = register(warped_image, fixed_image, warped_mask, fixed_mask, options=options)
             deformable_warped_image = transform_image(warped_image, nonrigid_reg_result.registration.forward_transform, 'LINEAR')
             nonrigid_warped_images.append(deformable_warped_image)
@@ -1730,7 +1732,7 @@ def groupwise_registration(image_mask_list: list[tuple[numpy.ndarray, numpy.ndar
             tmp_dir = f'grp_nr_{idx}'            
             options_.temporary_directory = join(options.temporary_directory, tmp_dir)
             nr_pairs.append(((fixed_image, fixed_mask), (moving_image, moving_mask), options_, composited_fixed_transform, idx))
-        pool = multiprocess.Pool(options.grp_n_proc)
+        pool = multiprocess.Pool(options.grp_n_proc) # type: ignore
         ret = pool.starmap(_reg_nr_grp_wrapper, nr_pairs)
         ret.sort(key=lambda x: x[-1])
         for ret_ in ret:
@@ -1765,12 +1767,12 @@ def transform_image(image: numpy.ndarray,
         transform = transform.forward_transform    
     return _transform_image(image,
                             transform.transform,
-                            transform.size,
+                            transform.size, # type: ignore
                             interpolation_mode)
 
 
 def _transform_image(image: numpy.ndarray, 
-                     transform: SimpleITK.SimpleITK.Transform,
+                     transform: SimpleITK.Transform,
                      size: tuple[int,int],
                      interpolation_mode: str | int = 'LINEAR') -> numpy.ndarray:
     """Transforms image from moving to fixed image space.
@@ -1871,7 +1873,7 @@ def transform_geojson(geojson_data: geojson.GeoJSON,
         geometries = geojson_data
     warped_geometries = []
     for _, geometry in enumerate(geometries):
-        warped_geometry = geojson.utils.map_tuples(lambda coords: __warp_geojson_coord_tuple(coords, transform), geometry)
+        warped_geometry = geojson.utils.map_tuples(lambda coords: __warp_geojson_coord_tuple(coords, transform), geometry) # type: ignore
         warped_geometries.append(warped_geometry)
     if not isinstance(geojson_data, list):
         geojson_data['features'] = warped_geometries
@@ -1956,7 +1958,7 @@ class GreedyFHist:
                                 moving_img_mask_path: str | None = None,
                                 fixed_img_mask_path: str | None = None,
                                 options: RegistrationOptions | None = None,
-                                transform_path: str | None = False
+                                transform_path: str | None = None
                                 ) -> tuple['RegistrationResult', numpy.ndarray | None]:
         """Register two images by supplying only filepaths. Optionally filepaths for masks can be supplied.
         If images cannot be read for some reason, consider the method `register`.
@@ -2117,7 +2119,7 @@ class GreedyFHist:
     def groupwise_registration(self,
                                image_mask_list: list[tuple[numpy.ndarray, numpy.ndarray | None]],
                                options: RegistrationOptions | None = None,
-                               ) -> tuple[GroupwiseRegResult, list[numpy.ndarray]]:
+                               ) -> tuple[GroupwiseRegResult, list[numpy.ndarray] | None]:
         """Performs groupwise registration on a provided image list. 
         For each image, an optional mask can be provided. Fixed 
         image is last image in image_mask_list.

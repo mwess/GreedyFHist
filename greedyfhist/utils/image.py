@@ -21,8 +21,8 @@ def com_affine_matrix(fixed: numpy.ndarray, moving: numpy.ndarray) -> numpy.ndar
     mat = numpy.eye(3)
     fixed_com = nd.center_of_mass(fixed)
     moving_com = nd.center_of_mass(moving)
-    mat[0, 2] = fixed_com[0] - moving_com[0]
-    mat[1, 2] = fixed_com[1] - moving_com[1]
+    mat[0, 2] = fixed_com[0] - moving_com[0] # type: ignore
+    mat[1, 2] = fixed_com[1] - moving_com[1] # type: ignore
     return mat
 
 
@@ -186,7 +186,7 @@ def denoise_image(image: numpy.ndarray,
     shape = image.shape
     img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     img_hsv = cv2.resize(img_hsv, (resolution, resolution))
-    img_denoised = cv2.pyrMeanShiftFiltering(img_hsv, sp, sr, maxLevel)
+    img_denoised = cv2.pyrMeanShiftFiltering(img_hsv, sp, sr, maxLevel) # type: ignore
     img_denoised = cv2.cvtColor(img_denoised, cv2.COLOR_HSV2RGB)
     img_denoised = cv2.resize(img_denoised, (shape[1], shape[0]))
     return img_denoised
@@ -204,7 +204,7 @@ def resample_image_with_gaussian(image: numpy.ndarray, resolution: image_shape, 
     Returns:
         numpy.ndarray: Resampled image.
     """
-    image = gaussian(image, sigma, channel_axis=-1)
+    image = gaussian(image, sigma, channel_axis=-1) # type: ignore
     image = resize(image, resolution)
     if len(image.shape) == 3:
         image = rgb2gray(image)

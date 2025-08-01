@@ -582,7 +582,7 @@ class RegistrationOptions:
         every registration sequentially.
     """
 
-    path_to_greedy: str | None = None
+    path_to_greedy: str = ''
     segmentation: SegmentationOptions | Callable[[numpy.ndarray], numpy.ndarray] | str = field(default_factory=YoloSegOptions.default_options)
     use_docker_container: bool = False
     affine_registration_options: AffineGreedyOptions = field(default_factory=AffineGreedyOptions.default_options)
