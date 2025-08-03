@@ -102,8 +102,8 @@ def get_tile_params(size: int, n_tiles: int = 2, overlap: float = 0.1) \
 
 # TODO: This one might be good to go.
 def extract_image_tiles(img: numpy.ndarray, 
-                        x_props: tuple[int, int, int, int, int, int],
-                        y_props: tuple[int, int, int, int, int, int]) -> list['ImageTile']:
+                        x_props: tuple[list[int], list[int], list[int], list[int], list[int], list[int]],
+                        y_props: tuple[list[int], list[int], list[int], list[int], list[int], list[int]]) -> list['ImageTile']:
     """Extracts image tile using tiling indices for x and y axes. 
 
     Args:

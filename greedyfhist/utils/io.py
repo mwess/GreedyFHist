@@ -7,7 +7,7 @@ from os import PathLike
 from os.path import join, exists
 from pathlib import Path
 import shutil
-from typing import Optional
+from typing import Any, Optional
 import xml.etree.ElementTree as ET
 
 
@@ -25,16 +25,16 @@ except:
     pass
 
 try:
-    import bioio_imageio
+    import bioio_imageio # type: ignore
     available_plugins.append(bioio_imageio)
 except:
     pass
 
 try: 
-    import bioio_bioformats
+    import bioio_bioformats # type: ignore
     available_plugins.append(bioio_bioformats)
     # Disable logging
-    from scyjava import jimport
+    from scyjava import jimport # type: ignore
     DebugTools = jimport('loci.common.DebugTools')
     DebugTools.setRootLevel("OFF"); # Bio-Formats
 except:
@@ -154,7 +154,7 @@ def get_default_metadata():
 
 def write_to_ometiffile(img: numpy.ndarray, 
                      path: str, 
-                     metadata: dict = None, 
+                     metadata: dict | None = None, 
                      is_annotation: bool = False,
                      tile: bool = True,
                      tile_size: int = 512,
@@ -237,11 +237,11 @@ def write_to_ometiffile(img: numpy.ndarray,
     root = ET.fromstring(xml_string)
     ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
     elem = root.find('*/ns0:Pixels', ns)
-    if not skip_channel:
+    if not skip_channel and elem:
         channels = metadata.get('channels', [])
         for channel_ in channels:
             elem.append(channel_)
-    if not skip_tiffdata:
+    if not skip_tiffdata and elem:
         tiff_data = metadata.get('tiff_data', [])
         for tiff_data_ in tiff_data:
             elem.append(tiff_data_)
@@ -282,8 +282,8 @@ def read_image(path: str, is_annotation: bool = False) -> numpy.ndarray | Option
             metadata = get_metadata_from_tif(tif.ome_metadata)
     elif suffix in pyvips.base.get_suffixes():
         img_vips = pyvips.Image.new_from_file(path)
-        img = img_vips.numpy()
-        image_description = img_vips.get('image-description')
+        img = img_vips.numpy() # type: ignore
+        image_description = img_vips.get('image-description') # type: ignore
         if is_tiff_file(suffix):
             metadata = get_metadata_from_tif(image_description)
     # TODO: Add another image reader here.
@@ -292,7 +292,7 @@ def read_image(path: str, is_annotation: bool = False) -> numpy.ndarray | Option
         img = sitk.GetArrayFromImage(sitk.ReadImage(path))
     if is_annotation and len(img.shape) == 3:
         img = np.moveaxis(img, 0, 2)
-    return img, metadata
+    return img, metadata # type: ignore
 
 
 def get_metadata_from_tif(xml_string: str) -> dict:
@@ -308,7 +308,7 @@ def get_metadata_from_tif(xml_string: str) -> dict:
     root = ET.fromstring(xml_string)
     ns = {'ns0': 'http://www.openmicroscopy.org/Schemas/OME/2016-06'}
     elem = root.findall('*/ns0:Pixels', ns)[0]
-    metadata = elem.attrib
+    metadata: dict[str, Any] = elem.attrib
     channels = root.findall('**/ns0:Channel', ns)
     tiff_data = root.findall('**/ns0:TiffData', ns)
     metadata['channels'] = channels

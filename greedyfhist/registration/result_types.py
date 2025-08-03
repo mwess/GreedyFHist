@@ -249,7 +249,9 @@ class RegistrationResult:
 
     registration: 'RegistrationTransforms'
 
-    reverse_registration: Optional['RegistrationTransforms'] = None
+    reverse_registration: 'RegistrationTransforms | None' = None
+
+    reg_params: Any | None = None
 
     def to_directory(self, path: str):
         """
@@ -315,7 +317,7 @@ class RegistrationTransforms:
     forward_transform: 'GFHTransform'
     backward_transform: 'GFHTransform'
     cmdln_returns: list[subprocess.CompletedProcess] | None = None
-    reg_params: dict | list | None = None
+    reg_params: 'dict | list | InternalRegParams | None' = None
     
     # TODO: Can I add cmdln_returns and reg_params somehow
     def to_directory(self, path: str):
@@ -399,53 +401,8 @@ class InternalRegParams:
     fixed_preprocessing_params: dict
     path_to_small_ref_image: str
     sub_dir_key: int
-    displacement_field: SimpleITK.Image
-    inv_displacement_field: SimpleITK.Image
-
-    # TODO: This method needs to be fixed. Doesnt seem to belong here at all.
-    @classmethod
-    def from_directory(cls, directory: str) -> 'InternalRegParams':
-        """Load from directory.
-
-        Args:
-            directory (str): 
-
-        Raises:
-            Exception: Thrown if directory does not exist.
-
-        Returns:
-            InternalRegResult: 
-        """
-        if not exists(directory):
-            raise Exception(f'Could not load transformation. Directory {directory} not found.')
-        with open(join(directory, 'reg_params.json')) as f:
-            reg_params = json.load(f)
-        path_to_big_warp = join(directory, 'metrics/full_resolution/big_warp.nii.gz')
-        path_to_big_inv_warp = join(directory, 'metrics/full_resolution/big_inv_warp.nii.gz')
-        path_to_big_affine = join(directory, 'metrics/full_resolution/Affine.mat')
-        path_to_small_affine = join(directory, 'metrics/small_resolution/small_affine.mat')
-        path_to_small_warp = join(directory, 'metrics/small_resolution/small_warp.nii.gz')
-        path_to_small_inv_warp = join(directory, 'metrics/small_resolution/small_inv_warp.nii.gz')
-        path_to_small_ref_image = join(directory, 'small_ref_image.nii.gz')
-        width_downscaling_factor = reg_params['width_downscaling_factor']
-        height_downscaling_factor = reg_params['height_downscaling_factor']
-        sub_dir_key = int(os.path.split(os.path.normpath(directory))[1])
-        return cls(
-            path_to_small_affine=path_to_small_affine,
-            path_to_big_affine=path_to_big_affine,
-            path_to_small_warp=path_to_small_warp,
-            path_to_big_warp=path_to_big_warp,
-            path_to_small_inv_warp=path_to_small_inv_warp,
-            path_to_big_inv_warp=path_to_big_inv_warp,
-            width_downscaling_factor=width_downscaling_factor,
-            height_downscaling_factor=height_downscaling_factor,
-            path_to_small_fixed='',
-            path_to_small_moving='',
-            cmdl_log=None,
-            reg_params=reg_params,
-            path_to_small_ref_image=path_to_small_ref_image,
-            sub_dir_key=sub_dir_key
-        )
+    displacement_field: SimpleITK.Image | None
+    inv_displacement_field: SimpleITK.Image | None
 
 
 @dataclass
@@ -507,8 +464,8 @@ def compose_registration_results(reg_results: list['RegistrationResult']) -> 'Re
     """
     reg_fw = compose_transforms([x.registration.forward_transform for x in reg_results])
     reg_bw = compose_transforms([x.registration.backward_transform for x in reg_results[::-1]])
-    rev_reg_fw = compose_transforms([x.reverse_registration.forward_transform for x in reg_results])
-    rev_reg_bw = compose_transforms([x.reverse_registration.backward_transform for x in reg_results[::-1]])
+    rev_reg_fw = compose_transforms([x.reverse_registration.forward_transform for x in reg_results if x.reverse_registration])
+    rev_reg_bw = compose_transforms([x.reverse_registration.backward_transform for x in reg_results[::-1] if x.reverse_registration])
 
     reg_transforms = RegistrationTransforms(forward_transform=reg_fw,
                                             backward_transform=reg_bw)
