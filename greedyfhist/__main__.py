@@ -7,6 +7,12 @@ from greedyfhist.cmdln_processor import (
 )
 
 
+class SpatialSectionConfigParamType(click.ParamType):
+    name = "SpatialSection"
+    def convert(self, value, param, ctx):
+        pass
+
+
 class ImageConfigParamType(click.ParamType):
     name = "Image"
     def convert(self, value, param, ctx):
@@ -72,6 +78,7 @@ def cli():
               '--greedy',
               type=click.Path(),
               required=False,
+              default='',
               help='Path to Greedy. If not provided assumes that Greedy is in the PATH environment variable.')
 @click.option('-d',
               '--use-docker-executable',
@@ -209,82 +216,60 @@ def groupwise_registration(
         config=config)
 
 
-#@click.command()
-#@click.option('--moving-image', '-m', type=click.Path())
-#@click.option('--moving-main-image', '-mmi', type=click.STRING, default='')
-#@click.option('--moving-main-channel', '-mmc', type=click.STRING, default='')
-#@click.option('--fixed-image', '-f', type=click.Path())
-#@click.option('--fixed-main-image', '-fmi', type=click.STRING, default='')
-#@click.option('--fixed-main-channel', '-fmc', type=click.STRING, default='')
-#@click.option('--output-directory', '-o', type=click.Path())
-#@click.option('--moving-mask', '-mmask', type=click.Path())  # Make this optional
-#@click.option('--fixed-mask', '-fmask', type=click.Path())  # Make this optional
-#@click.option('--path-to-greedy', '-g', type=click.Path())
-#@click.option('--config', '-c', type=click.Path())
-#@click.option('--use-docker-executable', '-d', type=click.BOOL, default=False)
-#@click.option('--images', type=click.Path(), multiple=True)
-#@click.option('--annotations', type=click.Path(), multiple=True)
-#@click.option('--pointsets', type=click.Path(), multiple=True)
-#@click.option('--geojsons', type=click.Path(), multiple=True)
-#def register(moving_image=None,
-#             moving_main_image=None,
-#             moving_main_channel=None,
-#             fixed_image=None,
-#             fixed_main_image=None,
-#             fixed_main_channel=None,
-#             output_directory=None,
-#             moving_mask=None,
-#             fixed_mask=None,
-#             path_to_greedy=None,
-#             config=None,
-#             use_docker_executable=None,             
-#             images=None,
-#             annotations=None,
-#             pointsets=None,
-#             geojsons=None):
-#    cmdln_processor.register(
-#        moving_image_path=moving_image,
-#        moving_main_image=moving_main_image,
-#        moving_main_channel=moving_main_channel,
-#        fixed_image_path=fixed_image,
-#        fixed_main_image=fixed_main_image,
-#        fixed_main_channel=fixed_main_channel,
-#        output_directory=output_directory,
-#        moving_mask_path=moving_mask,
-#        fixed_mask_path=fixed_mask,
-#        path_to_greedy=path_to_greedy,
-#        use_docker_executable=use_docker_executable,
-#        config_path=config,
-#        images=images,
-#        annotations=annotations,
-#        pointsets=pointsets,
-#        geojsons=geojsons
-#    )
-
 # TODO: Fix this. Should only be needed for 
 @click.command()
-@click.option('--transformation', '-t', type=click.Path(), required=True)
-@click.option('--output-directory', '-o', type=click.Path(), default='out')
-@click.option('--config', '-c', type=click.Path(), required=False)
-@click.option('--images', type=click.Path(), multiple=True)
-@click.option('--annotations', type=click.Path(), multiple=True)
-@click.option('--pointsets', type=click.Path(), multiple=True)
-@click.option('--geojsons', type=click.Path(), multiple=True)
-def transform(transformation=None,
-         output_directory=None,
-         config=None,
-         images=None,
-         annotations=None,
-         pointsets=None,
-         geojsons=None):
-    cmdln_processor.apply_transformation(output_directory=output_directory,
-                                         config_path=config,
+@click.option('-o',
+              '-out',
+              '--output',
+              '--output-directory',
+              type=click.Path(),
+              required=False,
+              default='out',
+              help='Output directory.')
+@click.option('-t',
+              '--transformation', 
+              type=click.Path(), 
+              required=True)
+@click.option('-i',
+              '--images',
+              type=ImageConfigParamType(),
+              required=False,
+              multiple=True,
+              help='Additional images to apply the transformation to.')
+@click.option('-p',
+              '--pointsets',
+              type=PointsetConfigParamType(),
+              required=False,
+              multiple=True,
+              help='Additional pointsets to apply the transformation to.')
+@click.option('-gs',
+              '--geojsons',
+              type=click.Path(),
+              required=False,
+              multiple=True,
+              help='Additional geojsons to apply the transformation to.')
+@click.option('-c',
+              '--config',
+              '--config_path',
+              type=click.Path(),
+              required=False,
+              help='Additional config parameters. Any parameters placed in config will override commandline arguments.')
+@click.option('-c',
+              '--config', 
+              type=click.Path(), 
+              required=False)
+def transform(output,
+              transformation,
+              images,
+              pointsets,
+              geojsons,
+              config):
+    cmdln_processor.apply_transformation(output_directory=output,
                                          path_to_transform=transformation,
                                          images=images,
-                                         annotations=annotations,
                                          pointsets=pointsets,
-                                         geojsons=geojsons)
-
+                                         geojsons=geojsons,
+                                         config_path=config)
 
 
 cli.add_command(register)

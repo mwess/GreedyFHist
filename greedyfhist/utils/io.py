@@ -65,7 +65,7 @@ def read_bioio_image(path: str | PathLike, reader_plugin: str | abc.ABCMeta | No
     """
     # Check that file is supported by ome-tiff-image.
     plugins = available_plugins.copy()
-    if reader_plugin is not None:
+    if reader_plugin:
         if isinstance(reader_plugin, str):
             plugin_name = reader_plugin
         elif isinstance(reader_plugin, abc.ABCMeta):

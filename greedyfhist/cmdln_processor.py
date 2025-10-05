@@ -87,7 +87,7 @@ class ImageConfig:
     path: str | PathLike | None = None
     main_image: str | int = 0 
     main_channel: str | int = 0 
-    order: str = '' 
+    order: str | None = None
     interpolate_default: INTERPOLATION_TYPE = 'LINEAR'
     interpolate_default_per_scene: INTERPOLATION_LIST_TYPE | INTERPOLATION_DICT_TYPE | None = None
     interpolate_default_per_channel: INTERPOLATION_LIST2_TYPE | INTERPOLATION_DICT2_TYPE | None = None
@@ -140,17 +140,17 @@ class ImageConfig:
 
     @staticmethod
     def get_empty_arg_list() -> list:
-        return [None, None, None, None, 'LINEAR', None, None, False, False]
+        return [None, 0, 0, None, 'LINEAR', None, None, False, False]
 
     @staticmethod
     def get_empty_arg_dict() -> dict:
         od = OrderedDict()
         od['path'] = None
-        od['main_image'] = None
-        od['main_channel'] = None
+        od['main_image'] = 0
+        od['main_channel'] = 0
         od['order'] = None
         od['interpolate_default'] = 'LINEAR'
-        od['interpolate_default_per_image'] = None
+        od['interpolate_default_per_scene'] = None
         od['interpolate_default_per_channel'] = None
         od['suppress_dictionary_conversion'] = False
         od['force_parameters_as_string'] = False
@@ -166,13 +166,14 @@ class ImageConfig:
         parsed_args = ImageConfig.get_empty_arg_dict()
         if not (1 <= len(args) <= len(parsed_args)):
             raise ValueError(f'Incorrect number of arguments parsed: {len(args)}')
-        for idx, (key, arg_str) in enumerate(zip(parsed_args, args)):
+        for idx, (key, arg_str) in enumerate(zip(parsed_args.copy(), args)):
             value = parsed_args[key]
             if '=' in arg_str:
                 arg_key, arg_value = arg_str.split('=', maxsplit=1)
                 parsed_args[arg_key] = arg_value
             else:
                 parsed_args[key] = arg_str
+        print(parsed_args)
         return cls(**parsed_args)
 
 
@@ -181,7 +182,7 @@ class PointsetConfig:
     
     path: str | PathLike
     x_axis: str | int = 0
-    y_axis: str | int = 0
+    y_axis: str | int = 1
     header: int | None = None
     force_parameters_as_string: bool = False
 
@@ -219,7 +220,7 @@ class PointsetConfig:
         parsed_args = PointsetConfig.get_empty_arg_dict()
         if not (1 <= len(args) <= len(parsed_args)):
             raise ValueError(f'Incorrect number of arguments parsed: {len(args)}')
-        for idx, (key, arg_str) in enumerate(zip(parsed_args, args)):
+        for idx, (key, arg_str) in enumerate(zip(parsed_args.copy(), args)):
             value = parsed_args[key]
             if '=' in arg_str:
                 arg_key, arg_value = arg_str.split('=', maxsplit=1)
@@ -537,152 +538,15 @@ def register(moving_image_config: ImageConfig,
         cv2.imwrite(path, fixed_preprocessing_mask)
     except Exception:
         print('Masks could not be stored due to error.')
-    
-
-
-#def register2(moving_image_path: str | None = None,
-#             moving_main_image: str | int | None = None,
-#             moving_main_channel: str | int | None = None,
-#             fixed_image_path: str | None = None,
-#             fixed_main_image: str | int | None = None,
-#             fixed_main_channel: str | int | None = None,
-#             output_directory: str | None = None,
-#             moving_mask_path: str | None = None,
-#             fixed_mask_path: str | None = None,
-#             path_to_greedy: str | None = None,
-#             use_docker_executable: bool | None = None,
-#             config_path: str | None = None,
-#             images: list[str] | None = None,
-#             annotations: list[str] | None = None,
-#             pointsets: list[str] | None = None,
-#             geojsons: list[str] | None = None):
-#    """Performs GreedyFHist registration between moving and fixed image followed by
-#    transformation of provided data. GreedyFHist parameters are read from the 
-#    config file. Otherwise, uses default. Optionally, masks are loaded included
-#    in the registration. After registration, additionally provided data is transformed.
-#
-#
-#    Args:
-#        moving_image_path (Optional[str], optional): Defaults to None.
-#        fixed_image_path (Optional[str], optional): Defaults to None.
-#        output_directory (Optional[str], optional): Defaults to None.
-#        moving_mask_path (Optional[str], optional): Defaults to None.
-#        fixed_mask_path (Optional[str], optional): Defaults to None.
-#        path_to_greedy (Optional[str], optional): Defaults to None.
-#        use_docker_executable (bool, None): Defaults to None.
-#        config_path (Optional[str], optional): Defaults to None.
-#        images (Optional[List[str]], optional): Defaults to None.
-#        annotations (Optional[List[str]], optional): Defaults to None.
-#        pointsets (Optional[List[str]], optional): Defaults to None.
-#        geojsons (Optional[List[str]], optional): Defaults to None.
-#    """
-#    # Parse input parameters correctly.
-#    if images is None:
-#        images = []
-#    if annotations is None:
-#        annotations = []
-#    if pointsets is None:
-#        pointsets = []
-#    if geojsons is None:
-#        geojsons = []
-#
-#    if config_path is not None:
-#        with open(config_path) as f:
-#            config = toml.load(f)
-#    else:
-#        config = {}
-#    if 'gfh_options' in config:
-#        registration_options = RegistrationOptions.parse_cmdln_dict(config['gfh_options'])
-#    else:
-#        registration_options = RegistrationOptions.default_options()
-#    if use_docker_executable:
-#        registration_options.use_docker_container = use_docker_executable
-#    logging.info('Registration options are loaded.')
-#    if all_paths_are_none([moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path]):
-#        moving_image_path, fixed_image_path, moving_mask_path, fixed_mask_path = get_paths_from_config(config.get('input', None))
-#    if moving_image_path is None and fixed_image_path is None:
-#        raise Exception('No moving and fixed image path provided!')
-#
-#    output_directory = resolve_variable('output_directory', output_directory, config.get('options', None), 'out')
-#    path_to_greedy = resolve_variable('path_to_greedy', path_to_greedy, config.get('options', None), '')
-#    save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)
-#
-#    # Load image data.
-#    moving_histology_section = load_base_histology_section(
-#        image_path=moving_image_path,
-#        mask_path=moving_mask_path
-#    )
-#    
-#    for image_path in images:
-#        image = Image.load_from_path(image_path)
-#        moving_histology_section.additional_data.append(image)
-#    for annotation_path in annotations:
-#        annotation = Image.load_from_path(annotation_path, True)
-#        moving_histology_section.additional_data.append(annotation)
-#    for pointset_path in pointsets:
-#        pointset = Pointset.load_from_path(pointset_path)
-#        moving_histology_section.additional_data.append(pointset)
-#    for geojson_path in geojsons:
-#        geojson_data = GeoJsonData.load_from_path(geojson_path)
-#        moving_histology_section.additional_data.append(geojson_data)
-#
-#
-#    # Setup file structure
-#    output_directory_registrations = join(output_directory, 'transformation')
-#    create_if_not_exists(output_directory_registrations)
-#
-#    fixed_image = Image.load_from_path(fixed_image_path)
-#    fixed_mask = Image.load_from_path(fixed_mask_path, is_annotation=True) if fixed_mask_path is not None else None
-#
-#    logging.info('Loaded images. Starting registration.')
-#    logging.info(f'Registration options: {registration_options}')
-#    registerer = GreedyFHist(path_to_greedy=path_to_greedy, use_docker_container=use_docker_executable)
-#
-#    moving_mask = moving_histology_section.ref_mask.data if moving_histology_section.ref_mask is not None else None
-#    fixed_mask = fixed_mask.data if fixed_mask is not None else None
-#    registration_result = registerer.register(
-#        moving_histology_section.ref_image.data,
-#        fixed_image.data,
-#        moving_mask,
-#        fixed_mask,
-#        options=registration_options
-#    )
-#    logging.info('Registration finished.')
-#    if save_transform_to_file:
-#        registration_result.to_directory(output_directory_registrations)
-#        logging.info('Registration saved.')
-#
-#    
-#    output_directory_transformation_data = join(output_directory, 'transformed_data')
-#    create_if_not_exists(output_directory_transformation_data)
-#
-#    warped_histology_section = moving_histology_section.apply_transformation(
-#        registration_transforms=registration_result.registration,
-#        registerer=registerer)
-#    warped_histology_section.to_directory(output_directory_transformation_data)
-#    output_directory_transformation_data_prep = join(output_directory_transformation_data, 'preprocessing_data')
-#    create_if_not_exists(output_directory_transformation_data_prep)
-#    # Try writing masks to file.
-#    try:
-#        moving_preprocessing_mask = registration_result.registration.reg_params.moving_preprocessing_params['moving_img_mask']
-#        path = join(output_directory_transformation_data_prep, 'moving_mask.png')
-#        cv2.imwrite(path, moving_preprocessing_mask)
-#        fixed_preprocessing_mask = registration_result.registration.reg_params.fixed_preprocessing_params['fixed_img_mask']
-#        path = join(output_directory_transformation_data_prep, 'fixed_mask.png')
-#        cv2.imwrite(path, fixed_preprocessing_mask)
-#    except Exception:
-#        print('Masks could not be stored due to error.')
-
 
   
 def apply_transformation(
              output_directory: str | None = None,
              config_path: str | None = None,
              path_to_transform: str | None = None,
-             images: list[str] | None = None,
-             annotations: list[str] | None = None,
-             pointsets: list[str] | None = None,
-             geojsons: list[str] | None = None):
+             images: list[ImageConfig] | None = None,
+             pointsets: list[PointsetConfig] | None = None,
+             geojsons: list[str | PathLike] | None = None):
     """Transforms provided data from moving to fixed image space by
     load a computed transformation. If registration_result
     is None, a registration_result is read from file. Registration_result
@@ -704,8 +568,6 @@ def apply_transformation(
     pass
     if images is None:
         images = []
-    if annotations is None:
-        annotations = []
     if pointsets is None:
         pointsets = []
     if geojsons is None:
@@ -727,24 +589,21 @@ def apply_transformation(
     registration_result = RegistrationTransforms.load(path_to_transform)
 
     moving_histology_section = HistologySection(ref_image=None, ref_mask=None)
-    for image_path in images:
-        image = Image.load_from_path(image_path)
+    for image_config in images:
+        image = image_config.load_image()
         moving_histology_section.additional_data.append(image)
-    for annotation_path in annotations:
-        annotation = Image.load_from_path(annotation_path, is_annotation=True)
-        moving_histology_section.additional_data.append(annotation)
-    for pointset_path in pointsets:
-        pointset = Pointset.load_from_path(pointset_path)
+    for pointset_config in pointsets:
+        pointset = pointset_config.load_pointset()
         moving_histology_section.additional_data.append(pointset)
     for geojson_path in geojsons:
         geojson_data = GeoJsonData.load_from_path(geojson_path)
         moving_histology_section.additional_data.append(geojson_data)
     
     # Setup file structure
-    output_directory_registrations = join(output_directory, 'registrations')
+    output_directory_registrations = join(output_directory, 'registrations') # type: ignore
     create_if_not_exists(output_directory_registrations)
 
-    output_directory_transformation_data = join(output_directory, 'transformed_data')
+    output_directory_transformation_data = join(output_directory, 'transformed_data') # type: ignore
     create_if_not_exists(output_directory_transformation_data)
 
     warped_histology_section = moving_histology_section.apply_transformation(
@@ -766,8 +625,8 @@ def groupwise_registration(moving_images_config: list[ImageConfig],
         config_path (str):
     """
     pass
-    if config_path is not None:
-        with open(config_path) as f:
+    if config is not None:
+        with open(config) as f:
             config = toml.load(f)
     else:
         config = {}
@@ -775,16 +634,17 @@ def groupwise_registration(moving_images_config: list[ImageConfig],
     options = RegistrationOptions.parse_cmdln_dict(reg_opts)
 
     path_to_greedy = resolve_variable('path_to_greedy', None, config.get('options', None), '')
-    use_docker_executable = resolve_variable('use_docker_container', None, config.get('options', None), False)
+    use_docker_executable = resolve_variable('use_docker_container', None, config.get('options', None), False) # type: ignore
     save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)        
-    output_directory = resolve_variable('output_directory', None, config.get('options', None), 'out')
-    registerer = GreedyFHist(path_to_greedy=path_to_greedy, use_docker_container=use_docker_executable)
+    output_directory = resolve_variable('output_directory', None, config.get('options', None), 'out') # type: ignore
+    registerer = GreedyFHist(path_to_greedy=path_to_greedy, # type: ignore
+                             use_docker_container=use_docker_executable)
 
     sections = load_sections(config['input'])
 
     img_mask_list = []
     for section in sections:
-        img = section.ref_image.data
+        img = section.ref_image.data.squeeze() # type: ignore
         mask = section.ref_mask.data if section.ref_mask is not None else None
         img_mask_list.append((img, mask))
     group_reg, _ = registerer.groupwise_registration(img_mask_list,
