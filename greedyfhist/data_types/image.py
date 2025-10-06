@@ -109,7 +109,7 @@ class Image:
     is_ome: bool = False
     interpolation_modes: dict[str, dict[str, INTERPOLATION_TYPE]]  = field(default_factory=default_interpolation_dict)
     metadata: dict = field(default_factory=dict) 
-    do_auto_squeeze: bool = False
+    do_auto_squeeze: bool = True
     
     def __post_init__(self):
         try:
@@ -229,7 +229,7 @@ class Image:
                        main_channel: int | str = 0,
                        reader: str | abc.ABCMeta | None = None,
                        interpolation_config: InterpolationConfig | None = None,
-                       do_auto_squeeze: bool = False):
+                       do_auto_squeeze: bool = True):
             img_data = read_bioio_image(path, reader)
             scenes = img_data.scenes
             channels = []
@@ -261,7 +261,7 @@ class Image:
         main_channel = config.get('main_channel', 0)
         reader = config.get('reader', '')
         interpolation_config = config.get('interpolation_config', None)
-        do_auto_squeeze = config.get('do_auto_squeeze', False)
+        do_auto_squeeze = config.get('do_auto_squeeze', True)
         return cls.load_from_path(
             path=path,
             order=order,

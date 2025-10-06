@@ -25,6 +25,12 @@ except:
     pass
 
 try:
+    import bioio_tifffile
+    available_plugins.append(bioio_tifffile)
+except:
+    pass
+
+try:
     import bioio_imageio # type: ignore
     available_plugins.append(bioio_imageio)
 except:
@@ -76,7 +82,7 @@ def read_bioio_image(path: str | PathLike, reader_plugin: str | abc.ABCMeta | No
         try:
             image = BioImage(path, reader=plugin.Reader)
             return image
-        except UnsupportedFileFormatError as e:
+        except Exception as e:
             err_msg = f'{plugin.__name__}: {e}'
             caught_exceptions.append(err_msg)
     err_msg = f'File: {path} could not be loaded with plugin: {reader_plugin}. Caught exceptions during reading: {caught_exceptions}'
@@ -249,6 +255,10 @@ def write_to_ometiffile(img: numpy.ndarray,
     img_vips.set_type(pyvips.GValue.gint_type, "page-height", img_vips.height)
     img_vips.set_type(pyvips.GValue.gstr_type, "image-description", ome_metadata_xml_string)
     img_vips.tiffsave(path, tile=tile, tile_width=tile_size, tile_height=tile_size, pyramid=pyramid, bigtiff=bigtiff)
+
+
+
+
 
 
 def is_tiff_file(suffix: str) -> bool:

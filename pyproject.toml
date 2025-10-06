@@ -48,7 +48,8 @@ dependencies = [
     "bioio",
     "bioio-imageio",
     "bioio-ome-tiff",
-    "bioio-bioformats"
+    "bioio-bioformats",
+    "bioio-tifffile"
 ]
 
 [tool.poetry.dev-dependencies]

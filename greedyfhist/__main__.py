@@ -142,81 +142,17 @@ def register(moving_image,
 # TODO: Explicit arguments for groupwise registration is missing
 # IDEA: Write image with associated annotations in a list.
 # Then just register all of that and write in separate directories as a result.
-@click.command()
-@click.option('-m',
-              '-mov', 
-              '--moving-image',
-              '--moving',
-              type=ImageConfigParamType(), 
-              multiple=True,
-              help='Moving image params.')
-@click.option('-f',
-              '-fix',
-              '--fixed-image',
-              '--fixed',
-              type=ImageConfigParamType(), 
-              help='Fixed image params')
-@click.option('-o',
-              '-out',
-              '--output',
-              '--output-directory',
-              type=click.Path(),
-              required=False,
-              default='out',
-              help='Output directory.')
-@click.option('-mm',
-              '-mmask',
-              '--moving-mask',
-              '--moving-image-mask',
-              type=ImageMaskConfigParamType(),
-              multiple=True,
-              required=False,
-              help='Path to optional mask for moving image. Will be applied in the same order as moving images.')
-@click.option('-fm',
-              '-fmask',
-              '--fixed-mask',
-              '--fixed-image-mask',
-              type=ImageMaskConfigParamType(),
-              required=False,
-              help='Path to optional mask for fixed image.')
-@click.option('-g',
-              '--path-to-greedy',
-              '--greedy',
-              type=click.Path(),
-              required=False,
-              help='Path to Greedy. If not provided assumes that Greedy is in the PATH environment variable.')
-@click.option('-d',
-              '--use-docker-executable',
-              type=click.BOOL,
-              default=False,
-              help='If the greedy is used as a docker executable, set this to True.')
+@cli.command('groupwise-registration')
 @click.option('-c',
               '--config',
               '--config_path',
               type=click.Path(),
               required=False,
-              help='Additional config parameters. Any parameters placed in config will override commandline arguments.')
-def groupwise_registration(
-             moving_image,
-             fixed_image,
-             output,
-             moving_mask,
-             fixed_mask,
-             path_to_greedy,
-             use_docker_executable,
-             config):
-    cmdln_processor.groupwise_registration(
-        moving_images_config=moving_image,
-        fixed_image_config=fixed_image,
-        output_directory=output,
-        moving_masks_config=moving_mask,
-        fixed_mask_config=fixed_mask,
-        path_to_greedy=path_to_greedy,
-        use_docker_executable=use_docker_executable,
-        config=config)
+              help='Config parameters to run groupwise registration.')
+def groupwise_registration(config):
+    cmdln_processor.groupwise_registration(config=config)
 
 
-# TODO: Fix this. Should only be needed for 
 @click.command()
 @click.option('-o',
               '-out',

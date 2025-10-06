@@ -173,7 +173,6 @@ class ImageConfig:
                 parsed_args[arg_key] = arg_value
             else:
                 parsed_args[key] = arg_str
-        print(parsed_args)
         return cls(**parsed_args)
 
 
@@ -611,14 +610,15 @@ def apply_transformation(
     warped_histology_section.to_directory(output_directory_transformation_data)
 
 
-def groupwise_registration(moving_images_config: list[ImageConfig],
-                           fixed_image_config: ImageConfig,
-                           output_directory: str,
-                           moving_masks_config: list[ImageConfig],
-                           fixed_mask_config: ImageConfig | None,
-                           path_to_greedy: str | PathLike | None,
-                           use_docker_executable: bool,
-                           config):
+# def groupwise_registration(moving_images_config: list[ImageConfig],
+#                            fixed_image_config: ImageConfig,
+#                            output_directory: str,
+#                            moving_masks_config: list[ImageConfig],
+#                            fixed_mask_config: ImageConfig | None,
+#                            path_to_greedy: str | PathLike | None,
+#                            use_docker_executable: bool,
+#                            config):
+def groupwise_registration(config):
     """Performs groupwise registration based on config.
 
     Args:
@@ -633,10 +633,10 @@ def groupwise_registration(moving_images_config: list[ImageConfig],
     reg_opts = config.get('gfh_options', {})
     options = RegistrationOptions.parse_cmdln_dict(reg_opts)
 
-    path_to_greedy = resolve_variable('path_to_greedy', None, config.get('options', None), '')
-    use_docker_executable = resolve_variable('use_docker_container', None, config.get('options', None), False) # type: ignore
-    save_transform_to_file = resolve_variable('save_transform_to_file', None, config.get('options', None), True)        
-    output_directory = resolve_variable('output_directory', None, config.get('options', None), 'out') # type: ignore
+    path_to_greedy: str = resolve_variable('path_to_greedy', None, config.get('options', None), '') # type: ignore
+    use_docker_executable: bool = resolve_variable('use_docker_container', None, config.get('options', None), False) # type: ignore
+    save_transform_to_file: bool = resolve_variable('save_transform_to_file', None, config.get('options', None), True)  #type: ignore      
+    output_directory: str = resolve_variable('output_directory', None, config.get('options', None), 'out') # type: ignore
     registerer = GreedyFHist(path_to_greedy=path_to_greedy, # type: ignore
                              use_docker_container=use_docker_executable)
 
