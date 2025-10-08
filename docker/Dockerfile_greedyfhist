@@ -7,7 +7,16 @@ RUN apt install -y python3.10
 RUN apt install python3-pip -y
 RUN pip install --upgrade pip
 RUN apt install libvips-dev -y
-RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc5
+# Install openjdk and maven for bioformats
+RUN apt install openjdk-21-jdk -y
+WORKDIR temp
+RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz | tar xfvz
+ENV PATH="$PATH:/temp/apache-maven-3.9.11/bin" 
+WORKDIR /
+
+# Install GreedyFHist
+RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc6
+RUN mkdir data
 
 ENTRYPOINT ["greedyfhist"]
 

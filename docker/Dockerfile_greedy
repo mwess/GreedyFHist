@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 RUN apt-get update && \
-    apt-get upgrade -y && \
+#    apt-get upgrade -y && \
     apt-get install -y git
 RUN apt-get update && apt-get -y install cmake protobuf-compiler
 RUN apt-get update && apt-get upgrade -y && apt-get -y --no-install-recommends install \
