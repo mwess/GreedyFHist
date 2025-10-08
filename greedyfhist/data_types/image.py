@@ -100,16 +100,27 @@ def default_interpolation_dict():
 class Image:
     
     img_data: BioImage
+    
+    # Original file path
     path: str | PathLike
-    # Use standard order of the BioImage if nothing else is added.
+    # Order set in the file. Use standard order of the BioImage if nothing else is added.
     order: str
+    # Main scene/page/image of the file.
     main_image: int | str = 0
+    # Main channel of the image.
     main_channel: int | str = 0
+    # Reader used for initializing bioimage
     reader: str | abc.ABCMeta | None = None
+    # Check if file is ome
     is_ome: bool = False
+    # Overcomplicated structure for various interpolation modes
     interpolation_modes: dict[str, dict[str, INTERPOLATION_TYPE]]  = field(default_factory=default_interpolation_dict)
+    # Metadata from bioimage that is relevant for writing a new file.
     metadata: dict = field(default_factory=dict) 
-    do_auto_squeeze: bool = True
+    # This is the order of the images that we are going to use. Since we end up using either 3d or 2d images, 
+    # the order will be YXS, if interleaved channels, such as RGB are available, and YX if its a 2d image. 
+    # T, Z can be ignored for our use case and C is always treated separately.
+    data_retrieval_order: str = ''
     
     def __post_init__(self):
         try:
@@ -144,6 +155,7 @@ class Image:
             'dim_order': dim_order            
         }
         self.metadata = metadata
+        self.data_retrieval_order = 'YXS' if 'S' in self.order else 'YX'
             
     @property
     @reset_scene_after_use
@@ -154,9 +166,7 @@ class Image:
             channel_idx = channel_names.index(self.main_channel)
         else:
             channel_idx = self.main_channel
-        data = self.img_data.get_image_data(self.order, C=channel_idx)
-        if self.do_auto_squeeze:
-            data = data.squeeze()
+        data = self.img_data.get_image_data(self.data_retrieval_order, C=channel_idx)
         return data
         
     @reset_scene_after_use
@@ -197,8 +207,7 @@ class Image:
             reader=self.reader,
             is_ome=self.is_ome,
             interpolation_modes=self.interpolation_modes,
-            metadata=self.metadata,
-            do_auto_squeeze=self.do_auto_squeeze
+            metadata=self.metadata
         )
         return new_image
 
@@ -212,7 +221,7 @@ class Image:
 
     def to_file(self, path: str | PathLike):
         OmeTiffWriter.save(
-            data=self.data,
+            data=self.img_data.data,
             uri=path,
             dim_order=self.order,
             ome_xml=self.metadata['ome_xml'] if self.is_ome else None,
@@ -228,8 +237,7 @@ class Image:
                        main_image: int | str = 0,
                        main_channel: int | str = 0,
                        reader: str | abc.ABCMeta | None = None,
-                       interpolation_config: InterpolationConfig | None = None,
-                       do_auto_squeeze: bool = True):
+                       interpolation_config: InterpolationConfig | None = None):
             img_data = read_bioio_image(path, reader)
             scenes = img_data.scenes
             channels = []
@@ -249,8 +257,7 @@ class Image:
                        main_image=main_image,
                        main_channel=main_channel,
                        reader=reader,
-                       interpolation_modes=interpolation_modes,
-                       do_auto_squeeze=do_auto_squeeze
+                       interpolation_modes=interpolation_modes
                        )
     
     @classmethod
@@ -261,15 +268,13 @@ class Image:
         main_channel = config.get('main_channel', 0)
         reader = config.get('reader', '')
         interpolation_config = config.get('interpolation_config', None)
-        do_auto_squeeze = config.get('do_auto_squeeze', True)
         return cls.load_from_path(
             path=path,
             order=order,
             main_image=main_image,
             main_channel=main_channel,
             reader=reader,
-            interpolation_config=interpolation_config,
-            do_auto_squeeze=do_auto_squeeze
+            interpolation_config=interpolation_config
         )
         
     @staticmethod

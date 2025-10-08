@@ -190,10 +190,6 @@ def groupwise_registration(config):
               type=click.Path(),
               required=False,
               help='Additional config parameters. Any parameters placed in config will override commandline arguments.')
-@click.option('-c',
-              '--config', 
-              type=click.Path(), 
-              required=False)
 def transform(output,
               transformation,
               images,

@@ -18,6 +18,21 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 # TODO: Add others that arent installed yet.
 available_plugins = []
 
+try: 
+    import bioio_bioformats # type: ignore
+    available_plugins.append(bioio_bioformats)
+    # Disable logging
+    
+    # We need to run this command scyjava.config.endpoints.append("ome:formats-gpl:6.7.0"), but since it hard links to another file that might
+    # change in the future, just execute the following line:
+    bioio_bioformats.utils._try_get_loci()
+    from scyjava import jimport # type: ignore
+    DebugTools = jimport('loci.common.DebugTools')
+    DebugTools.setRootLevel("OFF"); # Bio-Formats
+except:
+    pass
+
+
 try:
     import bioio_ome_tiff
     available_plugins.append(bioio_ome_tiff)
@@ -36,15 +51,6 @@ try:
 except:
     pass
 
-try: 
-    import bioio_bioformats # type: ignore
-    available_plugins.append(bioio_bioformats)
-    # Disable logging
-    from scyjava import jimport # type: ignore
-    DebugTools = jimport('loci.common.DebugTools')
-    DebugTools.setRootLevel("OFF"); # Bio-Formats
-except:
-    pass
 
 import numpy, numpy as np
 import pyvips

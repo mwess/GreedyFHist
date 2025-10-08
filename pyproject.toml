@@ -46,10 +46,11 @@ dependencies = [
     "multiprocess (>=0.70.17)",
     "matplotlib (>=3.10.0)",
     "bioio",
-    "bioio-imageio",
-    "bioio-ome-tiff",
     "bioio-bioformats",
-    "bioio-tifffile"
+    "bioio-ome-tiff",
+    "bioio-imageio",
+    "bioio-tifffile",
+    "bioio_ome_zarr"
 ]
 
 [tool.poetry.dev-dependencies]
