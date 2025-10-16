@@ -1,13 +1,17 @@
 import abc
 from dataclasses import dataclass, field
+import os
 from os import PathLike
+from os.path import join
 from typing import Iterable
 
 from bioio import BioImage
-import numpy as np
+from bioio_ome_tiff.writers import OmeTiffWriter
+import numpy, numpy as np
 
 from greedyfhist.registration.greedy_f_hist import GreedyFHist, RegistrationTransforms
-from greedyfhist.utils.io import read_bioio_image
+from greedyfhist.utils.decorators import reset_scene_after_use
+from greedyfhist.utils.io import read_bioio_image, write_to_ometiffile
 
 
 INTERPOLATION_TYPE = int | str
@@ -68,7 +72,7 @@ class InterpolationConfig:
         # Convert interpolate_per_scene and interpolate_per_channel to dicts
         if isinstance(self.interpolate_per_scene, list):
             self.interpolate_per_scene = convert_list_to_dict(scenes, self.interpolate_per_scene, self.interpolate_default)
-        self.interpolate_per_scene = InterpolationConfig.convert_interpolate_per_channel_to_dict(scene_channel_dict,
+        self.interpolate_per_channel = InterpolationConfig.convert_interpolate_per_channel_to_dict(scene_channel_dict,
                                                                                                  self.interpolate_per_channel,
                                                                                                  self.interpolate_default)
         interp_dict = {}
@@ -76,13 +80,14 @@ class InterpolationConfig:
             if skey not in interp_dict:
                 interp_dict[skey] = {}
             for ckey in scene_channel_dict[skey]:
-                if self.interpolate_per_channel\
+                if not self.interpolate_per_channel\
+                   or (self.interpolate_per_channel\
                    and skey not in self.interpolate_per_channel\
-                   and not ckey in self.interpolate_per_channel[skey]: # type: ignore
-                    if self.interpolate_per_scene and skey not in self.interpolate_per_scene:
-                        interp_value = self.interpolate_default
-                    else:
+                   and not ckey in self.interpolate_per_channel[skey]): # type: ignore
+                    if self.interpolate_per_scene and skey in self.interpolate_per_scene:
                         interp_value = self.interpolate_per_scene[skey]
+                    else:
+                        interp_value = self.interpolate_default
                 else:
                     interp_value = self.interpolate_per_channel[skey][ckey] # type: ignore
                 interp_dict[skey][ckey] = interp_value
@@ -95,16 +100,27 @@ def default_interpolation_dict():
 class Image:
     
     img_data: BioImage
+    
+    # Original file path
     path: str | PathLike
-    # Use standard order of the BioImage if nothing else is added.
-    order: str = ''
+    # Order set in the file. Use standard order of the BioImage if nothing else is added.
+    order: str
+    # Main scene/page/image of the file.
     main_image: int | str = 0
+    # Main channel of the image.
     main_channel: int | str = 0
-    reader: str | abc.ABCMeta = ''
+    # Reader used for initializing bioimage
+    reader: str | abc.ABCMeta | None = None
+    # Check if file is ome
     is_ome: bool = False
+    # Overcomplicated structure for various interpolation modes
     interpolation_modes: dict[str, dict[str, INTERPOLATION_TYPE]]  = field(default_factory=default_interpolation_dict)
-    metadata: dict | None = None
-    do_auto_squeeze: bool = False
+    # Metadata from bioimage that is relevant for writing a new file.
+    metadata: dict = field(default_factory=dict) 
+    # This is the order of the images that we are going to use. Since we end up using either 3d or 2d images, 
+    # the order will be YXS, if interleaved channels, such as RGB are available, and YX if its a 2d image. 
+    # T, Z can be ignored for our use case and C is always treated separately.
+    data_retrieval_order: str = ''
     
     def __post_init__(self):
         try:
@@ -139,21 +155,21 @@ class Image:
             'dim_order': dim_order            
         }
         self.metadata = metadata
+        self.data_retrieval_order = 'YXS' if 'S' in self.order else 'YX'
             
     @property
+    @reset_scene_after_use
     def data(self):
-        self.img_data.set_scene(self.main_image)
         # Get channel idx
         if isinstance(self.main_channel , str):
             channel_names = self.img_data.get_channel_names()
             channel_idx = channel_names.index(self.main_channel)
         else:
             channel_idx = self.main_channel
-        data = self.img_data.get_image_data(self.order, C=channel_idx)
-        if self.do_auto_squeeze:
-            data = data.squeeze()
+        data = self.img_data.get_image_data(self.data_retrieval_order, C=channel_idx)
         return data
         
+    @reset_scene_after_use
     def transform_data(self, 
                        registerer: GreedyFHist, 
                        transformation: RegistrationTransforms) -> 'Image':
@@ -191,23 +207,37 @@ class Image:
             reader=self.reader,
             is_ome=self.is_ome,
             interpolation_modes=self.interpolation_modes,
-            metadata=self.metadata,
-            do_auto_squeeze=self.do_auto_squeeze
+            metadata=self.metadata
         )
         return new_image
 
-    def save(self, directory: str):
-        pass
-    
+    def to_directory(self, path: str | PathLike):
+        fname = os.path.basename(self.path)
+        name, _ = os.path.splitext(fname)
+        if name.endswith('.ome'):
+            name = name.rsplit('.ome', maxsplit=1)[0]
+        path = join(path, f'{name}.ome.tif')
+        self.to_file(path)
+
+    def to_file(self, path: str | PathLike):
+        OmeTiffWriter.save(
+            data=self.img_data.data,
+            uri=path,
+            dim_order=self.order,
+            ome_xml=self.metadata['ome_xml'] if self.is_ome else None,
+            channel_names=self.metadata.get('channel_names', None),
+            image_name=self.metadata.get('image_names', None),
+            physical_pixel_sizes=self.metadata.get('physical_pixel_sizes', None)
+        )
+
     @classmethod
     def load_from_path(cls, 
                        path: str | PathLike,
-                       order: str = '',
+                       order: str | None = None,
                        main_image: int | str = 0,
                        main_channel: int | str = 0,
-                       reader: str | abc.ABCMeta = '',
-                       interpolation_config: InterpolationConfig | None = None,
-                       do_auto_squeeze: bool = False):
+                       reader: str | abc.ABCMeta | None = None,
+                       interpolation_config: InterpolationConfig | None = None):
             img_data = read_bioio_image(path, reader)
             scenes = img_data.scenes
             channels = []
@@ -219,31 +249,36 @@ class Image:
             if interpolation_config is None:
                 interpolation_config = InterpolationConfig()
             interpolation_modes = interpolation_config.get_interpolation_modes(scenes, channels)
+            if order is None:
+                order = img_data.dims.order
             return cls(img_data=img_data,
                        path=path,
-                       order=order,
+                       order=order, # type: ignore
                        main_image=main_image,
                        main_channel=main_channel,
                        reader=reader,
-                       interpolation_modes=interpolation_modes,
-                       do_auto_squeeze=do_auto_squeeze
+                       interpolation_modes=interpolation_modes
                        )
     
     @classmethod
     def load_from_config(cls, config: dict):
         path = config['path']
-        order = config.get('order', '')
+        order = config.get('order', None)
         main_image = config.get('main_image', 0)
         main_channel = config.get('main_channel', 0)
         reader = config.get('reader', '')
         interpolation_config = config.get('interpolation_config', None)
-        do_auto_squeeze = config.get('do_auto_squeeze', False)
         return cls.load_from_path(
             path=path,
             order=order,
             main_image=main_image,
             main_channel=main_channel,
             reader=reader,
-            interpolation_config=interpolation_config,
-            do_auto_squeeze=do_auto_squeeze
+            interpolation_config=interpolation_config
         )
+        
+    @staticmethod
+    def write_numpy_to_ometiff(image: numpy.ndarray,
+                               path: str | PathLike):
+        bimg = BioImage(image)
+        

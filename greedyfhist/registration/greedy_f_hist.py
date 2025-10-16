@@ -242,8 +242,7 @@ def _reassemble_to_gfh_transform(displ_tiles: list[ImageTile],
     return gfh_transform
 
 
-# TODO: Set paths
-# TODO: This function doesnt work anymore, because we have kicked out pyvips. Fix!
+# TODO: This function needs to be updated when the new tif reading functionality is implemented.
 def register_from_filepaths(moving_img_path: str,
                             fixed_img_path: str,
                             target_img_path: str,
