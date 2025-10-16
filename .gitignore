@@ -41,3 +41,5 @@ docs/build/
 doc_source/
 
 .idea/
+
+.venv/

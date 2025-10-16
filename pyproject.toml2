@@ -1,14 +1,28 @@
+#[build-system]
+#requires = ["poetry>=2.0.0"]
+#build-backend = "poetry.masonry.api"
+
+[tool.black]
+line-length = 79
+
+[tool.poetry]
+version = "0.0.3-rc6"
+readme = "README.md"
+
 [project]
 name = "GreedyFHist"
 description = "Registration for stained histology images"
+#authors = ["Maximilian Wess <maximilian.wess@ntnu.no>"]
 authors = [
     {name = "Maximilian Wess", email = "maximilian.wess@ntnu.no"},
 ]
 dynamic = ["version"]
-license = "MIT"
+license = {text = "MIT"}
 requires-python = ">=3.11"
-version = "0.0.3-rc6"
-readme = "README.md"
+
+include = [
+    { path = "greedyfhist/model_data/segmentation/default_yolo.onnx", format = ["sdist", "wheel"] }
+]
 
 dependencies = [
     "click (>=8.1.7)",
@@ -39,23 +53,8 @@ dependencies = [
     "bioio_ome_zarr (>=3.0.0)"
 ]
 
-[build-system]
-requires = ["poetry-core>=2,<3"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.black]
-line-length = 79
-
-
-#    [tool.uv.build-backend]
-#
-include = [
-    { path = "greedyfhist/model_data/segmentation/default_yolo.onnx", format = ["sdist", "wheel"] }
-]
-
-[tool.poetry.group.dev.dependencies]
+[tool.poetry.dev-dependencies]
 mypy = "^0.812"
 
-[project.scripts]
+[tool.poetry.scripts]
 greedyfhist = "greedyfhist.__main__:cli"
-
