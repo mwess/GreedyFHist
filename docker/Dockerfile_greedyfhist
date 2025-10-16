@@ -10,7 +10,8 @@ ENV PATH=/root/.local/bin:$PATH
 RUN source /root/.local/bin/env
 RUN mkdir /app
 WORKDIR /app
-RUN uv venv --python 3.11
+RUN uv python install 3.11 #--default --force
+# RUN uv venv --python 3.11
 
 RUN apt install libvips-dev -y
 # Install openjdk and maven for bioformats
@@ -22,7 +23,9 @@ ENV PATH="$PATH:/temp/apache-maven-3.9.11/bin"
 WORKDIR /app
 
 # Install GreedyFHist
-RUN uv pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc6
+# RUN uv pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc6
+RUN python3.11 -m pip install git+https://github.com/mwess/greedyfhist
+RUN greedyfhist
 RUN mkdir /data
 
 ENTRYPOINT ["greedyfhist"]
