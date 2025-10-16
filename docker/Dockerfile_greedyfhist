@@ -1,22 +1,29 @@
 FROM mwess89/greedy:1.3.0-alpha
 
-RUN apt update && apt-get install -y software-properties-common
+SHELL ["/bin/bash", "-c"]
+RUN apt update && apt-get install -y software-properties-common curl
 RUN apt update --fix-missing
-RUN add-apt-repository -y ppa:deadsnakes/ppa
-RUN apt install -y python3.10
-RUN apt install python3-pip -y
-RUN pip install --upgrade pip
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN echo $PATH
+RUN echo $HOME
+ENV PATH=/root/.local/bin:$PATH
+RUN source /root/.local/bin/env
+RUN mkdir /app
+WORKDIR /app
+RUN uv venv --python 3.11
+
 RUN apt install libvips-dev -y
 # Install openjdk and maven for bioformats
 RUN apt install openjdk-21-jdk -y
-WORKDIR temp
-RUN wget https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz | tar xfvz
+RUN mkdir /temp
+WORKDIR /temp
+RUN wget -qO- https://dlcdn.apache.org/maven/maven-3/3.9.11/binaries/apache-maven-3.9.11-bin.tar.gz | tar xfvz -
 ENV PATH="$PATH:/temp/apache-maven-3.9.11/bin" 
-WORKDIR /
+WORKDIR /app
 
 # Install GreedyFHist
-RUN pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc6
-RUN mkdir data
+RUN uv pip install git+https://github.com/mwess/greedyfhist@v0.0.3-rc6
+RUN mkdir /data
 
 ENTRYPOINT ["greedyfhist"]
 
