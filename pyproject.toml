@@ -46,9 +46,6 @@ build-backend = "poetry.core.masonry.api"
 [tool.black]
 line-length = 79
 
-
-#    [tool.uv.build-backend]
-#
 include = [
     { path = "greedyfhist/model_data/segmentation/default_yolo.onnx", format = ["sdist", "wheel"] }
 ]
